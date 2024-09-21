@@ -46,7 +46,7 @@ view model =
             [ text "You can see the code for this example in the "
             , a
                 [ title "git repo"
-                , href (rteToolkit ++ "/tree/master/demo/src/Page/Basic.elm")
+                , href (rteToolkit ++ "/tree/master/docs/src/Page/Basic.elm")
                 ]
                 [ text "git repo." ]
             ]

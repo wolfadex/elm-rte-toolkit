@@ -15,5 +15,3 @@ node_modules
 
 # Ignore IDE files
 .idea
-
-js-dist

@@ -9,7 +9,7 @@ This package was heavily inspired by other rich text editor frameworks like Pros
 ## Resources
 
 -   Elm Package: https://package.elm-lang.org/packages/wolfadex/elm-rte-toolkit/latest/
--   Demo page: https://wolfadex.github.io/elm-rte-toolkit (source code is in the [demo](demo) directory)
+-   Demo page: https://wolfadex.github.io/elm-rte-toolkit (source code is in the [demo](docs) directory)
 -   Wiki: https://github.com/wolfadex/elm-rte-toolkit/wiki
 
 ## Getting started
@@ -72,14 +72,14 @@ The demo was bootstrapped with [create-elm-app](https://github.com/halfzebra/cre
 To debug the demo locally, run the following from the repository's root directory:
 
 ```bash
-cd demo
+cd docs
 elm-app start
 ```
 
 To build the demo, run the following from the repository's root directory:
 
 ```bash
-cd demo
+cd docs
 ./build.sh
 ```
 
@@ -92,7 +92,7 @@ For now, because of mysterious package issues with elm-test I don't want to debu
 tests for the package are in the demo app folder. To run tests:
 
 ```bash
-cd demo
+cd docs
 elm-test
 ```
 

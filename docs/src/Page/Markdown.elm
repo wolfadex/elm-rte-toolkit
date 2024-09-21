@@ -120,7 +120,7 @@ view model =
             [ text "You can see the code for this example in the "
             , a
                 [ title "git repo"
-                , href (rteToolkit ++ "/tree/master/demo/src/Page/Markdown.elm")
+                , href (rteToolkit ++ "/tree/master/docs/src/Page/Markdown.elm")
                 ]
                 [ text "git repo." ]
             ]
