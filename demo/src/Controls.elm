@@ -1,7 +1,7 @@
 module Controls exposing (..)
 
-import FontAwesome.Icon as Icon exposing (Icon)
-import FontAwesome.Solid as Solid
+import FontAwesome exposing (Icon)
+import FontAwesome.Solid
 import Html exposing (Attribute, Html, div, span)
 import Html.Attributes exposing (class)
 import Html.Events exposing (preventDefaultOn)
@@ -165,7 +165,7 @@ onButtonPressInsertHR =
     preventDefaultOn "mousedown" (succeed ( InsertHorizontalRule, True ))
 
 
-createButtonForStyle : ControlState -> Style -> Icon -> Html EditorMsg
+createButtonForStyle : ControlState -> Style -> Icon hasId -> Html EditorMsg
 createButtonForStyle controlState style icon =
     let
         status =
@@ -177,7 +177,7 @@ createButtonForStyle controlState style icon =
     createButton status (onButtonPressToggleStyle style) icon title
 
 
-createButton : Status -> Html.Attribute EditorMsg -> Icon -> String -> Html EditorMsg
+createButton : Status -> Html.Attribute EditorMsg -> Icon hasId -> String -> Html EditorMsg
 createButton status actionAttribute icon title =
     span
         ([ actionAttribute, Html.Attributes.title title, class "rte-button" ]
@@ -192,7 +192,7 @@ createButton status actionAttribute icon title =
                         [ class "rte-enabled" ]
                )
         )
-        [ Icon.viewIcon icon ]
+        [ FontAwesome.view icon ]
 
 
 inlineElementButtons : ControlState -> List (Html EditorMsg)
@@ -225,9 +225,9 @@ inlineElementButtons controlState =
             else
                 Enabled
     in
-    [ createButton codeStatus onButtonPressInsertCode Solid.code "code"
-    , createButton linkStatus onButtonPressInsertLink Solid.link "link"
-    , createButton imageStatus onButtonPressInsertImage Solid.image "image"
+    [ createButton codeStatus onButtonPressInsertCode FontAwesome.Solid.code "code"
+    , createButton linkStatus onButtonPressInsertLink FontAwesome.Solid.link "link"
+    , createButton imageStatus onButtonPressInsertImage FontAwesome.Solid.image "image"
     ]
 
 
@@ -248,11 +248,11 @@ blockElements controlStatus =
             else
                 Disabled
     in
-    [ createButton blockStatus (onButtonPressToggleList Ordered) Solid.listOl "ordered list"
-    , createButton blockStatus (onButtonPressToggleList Unordered) Solid.listUl "unordered list"
-    , createButton blockStatus onButtonPressInsertHR Solid.minus "horizontal rule"
-    , createButton blockStatus onButtonPressWrapBlockquote Solid.quoteRight "blockquote"
-    , createButton liftStatus onButtonPressLiftOutOfBlock Solid.outdent "lift"
+    [ createButton blockStatus (onButtonPressToggleList Ordered) FontAwesome.Solid.listOl "ordered list"
+    , createButton blockStatus (onButtonPressToggleList Unordered) FontAwesome.Solid.listUl "unordered list"
+    , createButton blockStatus onButtonPressInsertHR FontAwesome.Solid.minus "horizontal rule"
+    , createButton blockStatus onButtonPressWrapBlockquote FontAwesome.Solid.quoteRight "blockquote"
+    , createButton liftStatus onButtonPressLiftOutOfBlock FontAwesome.Solid.outdent "lift"
     ]
 
 
@@ -276,7 +276,7 @@ headerElements controlState =
                 title
         )
         [ "H1", "Code block" ]
-        [ Solid.heading, Solid.codeBranch ]
+        [ FontAwesome.Solid.heading, FontAwesome.Solid.codeBranch ]
         [ "heading", "code block" ]
 
 
@@ -381,23 +381,23 @@ deriveControlState editor =
             }
 
 
-styleToIcon : Style -> Icon
+styleToIcon : Style -> Icon FontAwesome.WithoutId
 styleToIcon style =
     case style of
         Bold ->
-            Solid.bold
+            FontAwesome.Solid.bold
 
         Italic ->
-            Solid.italic
+            FontAwesome.Solid.italic
 
         Code ->
-            Solid.code
+            FontAwesome.Solid.code
 
         Strikethrough ->
-            Solid.strikethrough
+            FontAwesome.Solid.strikethrough
 
         Underline ->
-            Solid.underline
+            FontAwesome.Solid.underline
 
 
 editorControlPanel : List Style -> Editor -> Html EditorMsg
@@ -439,7 +439,7 @@ undoRedo controlState =
             Disabled
         )
         (preventDefaultOn "mousedown" (succeed ( Undo, True )))
-        Solid.undo
+        FontAwesome.Solid.undo
         "undo"
     , createButton
         (if controlState.hasRedo then
@@ -449,7 +449,7 @@ undoRedo controlState =
             Disabled
         )
         (preventDefaultOn "mousedown" (succeed ( Redo, True )))
-        Solid.redo
+        FontAwesome.Solid.redo
         "redo"
     ]
 

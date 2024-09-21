@@ -68,7 +68,7 @@ viewMenu page =
             navbarLink page
     in
     [ linkTo Route.Examples [ text "Examples" ]
-    , navbarExternalLink "https://github.com/mweiss/elm-rte-toolkit" [ text "Github" ]
+    , navbarExternalLink "https://github.com/wolfadex/elm-rte-toolkit" [ text "Github" ]
     ]
 
 
@@ -78,7 +78,7 @@ viewFooter =
         [ div [ class "container" ]
             [ span [ class "attribution" ]
                 [ text "This is a demo for the "
-                , a [ href "https://github.com/mweiss/elm-rte-toolkit" ] [ text " Elm Rich Text Editor Toolkit" ]
+                , a [ href "https://github.com/wolfadex/elm-rte-toolkit" ] [ text " Elm Rich Text Editor Toolkit" ]
                 , text ". Code & design licensed under BSD-3-Clause License."
                 ]
             ]

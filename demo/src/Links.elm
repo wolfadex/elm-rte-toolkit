@@ -3,4 +3,4 @@ module Links exposing (..)
 
 rteToolkit : String
 rteToolkit =
-    "https://github.com/mweiss/elm-rte-toolkit"
+    "https://github.com/wolfadex/elm-rte-toolkit"

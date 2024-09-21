@@ -1,7 +1,7 @@
 {
     "targets": {
         "Demo": {
-            "inputs": ["src/Demo.elm"],
+            "inputs": ["src/Main.elm"],
             "output": "public/elm.js"
         }
     },
