@@ -47,7 +47,7 @@ import RichText.Config.Spec
 import RichText.Internal.BeforeInput
 import RichText.Internal.Constants
 import RichText.Internal.DomNode
-import RichText.Internal.Editor exposing (Editor)
+import RichText.Internal.Editor
 import RichText.Internal.Event
 import RichText.Internal.HtmlNode
 import RichText.Internal.KeyDown
@@ -954,14 +954,14 @@ type alias Message =
 -}
 state : Editor -> RichText.Model.State.State
 state =
-    InternalEditor.state
+    RichText.Internal.Editor.state
 
 
 {-| Retrieves the current history from the editor
 -}
 history : Editor -> RichText.Model.History.History
 history =
-    InternalEditor.history
+    RichText.Internal.Editor.history
 
 
 {-| The editor shortKey is a platform dependent key for command map bindings. It is initialized
@@ -971,7 +971,7 @@ defaults to `"Meta"`.
 -}
 shortKey : Editor -> String
 shortKey =
-    InternalEditor.shortKey
+    RichText.Internal.Editor.shortKey
 
 
 {-| Change count is a counter that gets incremented any time the editor's state gets updated. You
@@ -981,7 +981,7 @@ editor state changes has been thought out.
 -}
 changeCount : Editor -> Int
 changeCount =
-    InternalEditor.changeCount
+    RichText.Internal.Editor.changeCount
 
 
 {-| Sets the history on the editor.
@@ -992,7 +992,7 @@ changeCount =
 -}
 withHistory : RichText.Model.History.History -> Editor -> Editor
 withHistory =
-    InternalEditor.withHistory
+    RichText.Internal.Editor.withHistory
 
 
 {-| Apply a list of named commands to the editor to try in order, returning the updated editor after

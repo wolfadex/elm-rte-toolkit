@@ -1,0 +1,9 @@
+{
+    "targets": {
+        "Demo": {
+            "inputs": ["src/Demo.elm"],
+            "output": "public/elm.js"
+        }
+    },
+    "serve": "public"
+}

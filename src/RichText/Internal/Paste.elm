@@ -249,7 +249,7 @@ pasteBlockArray blockFragment editorState =
                                                 Err s
 
                                             Ok splitEditorState ->
-                                                case State.selection splitEditorState of
+                                                case RichText.Model.State.selection splitEditorState of
                                                     Nothing ->
                                                         Err "Invalid editor state selection after split action."
 

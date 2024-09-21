@@ -332,10 +332,10 @@ marks : Inline -> List RichText.Model.Mark.Mark
 marks leaf =
     case leaf of
         Text l ->
-            Text.marks l
+            RichText.Model.Text.marks l
 
         InlineElement l ->
-            InlineElement.marks l
+            RichText.Model.InlineElement.marks l
 
 
 {-| Transforms a list of list of marks to an array of inline tree nodes
@@ -389,7 +389,7 @@ marksToMarkNodeListRec indexedMarkLists =
 -}
 inlineElement : RichText.Model.Element.Element -> List RichText.Model.Mark.Mark -> Inline
 inlineElement parameters mark =
-    InlineElement (InlineElement.inlineElement parameters mark)
+    InlineElement (RichText.Model.InlineElement.inlineElement parameters mark)
 
 
 {-| Creates an inline that represents some text with marks

@@ -38,10 +38,9 @@ when defining your own transforms.
 
 -}
 
--- import RichText.Internal.Constants
-
 import Array
 import List.Extra
+import RichText.Internal.Constants
 import RichText.Model.Element
 import RichText.Model.InlineElement
 import RichText.Model.Node
@@ -57,14 +56,14 @@ rendering to annotate a selected node for decorators.
 -}
 selection : String
 selection =
-    Constants.selection
+    RichText.Internal.Constants.selection
 
 
 {-| Represents that a node can be selected. This annotation is not transient.
 -}
 selectable : String
 selectable =
-    Constants.selectable
+    RichText.Internal.Constants.selectable
 
 
 {-| Represents that a node should be lifted. This annotation is transient, e.g. it should be
@@ -72,7 +71,7 @@ cleared before a transform or command is complete.
 -}
 lift : String
 lift =
-    Constants.lift
+    RichText.Internal.Constants.lift
 
 
 {-| Adds an annotation to the node at the given path. Returns an error if no node
@@ -181,7 +180,7 @@ toggleElementParameters : (String -> Set String -> Set String) -> String -> Rich
 toggleElementParameters func annotation parameters =
     let
         annotations =
-            Element.annotations parameters
+            RichText.Model.Element.annotations parameters
     in
     RichText.Model.Element.withAnnotations (func annotation annotations) parameters
 

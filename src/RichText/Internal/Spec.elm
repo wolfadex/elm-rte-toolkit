@@ -96,7 +96,7 @@ htmlNodeToEditorFragment spec marks node =
                 Just ( definition, ( element, children ) ) ->
                     let
                         contentType =
-                            ElementDefinition.contentType definition
+                            RichText.Config.ElementDefinition.contentType definition
                     in
                     if contentType == RichText.Internal.Definitions.InlineLeafNodeType then
                         Ok <|

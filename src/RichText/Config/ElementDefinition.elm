@@ -130,7 +130,7 @@ elementDefinition :
     }
     -> ElementDefinition
 elementDefinition contents =
-    Internal.ElementDefinition
+    RichText.Internal.Definitions.ElementDefinition
         contents
 
 

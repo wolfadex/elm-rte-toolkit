@@ -25,25 +25,25 @@ type alias History =
 -}
 empty : { groupDelayMilliseconds : Int, size : Int } -> History
 empty =
-    Internal.empty
+    RichText.Internal.History.empty
 
 
 {-| Returns the last executed action and previous state on the undo stack.
 -}
 peek : History -> Maybe ( String, RichText.Model.State.State )
 peek =
-    Internal.peek
+    RichText.Internal.History.peek
 
 
 {-| Returns the entire undo stack.
 -}
 undoList : History -> List ( String, RichText.Model.State.State )
 undoList =
-    Internal.undoList
+    RichText.Internal.History.undoList
 
 
 {-| Returns the entire redo stack.
 -}
 redoList : History -> List RichText.Model.State.State
 redoList =
-    Internal.redoList
+    RichText.Internal.History.redoList

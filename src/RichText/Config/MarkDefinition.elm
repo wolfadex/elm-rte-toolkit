@@ -85,7 +85,7 @@ markDefinition :
     }
     -> MarkDefinition
 markDefinition contents =
-    Internal.MarkDefinition
+    RichText.Internal.Definitions.MarkDefinition
         contents
 
 

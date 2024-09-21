@@ -491,8 +491,8 @@ linkToHtmlNode mark children =
     let
         attributes =
             filterAttributesToHtml
-                [ ( "href", Just <| Maybe.withDefault "" (RichText.Model.Attribute.findStringAttribute "href" (Mark.attributes mark)) )
-                , ( "title", RichText.Model.Attribute.findStringAttribute "title" (Mark.attributes mark) )
+                [ ( "href", Just <| Maybe.withDefault "" (RichText.Model.Attribute.findStringAttribute "href" (RichText.Model.Mark.attributes mark)) )
+                , ( "title", RichText.Model.Attribute.findStringAttribute "title" (RichText.Model.Mark.attributes mark) )
                 ]
     in
     RichText.Model.HtmlNode.ElementNode "a"

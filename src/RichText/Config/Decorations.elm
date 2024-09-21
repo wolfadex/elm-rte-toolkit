@@ -180,7 +180,7 @@ addElementDecoration definition decorator decorations =
             elementDecorations decorations
 
         name =
-            ElementDefinition.name definition
+            RichText.Config.ElementDefinition.name definition
 
         previousDecorations =
             Maybe.withDefault [] (Dict.get name eleDecorators)
@@ -206,7 +206,7 @@ addMarkDecoration definition decorator decorations =
             markDecorations decorations
 
         name =
-            MarkDefinition.name definition
+            RichText.Config.MarkDefinition.name definition
 
         previousDecorations =
             Maybe.withDefault [] (Dict.get name mDecorators)

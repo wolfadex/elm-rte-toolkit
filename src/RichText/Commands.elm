@@ -1581,7 +1581,7 @@ hugLeft state =
                         RichText.Model.Selection.anchorNode normalizedSelection
 
                     root =
-                        State.root state
+                        RichText.Model.State.root state
                 in
                 case RichText.Node.nodeAt anchorPath root of
                     Nothing ->
@@ -1641,7 +1641,7 @@ hugRight state =
                         RichText.Model.Selection.focusNode normalizedSelection
 
                     root =
-                        State.root state
+                        RichText.Model.State.root state
                 in
                 case RichText.Node.nodeAt focusPath root of
                     Nothing ->
@@ -1800,7 +1800,7 @@ toggleMarkFull markOrder mark action editorState =
                                                                 node
 
                                                             RichText.Node.Inline _ ->
-                                                                RTNode.toggleMark toggleAction markOrder mark node
+                                                                RichText.Node.toggleMark toggleAction markOrder mark node
                                                 )
                                                 (RichText.Node.Block (RichText.Model.State.root editorState))
                                         of
@@ -2328,7 +2328,7 @@ addLiftMarkToBlocksInSelection selection root =
                                             False
                             in
                             if addMarker then
-                                RichText.Annotation.add Annotation.lift <| RichText.Node.Block bn
+                                RichText.Annotation.add RichText.Annotation.lift <| RichText.Node.Block bn
 
                             else
                                 node
@@ -2417,7 +2417,7 @@ lift editorState =
                 (editorState
                     |> RichText.Model.State.withSelection newSelection
                     |> RichText.Model.State.withRoot
-                        (RichText.Annotation.clear Annotation.lift <|
+                        (RichText.Annotation.clear RichText.Annotation.lift <|
                             RichText.Annotation.clearSelectionAnnotations liftedRoot
                         )
                 )
@@ -3729,7 +3729,7 @@ insertAfterBlockLeaf blockToInsert state =
                             newAnchorPath =
                                 RichText.Model.Node.increment (anchorNode selection) ++ relativeSelectablePath
                         in
-                        Ok (State.state newRoot (Just <| RichText.Model.Selection.caret newAnchorPath 0))
+                        Ok (RichText.Model.State.state newRoot (Just <| RichText.Model.Selection.caret newAnchorPath 0))
 
 
 {-| Insert a newline at the selection in elements with the name whitelisted by the String list. This
@@ -3780,7 +3780,7 @@ selectBackward state =
             else
                 let
                     root =
-                        State.root state
+                        RichText.Model.State.root state
                 in
                 case RichText.Node.findBackwardFromExclusive (\_ n -> RichText.Annotation.isSelectable n) (anchorNode selection) root of
                     Nothing ->
@@ -3821,7 +3821,7 @@ selectForward state =
             else
                 let
                     root =
-                        State.root state
+                        RichText.Model.State.root state
                 in
                 case RichText.Node.findForwardFromExclusive (\_ n -> RichText.Annotation.isSelectable n) (anchorNode selection) root of
                     Nothing ->
