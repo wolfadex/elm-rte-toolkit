@@ -24,7 +24,7 @@ like if something is selectable.
 @docs add, addAtPath, addToBlock, addToInline, fromNode, clear, remove, removeAtPath, removeFromBlock, removeFromInline
 
 
-# Selection
+# Selections
 
 These methods are for marking selection, which is useful for keeping track of a user's selection
 when defining your own transforms.
@@ -32,7 +32,7 @@ when defining your own transforms.
 @docs annotateSelection, selectionFromAnnotations, clearSelectionAnnotations, isSelectable
 
 
-# Lift
+# Lifts
 
 @docs doLift
 
@@ -179,6 +179,7 @@ removeFromInline a n =
 toggleElementParameters : (String -> Set String -> Set String) -> String -> RichText.Model.Element.Element -> RichText.Model.Element.Element
 toggleElementParameters func annotation parameters =
     let
+        annotations : Set String
         annotations =
             RichText.Model.Element.annotations parameters
     in
@@ -190,19 +191,20 @@ toggle func annotation node =
     case node of
         RichText.Node.Block bn ->
             let
+                newParameters : RichText.Model.Element.Element
                 newParameters =
                     toggleElementParameters func annotation (RichText.Model.Node.element bn)
-
-                newBlockNode =
-                    bn |> RichText.Model.Node.withElement newParameters
             in
-            RichText.Node.Block newBlockNode
+            bn
+                |> RichText.Model.Node.withElement newParameters
+                |> RichText.Node.Block
 
         RichText.Node.Inline il ->
             RichText.Node.Inline <|
                 case il of
                     RichText.Model.Node.InlineElement l ->
                         let
+                            newParameters : RichText.Model.Element.Element
                             newParameters =
                                 toggleElementParameters func annotation (RichText.Model.InlineElement.element l)
                         in
@@ -310,11 +312,7 @@ selectionFromAnnotations node anchorOffset focusOffset =
 
 findNodeRangeFromSelectionAnnotations : RichText.Model.Node.Block -> Maybe ( RichText.Model.Node.Path, RichText.Model.Node.Path )
 findNodeRangeFromSelectionAnnotations node =
-    let
-        paths =
-            findPathsWithAnnotation selection node
-    in
-    case paths of
+    case findPathsWithAnnotation selection node of
         [] ->
             Nothing
 
@@ -363,21 +361,15 @@ liftConcatMapFunc node =
                     [ node ]
 
                 RichText.Model.Node.BlockChildren a ->
-                    let
-                        groupedBlockNodes =
-                            List.Extra.groupWhile
-                                (\n1 n2 ->
-                                    Set.member
-                                        lift
-                                        (annotationsFromBlockNode n1)
-                                        == Set.member
-                                            lift
-                                            (annotationsFromBlockNode n2)
-                                )
-                                (Array.toList (RichText.Model.Node.toBlockArray a))
-                    in
-                    List.map RichText.Node.Block <|
-                        List.concatMap
+                    a
+                        |> RichText.Model.Node.toBlockArray
+                        |> Array.toList
+                        |> List.Extra.groupWhile
+                            (\n1 n2 ->
+                                Set.member lift (annotationsFromBlockNode n1)
+                                    == Set.member lift (annotationsFromBlockNode n2)
+                            )
+                        |> List.concatMap
                             (\( n, l ) ->
                                 if Set.member lift (annotationsFromBlockNode n) then
                                     n :: l
@@ -385,7 +377,7 @@ liftConcatMapFunc node =
                                 else
                                     [ bn |> RichText.Model.Node.withChildNodes (RichText.Model.Node.blockChildren (Array.fromList <| n :: l)) ]
                             )
-                            groupedBlockNodes
+                        |> List.map RichText.Node.Block
 
         RichText.Node.Inline _ ->
             [ node ]

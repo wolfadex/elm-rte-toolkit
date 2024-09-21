@@ -61,7 +61,7 @@ between multiple spaces:
 
 ## Contributing
 
-This package is open-source software, freely distributable under the terms of an [BSD-3-Clause license](https://package.elm-lang.org/packages/wolfadex/elm-rte-toolkit/1.0.0/LICENSE). The [source code is hosted on GitHub](https://github.com/wolfadex/elm-rte-toolkit).
+This package is open-source software, freely distributable under the terms of an [BSD-3-Clause license](LICENSE). The [source code is hosted on GitHub](https://github.com/wolfadex/elm-rte-toolkit).
 
 Contributions in the form of bug reports, pull requests, or thoughtful discussions in the [GitHub issue tracker](https://github.com/wolfadex/elm-rte-toolkit/issues) are welcome. Please see the [Code of Conduct](CODE_OF_CONDUCT.md) for our pledge to contributors.
 
