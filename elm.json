@@ -1,9 +1,9 @@
 {
     "type": "package",
-    "name": "mweiss/elm-rte-toolkit",
+    "name": "wolfadex/elm-rte-toolkit",
     "summary": "Build rich text editors in Elm",
     "license": "BSD-3-Clause",
-    "version": "1.0.4",
+    "version": "1.0.0",
     "exposed-modules": [
         "RichText.Annotation",
         "RichText.Commands",
@@ -30,7 +30,7 @@
         "RichText.Node",
         "RichText.State"
     ],
-    "elm-version": "0.19.1 <= v < 0.20.0",
+    "elm-version": "0.19.0 <= v < 0.20.0",
     "dependencies": {
         "elm/browser": "1.0.0 <= v < 2.0.0",
         "elm/core": "1.0.0 <= v < 2.0.0",
