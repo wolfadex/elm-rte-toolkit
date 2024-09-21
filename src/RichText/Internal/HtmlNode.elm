@@ -16,6 +16,7 @@ import RichText.Model.Node
 import RichText.Model.Text
 
 
+childNodesPlaceholder : Array RichText.Model.HtmlNode.HtmlNode
 childNodesPlaceholder =
     Array.fromList
         [ RichText.Model.HtmlNode.ElementNode "__child_node_marker__" [] Array.empty ]
@@ -26,6 +27,7 @@ childNodesPlaceholder =
 markToHtmlNode : RichText.Config.Spec.Spec -> RichText.Model.Mark.Mark -> Array RichText.Model.HtmlNode.HtmlNode -> RichText.Model.HtmlNode.HtmlNode
 markToHtmlNode spec mark children =
     let
+        markDefinition : RichText.Config.MarkDefinition.MarkDefinition
         markDefinition =
             RichText.Internal.Spec.markDefinitionWithDefault mark spec
     in
@@ -37,6 +39,7 @@ markToHtmlNode spec mark children =
 elementToHtmlNode : RichText.Config.Spec.Spec -> RichText.Model.Element.Element -> Array RichText.Model.HtmlNode.HtmlNode -> RichText.Model.HtmlNode.HtmlNode
 elementToHtmlNode spec parameters children =
     let
+        elementDefinition : RichText.Config.ElementDefinition.ElementDefinition
         elementDefinition =
             RichText.Internal.Spec.elementDefinitionWithDefault parameters spec
     in

@@ -49,7 +49,7 @@ modifying the editor.
 @docs joinBackward, joinForward
 
 
-## Lift
+## Lifts
 
 @docs lift, liftEmpty
 
@@ -71,13 +71,13 @@ Toggle commands for elements and marks
 @docs selectAll
 
 
-## Wrap
+## Wraps
 
 @docs wrap
 
 -}
 
-import Array
+import Array exposing (Array)
 import Array.Extra
 import List.Extra
 import Regex
@@ -86,18 +86,18 @@ import RichText.Config.Command
 import RichText.Config.Keys
 import RichText.Definitions
 import RichText.Internal.DeleteWord
-import RichText.Internal.Event
 import RichText.Model.Element
 import RichText.Model.InlineElement
 import RichText.Model.Mark
 import RichText.Model.Node
-import RichText.Model.Selection exposing (anchorNode)
+import RichText.Model.Selection
 import RichText.Model.State
 import RichText.Model.Text
 import RichText.Node
 import RichText.State
 
 
+backspaceCommands : List ( String, RichText.Config.Command.Command )
 backspaceCommands =
     [ ( "removeRange", RichText.Config.Command.transform removeRange )
     , ( "removeSelectedLeafElementCommand", RichText.Config.Command.transform removeSelectedLeafElement )
@@ -108,6 +108,7 @@ backspaceCommands =
     ]
 
 
+deleteCommands : List ( String, RichText.Config.Command.Command )
 deleteCommands =
     [ ( "removeRange", RichText.Config.Command.transform removeRange )
     , ( "removeSelectedLeafElementCommand", RichText.Config.Command.transform removeSelectedLeafElement )
@@ -150,7 +151,7 @@ defaultCommandMap =
 {-| The default key command does remove range when a range is selected and a regular
 key is pressed. In this case, we want to remove range and insert the character related to that key.
 -}
-defaultKeyCommand : RichText.Internal.Event.KeyboardEvent -> RichText.Config.Command.NamedCommandList
+defaultKeyCommand : RichText.Config.Command.KeyboardEvent -> RichText.Config.Command.NamedCommandList
 defaultKeyCommand event =
     if not event.altKey && not event.metaKey && not event.ctrlKey && String.length event.key == 1 then
         [ ( "removeRangeAndInsert", RichText.Config.Command.transform <| removeRangeAndInsert event.key ) ]
@@ -163,7 +164,7 @@ defaultKeyCommand event =
 event occurs. In this case, we want to remove range and insert the text related to the input
 data.
 -}
-defaultInputEventCommand : RichText.Internal.Event.InputEvent -> RichText.Config.Command.NamedCommandList
+defaultInputEventCommand : RichText.Config.Command.InputEvent -> RichText.Config.Command.NamedCommandList
 defaultInputEventCommand event =
     if event.inputType == "insertText" then
         case event.data of
@@ -318,9 +319,11 @@ insertText s editorState =
 
                                     RichText.Model.Node.Text tl ->
                                         let
+                                            newText : String
                                             newText =
                                                 insertAt s (RichText.Model.Selection.anchorOffset selection) (RichText.Model.Text.text tl)
 
+                                            newTextLeaf : RichText.Model.Node.Inline
                                             newTextLeaf =
                                                 RichText.Model.Node.Text (tl |> RichText.Model.Text.withText newText)
                                         in
@@ -426,6 +429,7 @@ joinBackward editorState =
                                 case RichText.Model.Node.childNodes n of
                                     RichText.Model.Node.InlineChildren a ->
                                         let
+                                            array : Array RichText.Model.Node.Inline
                                             array =
                                                 RichText.Model.Node.toInlineArray a
                                         in
@@ -435,6 +439,7 @@ joinBackward editorState =
 
                                             Just leaf ->
                                                 let
+                                                    newSelection : RichText.Model.Selection.Selection
                                                     newSelection =
                                                         case leaf of
                                                             RichText.Model.Node.Text tl ->
@@ -533,10 +538,14 @@ joinForward editorState =
 
                                     Just newBlock ->
                                         let
-                                            removed =
-                                                RichText.Node.removeNodeAndEmptyParents p2 (RichText.Model.State.root editorState)
+                                            replaced : Result String RichText.Model.Node.Block
+                                            replaced =
+                                                editorState
+                                                    |> RichText.Model.State.root
+                                                    |> RichText.Node.removeNodeAndEmptyParents p2
+                                                    |> RichText.Node.replace p1 (RichText.Node.Block newBlock)
                                         in
-                                        case RichText.Node.replace p1 (RichText.Node.Block newBlock) removed of
+                                        case replaced of
                                             Err e ->
                                                 Err e
 
@@ -568,12 +577,7 @@ type alias FindFunc =
 
 findTextBlock : FindFunc -> RichText.Model.Node.Path -> RichText.Model.Node.Block -> Maybe ( RichText.Model.Node.Path, RichText.Model.Node.Block )
 findTextBlock findFunc path node =
-    case
-        findFunc
-            isTextBlock
-            path
-            node
-    of
+    case findFunc isTextBlock path node of
         Nothing ->
             Nothing
 
@@ -657,6 +661,7 @@ removeRange editorState =
 
             else
                 let
+                    normalizedSelection : RichText.Model.Selection.Selection
                     normalizedSelection =
                         RichText.Model.Selection.normalize selection
                 in
@@ -670,6 +675,7 @@ removeRange editorState =
                     of
                         Ok ( newRoot, _ ) ->
                             let
+                                newSelection : RichText.Model.Selection.Selection
                                 newSelection =
                                     RichText.Model.Selection.caret (RichText.Model.Selection.anchorNode normalizedSelection) (RichText.Model.Selection.anchorOffset normalizedSelection)
                             in
@@ -698,33 +704,40 @@ removeRange editorState =
 
                         Ok ( removedEnd, _ ) ->
                             let
+                                removedNodes :
+                                    Result
+                                        String
+                                        ( RichText.Model.Node.Block
+                                        , Maybe ( RichText.Model.Node.Path, RichText.Node.Node )
+                                        )
                                 removedNodes =
-                                    RichText.Node.removeInRange
-                                        (RichText.Model.Node.increment (RichText.Model.Selection.anchorNode normalizedSelection))
-                                        (RichText.Model.Node.decrement (RichText.Model.Selection.focusNode normalizedSelection))
-                                        removedEnd
+                                    removedEnd
+                                        |> RichText.Node.removeInRange
+                                            (RichText.Model.Node.increment (RichText.Model.Selection.anchorNode normalizedSelection))
+                                            (RichText.Model.Node.decrement (RichText.Model.Selection.focusNode normalizedSelection))
+                                        |> removeNodeOrTextWithRange
+                                            (RichText.Model.Selection.anchorNode normalizedSelection)
+                                            (RichText.Model.Selection.anchorOffset normalizedSelection)
+                                            Nothing
                             in
-                            case
-                                removeNodeOrTextWithRange
-                                    (RichText.Model.Selection.anchorNode normalizedSelection)
-                                    (RichText.Model.Selection.anchorOffset normalizedSelection)
-                                    Nothing
-                                    removedNodes
-                            of
+                            case removedNodes of
                                 Err s ->
                                     Err s
 
                                 Ok ( removedStart, maybePath ) ->
                                     let
+                                        anchorTextBlock : Maybe ( RichText.Model.Node.Path, RichText.Model.Node.Block )
                                         anchorTextBlock =
                                             RichText.Node.findTextBlockNodeAncestor
                                                 (RichText.Model.Selection.anchorNode normalizedSelection)
                                                 (RichText.Model.State.root editorState)
 
+                                        newSelection : Maybe RichText.Model.Selection.Selection
                                         newSelection =
                                             Maybe.map
                                                 (\( p, n ) ->
                                                     let
+                                                        offset : Int
                                                         offset =
                                                             case n of
                                                                 RichText.Node.Inline i ->
@@ -744,6 +757,7 @@ removeRange editorState =
                                                 )
                                                 maybePath
 
+                                        defaultedSelection : Maybe RichText.Model.Selection.Selection
                                         defaultedSelection =
                                             case newSelection of
                                                 Nothing ->
@@ -754,6 +768,7 @@ removeRange editorState =
                                                 Just _ ->
                                                     newSelection
 
+                                        newEditorState : RichText.Model.State.State
                                         newEditorState =
                                             editorState
                                                 |> RichText.Model.State.withRoot removedStart
@@ -765,6 +780,7 @@ removeRange editorState =
 
                                         Just ( ap, _ ) ->
                                             let
+                                                focusTextBlock : Maybe ( RichText.Model.Node.Path, RichText.Model.Node.Block )
                                                 focusTextBlock =
                                                     RichText.Node.findTextBlockNodeAncestor
                                                         (RichText.Model.Selection.focusNode normalizedSelection)
@@ -918,6 +934,7 @@ insertInline leaf editorState =
 
                                             Ok newRoot ->
                                                 let
+                                                    newSelection : Maybe RichText.Model.Selection.Selection
                                                     newSelection =
                                                         case
                                                             RichText.Node.findForwardFrom
@@ -957,6 +974,7 @@ insertInline leaf editorState =
 
                                             Ok newRoot ->
                                                 let
+                                                    newSelection : Maybe RichText.Model.Selection.Selection
                                                     newSelection =
                                                         case
                                                             RichText.Node.findForwardFromExclusive
@@ -1077,6 +1095,7 @@ splitBlock ancestorFunc editorState =
 
                     Just ( ancestorPath, ancestorNode ) ->
                         let
+                            relativePath : RichText.Model.Node.Path
                             relativePath =
                                 List.drop (List.length ancestorPath) (RichText.Model.Selection.anchorNode selection)
                         in
@@ -1096,12 +1115,14 @@ splitBlock ancestorFunc editorState =
 
                                     Ok newRoot ->
                                         let
+                                            newSelectionPath : RichText.Model.Node.Path
                                             newSelectionPath =
                                                 RichText.Model.Node.increment ancestorPath
                                                     ++ List.repeat
                                                         (List.length (RichText.Model.Selection.anchorNode selection) - List.length ancestorPath)
                                                         0
 
+                                            newSelection : RichText.Model.Selection.Selection
                                             newSelection =
                                                 RichText.Model.Selection.caret newSelectionPath 0
                                         in
@@ -1147,9 +1168,11 @@ removeNodeOrTextWithRange nodePath start maybeEnd root =
             case node of
                 RichText.Node.Block _ ->
                     let
+                        previouslySelectablePathAndNode : Maybe ( RichText.Model.Node.Path, RichText.Node.Node )
                         previouslySelectablePathAndNode =
                             RichText.Node.findBackwardFromExclusive (\_ n -> RichText.Annotation.isSelectable n) nodePath root
 
+                        newRoot : RichText.Model.Node.Block
                         newRoot =
                             RichText.Node.removeNodeAndEmptyParents nodePath root
                     in
@@ -1159,9 +1182,11 @@ removeNodeOrTextWithRange nodePath start maybeEnd root =
                     case leaf of
                         RichText.Model.Node.InlineElement _ ->
                             let
+                                previouslySelectablePath : Maybe ( RichText.Model.Node.Path, RichText.Node.Node )
                                 previouslySelectablePath =
                                     RichText.Node.findBackwardFromExclusive (\_ n -> RichText.Annotation.isSelectable n) nodePath root
 
+                                newRoot : RichText.Model.Node.Block
                                 newRoot =
                                     RichText.Node.removeNodeAndEmptyParents nodePath root
                             in
@@ -1169,6 +1194,7 @@ removeNodeOrTextWithRange nodePath start maybeEnd root =
 
                         RichText.Model.Node.Text v ->
                             let
+                                textNode : RichText.Model.Node.Inline
                                 textNode =
                                     case maybeEnd of
                                         Nothing ->
@@ -1252,6 +1278,7 @@ removeSelectedLeafElement editorState =
 
             else if isLeafNode (RichText.Model.Selection.anchorNode selection) (RichText.Model.State.root editorState) then
                 let
+                    newSelection : Maybe RichText.Model.Selection.Selection
                     newSelection =
                         case
                             RichText.Node.findBackwardFromExclusive
@@ -1264,6 +1291,7 @@ removeSelectedLeafElement editorState =
 
                             Just ( p, n ) ->
                                 let
+                                    offset : Int
                                     offset =
                                         case n of
                                             RichText.Node.Inline il ->
@@ -1391,6 +1419,7 @@ backspaceText editorState =
 
                                                 Ok newRoot ->
                                                     let
+                                                        newSelection : RichText.Model.Selection.Selection
                                                         newSelection =
                                                             RichText.Model.Selection.caret (RichText.Model.Selection.anchorNode selection) 0
                                                     in
@@ -1411,9 +1440,11 @@ backspaceText editorState =
                                                             case previousInlineLeafWrapper of
                                                                 RichText.Model.Node.Text previousTextLeaf ->
                                                                     let
+                                                                        l : Int
                                                                         l =
                                                                             String.length (RichText.Model.Text.text previousTextLeaf)
 
+                                                                        newSelection : RichText.Model.Selection.Selection
                                                                         newSelection =
                                                                             RichText.Model.Selection.singleNodeRange previousPath l (max 0 (l - 1))
                                                                     in
@@ -1451,6 +1482,7 @@ toggleMarkSingleInlineNode markOrder mark action editorState =
 
             else
                 let
+                    normalizedSelection : RichText.Model.Selection.Selection
                     normalizedSelection =
                         RichText.Model.Selection.normalize selection
                 in
@@ -1465,9 +1497,11 @@ toggleMarkSingleInlineNode markOrder mark action editorState =
 
                             RichText.Node.Inline il ->
                                 let
+                                    newMarks : List RichText.Model.Mark.Mark
                                     newMarks =
                                         RichText.Model.Mark.toggle action markOrder mark (RichText.Model.Node.marks il)
 
+                                    leaves : List RichText.Model.Node.Inline
                                     leaves =
                                         case il of
                                             RichText.Model.Node.InlineElement leaf ->
@@ -1488,6 +1522,7 @@ toggleMarkSingleInlineNode markOrder mark action editorState =
 
                                                 else
                                                     let
+                                                        newNode : RichText.Model.Node.Inline
                                                         newNode =
                                                             RichText.Model.Node.Text
                                                                 (leaf
@@ -1500,6 +1535,7 @@ toggleMarkSingleInlineNode markOrder mark action editorState =
                                                                         )
                                                                 )
 
+                                                        right : RichText.Model.Node.Inline
                                                         right =
                                                             RichText.Model.Node.Text
                                                                 (leaf
@@ -1515,6 +1551,7 @@ toggleMarkSingleInlineNode markOrder mark action editorState =
 
                                                     else
                                                         let
+                                                            left : RichText.Model.Node.Inline
                                                             left =
                                                                 RichText.Model.Node.Text
                                                                     (leaf
@@ -1542,6 +1579,7 @@ toggleMarkSingleInlineNode markOrder mark action editorState =
 
                                     Ok newRoot ->
                                         let
+                                            path : RichText.Model.Node.Path
                                             path =
                                                 if RichText.Model.Selection.anchorOffset normalizedSelection == 0 then
                                                     RichText.Model.Selection.anchorNode normalizedSelection
@@ -1549,6 +1587,7 @@ toggleMarkSingleInlineNode markOrder mark action editorState =
                                                 else
                                                     RichText.Model.Node.increment (RichText.Model.Selection.anchorNode normalizedSelection)
 
+                                            newSelection : RichText.Model.Selection.Selection
                                             newSelection =
                                                 RichText.Model.Selection.singleNodeRange
                                                     path
@@ -1574,12 +1613,15 @@ hugLeft state =
 
             else
                 let
+                    normalizedSelection : RichText.Model.Selection.Selection
                     normalizedSelection =
                         RichText.Model.Selection.normalize selection
 
+                    anchorPath : RichText.Model.Node.Path
                     anchorPath =
                         RichText.Model.Selection.anchorNode normalizedSelection
 
+                    root : RichText.Model.Node.Block
                     root =
                         RichText.Model.State.root state
                 in
@@ -1634,12 +1676,15 @@ hugRight state =
 
             else
                 let
+                    normalizedSelection : RichText.Model.Selection.Selection
                     normalizedSelection =
                         RichText.Model.Selection.normalize selection
 
+                    focusPath : RichText.Model.Node.Path
                     focusPath =
                         RichText.Model.Selection.focusNode normalizedSelection
 
+                    root : RichText.Model.Node.Block
                     root =
                         RichText.Model.State.root state
                 in
@@ -1758,9 +1803,11 @@ toggleMarkFull markOrder mark action editorState =
 
             else
                 let
+                    normalizedSelection : RichText.Model.Selection.Selection
                     normalizedSelection =
                         RichText.Model.Selection.normalize selection
 
+                    toggleAction : RichText.Model.Mark.ToggleAction
                     toggleAction =
                         if action /= RichText.Model.Mark.Flip then
                             action
@@ -1777,6 +1824,7 @@ toggleMarkFull markOrder mark action editorState =
                         else
                             RichText.Model.Mark.Add
 
+                    betweenRoot : RichText.Model.Node.Block
                     betweenRoot =
                         case RichText.Node.next (RichText.Model.Selection.anchorNode normalizedSelection) (RichText.Model.State.root editorState) of
                             Nothing ->
@@ -1810,6 +1858,7 @@ toggleMarkFull markOrder mark action editorState =
                                             _ ->
                                                 RichText.Model.State.root editorState
 
+                    modifiedEndNodeEditorState : RichText.Model.State.State
                     modifiedEndNodeEditorState =
                         Result.withDefault (editorState |> RichText.Model.State.withRoot betweenRoot) <|
                             toggleMarkSingleInlineNode
@@ -1828,6 +1877,7 @@ toggleMarkFull markOrder mark action editorState =
                                         )
                                 )
 
+                    modifiedStartNodeEditorState : RichText.Model.State.State
                     modifiedStartNodeEditorState =
                         case RichText.Node.nodeAt (RichText.Model.Selection.anchorNode normalizedSelection) (RichText.Model.State.root editorState) of
                             Nothing ->
@@ -1837,6 +1887,7 @@ toggleMarkFull markOrder mark action editorState =
                                 case node of
                                     RichText.Node.Inline il ->
                                         let
+                                            focusOffset : Int
                                             focusOffset =
                                                 case il of
                                                     RichText.Model.Node.Text leaf ->
@@ -1864,12 +1915,16 @@ toggleMarkFull markOrder mark action editorState =
                                     _ ->
                                         modifiedEndNodeEditorState
 
+                    incrementAnchorOffset : Bool
                     incrementAnchorOffset =
                         RichText.Model.Selection.anchorOffset normalizedSelection /= 0
 
+                    anchorAndFocusHaveSameParent : Bool
                     anchorAndFocusHaveSameParent =
-                        RichText.Model.Node.parent (RichText.Model.Selection.anchorNode normalizedSelection) == RichText.Model.Node.parent (RichText.Model.Selection.focusNode normalizedSelection)
+                        RichText.Model.Node.parent (RichText.Model.Selection.anchorNode normalizedSelection)
+                            == RichText.Model.Node.parent (RichText.Model.Selection.focusNode normalizedSelection)
 
+                    newSelection : RichText.Model.Selection.Selection
                     newSelection =
                         RichText.Model.Selection.range
                             (if incrementAnchorOffset then
@@ -1946,15 +2001,19 @@ toggleTextBlock onElement offElement convertToPlainText editorState =
 
         Just selection ->
             let
+                normalizedSelection : RichText.Model.Selection.Selection
                 normalizedSelection =
                     RichText.Model.Selection.normalize selection
 
+                anchorPath : RichText.Model.Node.Path
                 anchorPath =
                     RichText.Node.findClosestBlockPath (RichText.Model.Selection.anchorNode normalizedSelection) (RichText.Model.State.root editorState)
 
+                focusPath : RichText.Model.Node.Path
                 focusPath =
                     RichText.Node.findClosestBlockPath (RichText.Model.Selection.focusNode normalizedSelection) (RichText.Model.State.root editorState)
 
+                doOffBehavior : Bool
                 doOffBehavior =
                     RichText.Node.allRange
                         (\node ->
@@ -1974,6 +2033,7 @@ toggleTextBlock onElement offElement convertToPlainText editorState =
                         focusPath
                         (RichText.Model.State.root editorState)
 
+                newParams : RichText.Model.Element.Element
                 newParams =
                     if doOffBehavior then
                         offElement
@@ -1981,6 +2041,7 @@ toggleTextBlock onElement offElement convertToPlainText editorState =
                     else
                         onElement
 
+                newRoot : RichText.Model.Node.Block
                 newRoot =
                     case
                         RichText.Node.indexedMap
@@ -1994,6 +2055,7 @@ toggleTextBlock onElement offElement convertToPlainText editorState =
                                             case RichText.Model.Node.childNodes bn of
                                                 RichText.Model.Node.InlineChildren ic ->
                                                     let
+                                                        newInlineChildren : RichText.Model.Node.Children
                                                         newInlineChildren =
                                                             if convertToPlainText then
                                                                 RichText.Model.Node.inlineChildren (Array.fromList [ RichText.Model.Node.plainText (convertInlineChildrenToString ic) ])
@@ -2091,18 +2153,23 @@ wrap contentsMapFunc elementParameters editorState =
 
         Just selection ->
             let
+                normalizedSelection : RichText.Model.Selection.Selection
                 normalizedSelection =
                     RichText.Model.Selection.normalize selection
 
+                markedRoot : RichText.Model.Node.Block
                 markedRoot =
                     RichText.Annotation.annotateSelection normalizedSelection (RichText.Model.State.root editorState)
 
+                anchorBlockPath : RichText.Model.Node.Path
                 anchorBlockPath =
                     RichText.Node.findClosestBlockPath (RichText.Model.Selection.anchorNode normalizedSelection) markedRoot
 
+                focusBlockPath : RichText.Model.Node.Path
                 focusBlockPath =
                     RichText.Node.findClosestBlockPath (RichText.Model.Selection.focusNode normalizedSelection) markedRoot
 
+                ancestor : RichText.Model.Node.Path
                 ancestor =
                     RichText.Model.Node.commonAncestor anchorBlockPath focusBlockPath
             in
@@ -2113,6 +2180,7 @@ wrap contentsMapFunc elementParameters editorState =
 
                     Just node ->
                         let
+                            newChildren : RichText.Model.Node.Children
                             newChildren =
                                 case node of
                                     RichText.Node.Block bn ->
@@ -2121,6 +2189,7 @@ wrap contentsMapFunc elementParameters editorState =
                                     RichText.Node.Inline il ->
                                         RichText.Model.Node.inlineChildren (Array.fromList [ il ])
 
+                            newNode : RichText.Model.Node.Block
                             newNode =
                                 RichText.Model.Node.block elementParameters newChildren
                         in
@@ -2161,6 +2230,7 @@ wrap contentsMapFunc elementParameters editorState =
                                                 case RichText.Model.Node.childNodes bn of
                                                     RichText.Model.Node.BlockChildren a ->
                                                         let
+                                                            newChildNode : RichText.Model.Node.Block
                                                             newChildNode =
                                                                 RichText.Model.Node.block elementParameters
                                                                     (RichText.Model.Node.blockChildren <|
@@ -2172,6 +2242,7 @@ wrap contentsMapFunc elementParameters editorState =
                                                                             )
                                                                     )
 
+                                                            newBlockArray : RichText.Model.Node.Children
                                                             newBlockArray =
                                                                 RichText.Model.Node.blockChildren <|
                                                                     Array.append
@@ -2187,6 +2258,7 @@ wrap contentsMapFunc elementParameters editorState =
                                                                             (RichText.Model.Node.toBlockArray a)
                                                                         )
 
+                                                            newNode : RichText.Model.Node.Block
                                                             newNode =
                                                                 bn |> RichText.Model.Node.withChildNodes newBlockArray
                                                         in
@@ -2260,6 +2332,7 @@ selectAll editorState =
                 (\path node ( firstAndLast, offset ) ->
                     if RichText.Annotation.isSelectable node then
                         let
+                            newOffset : Int
                             newOffset =
                                 case node of
                                     RichText.Node.Inline il ->
@@ -2300,9 +2373,11 @@ selectAll editorState =
 addLiftMarkToBlocksInSelection : RichText.Model.Selection.Selection -> RichText.Model.Node.Block -> RichText.Model.Node.Block
 addLiftMarkToBlocksInSelection selection root =
     let
+        start : RichText.Model.Node.Path
         start =
             RichText.Node.findClosestBlockPath (RichText.Model.Selection.anchorNode selection) root
 
+        end : RichText.Model.Node.Path
         end =
             RichText.Node.findClosestBlockPath (RichText.Model.Selection.focusNode selection) root
     in
@@ -2316,6 +2391,7 @@ addLiftMarkToBlocksInSelection selection root =
                     case node of
                         RichText.Node.Block bn ->
                             let
+                                addMarker : Bool
                                 addMarker =
                                     case RichText.Model.Node.childNodes bn of
                                         RichText.Model.Node.Leaf ->
@@ -2397,16 +2473,22 @@ lift editorState =
 
         Just selection ->
             let
+                normalizedSelection : RichText.Model.Selection.Selection
                 normalizedSelection =
                     RichText.Model.Selection.normalize selection
 
+                markedRoot : RichText.Model.Node.Block
                 markedRoot =
-                    addLiftMarkToBlocksInSelection normalizedSelection <|
-                        RichText.Annotation.annotateSelection normalizedSelection (RichText.Model.State.root editorState)
+                    editorState
+                        |> RichText.Model.State.root
+                        |> RichText.Annotation.annotateSelection normalizedSelection
+                        |> addLiftMarkToBlocksInSelection normalizedSelection
 
+                liftedRoot : RichText.Model.Node.Block
                 liftedRoot =
                     RichText.Annotation.doLift markedRoot
 
+                newSelection : Maybe RichText.Model.Selection.Selection
                 newSelection =
                     RichText.Annotation.selectionFromAnnotations
                         liftedRoot
@@ -2477,6 +2559,7 @@ liftEmpty editorState =
 
             else
                 let
+                    p : RichText.Model.Node.Path
                     p =
                         RichText.Node.findClosestBlockPath (RichText.Model.Selection.anchorNode selection) (RichText.Model.State.root editorState)
                 in
@@ -2551,6 +2634,7 @@ splitBlockHeaderToNewParagraph headerElements paragraphElement editorState =
 
                     else
                         let
+                            p : RichText.Model.Node.Path
                             p =
                                 RichText.Node.findClosestBlockPath
                                     (RichText.Model.Selection.anchorNode selection)
@@ -2564,6 +2648,7 @@ splitBlockHeaderToNewParagraph headerElements paragraphElement editorState =
                                 case node of
                                     RichText.Node.Block bn ->
                                         let
+                                            parameters : RichText.Model.Element.Element
                                             parameters =
                                                 RichText.Model.Node.element bn
                                         in
@@ -2680,6 +2765,7 @@ insertBlock node editorState =
 
                                     Ok newRoot ->
                                         let
+                                            newSelection : RichText.Model.Selection.Selection
                                             newSelection =
                                                 if RichText.Annotation.isSelectable (RichText.Node.Block node) then
                                                     RichText.Model.Selection.caret (RichText.Model.Node.increment (RichText.Model.Selection.anchorNode selection)) 0
@@ -2715,9 +2801,11 @@ insertBlockBeforeSelection node editorState =
 
             else
                 let
+                    markedRoot : RichText.Model.Node.Block
                     markedRoot =
                         RichText.Annotation.annotateSelection selection (RichText.Model.State.root editorState)
 
+                    closestBlockPath : RichText.Model.Node.Path
                     closestBlockPath =
                         RichText.Node.findClosestBlockPath (RichText.Model.Selection.anchorNode selection) markedRoot
                 in
@@ -2729,6 +2817,7 @@ insertBlockBeforeSelection node editorState =
                         case anchorNode of
                             RichText.Node.Block bn ->
                                 let
+                                    newFragment : List RichText.Model.Node.Block
                                     newFragment =
                                         if RichText.Node.isEmptyTextBlock <| RichText.Node.Block bn then
                                             [ node ]
@@ -2747,6 +2836,7 @@ insertBlockBeforeSelection node editorState =
 
                                     Ok newRoot ->
                                         let
+                                            newSelection : Maybe RichText.Model.Selection.Selection
                                             newSelection =
                                                 if RichText.Annotation.isSelectable (RichText.Node.Block node) then
                                                     Just <| RichText.Model.Selection.caret closestBlockPath 0
@@ -2832,8 +2922,9 @@ backspaceInlineElement editorState =
 
             else
                 let
+                    decrementedPath : RichText.Model.Node.Path
                     decrementedPath =
-                        RichText.Model.Node.decrement (anchorNode selection)
+                        RichText.Model.Node.decrement (RichText.Model.Selection.anchorNode selection)
                 in
                 case RichText.Node.nodeAt decrementedPath (RichText.Model.State.root editorState) of
                     Nothing ->
@@ -2926,8 +3017,9 @@ backspaceBlock editorState =
 
             else
                 let
+                    blockPath : RichText.Model.Node.Path
                     blockPath =
-                        RichText.Node.findClosestBlockPath (anchorNode selection) (RichText.Model.State.root editorState)
+                        RichText.Node.findClosestBlockPath (RichText.Model.Selection.anchorNode selection) (RichText.Model.State.root editorState)
                 in
                 case RichText.Node.previous blockPath (RichText.Model.State.root editorState) of
                     Nothing ->
@@ -2939,10 +3031,14 @@ backspaceBlock editorState =
                                 case RichText.Model.Node.childNodes bn of
                                     RichText.Model.Node.Leaf ->
                                         let
+                                            markedRoot : Result String RichText.Model.Node.Block
                                             markedRoot =
-                                                RichText.Annotation.annotateSelection selection (RichText.Model.State.root editorState)
+                                                editorState
+                                                    |> RichText.Model.State.root
+                                                    |> RichText.Annotation.annotateSelection selection
+                                                    |> RichText.Node.replaceWithFragment path (RichText.Node.BlockFragment Array.empty)
                                         in
-                                        case RichText.Node.replaceWithFragment path (RichText.Node.BlockFragment Array.empty) markedRoot of
+                                        case markedRoot of
                                             Err s ->
                                                 Err s
 
@@ -3077,19 +3173,20 @@ backspaceWord editorState =
                 Err "I cannot remove a word of a range selection"
 
             else
-                case RichText.Node.findTextBlockNodeAncestor (anchorNode selection) (RichText.Model.State.root editorState) of
+                case RichText.Node.findTextBlockNodeAncestor (RichText.Model.Selection.anchorNode selection) (RichText.Model.State.root editorState) of
                     Nothing ->
                         Err "I can only remove a word on a text leaf"
 
                     Just ( p, n ) ->
                         case RichText.Model.Node.childNodes n of
                             RichText.Model.Node.InlineChildren arr ->
-                                case List.Extra.last (anchorNode selection) of
+                                case List.Extra.last (RichText.Model.Selection.anchorNode selection) of
                                     Nothing ->
                                         Err "Somehow the anchor node is the root node"
 
                                     Just lastIndex ->
                                         let
+                                            groupedLeaves : List ( RichText.Model.Node.Inline, List RichText.Model.Node.Inline )
                                             groupedLeaves =
                                                 -- group text nodes together
                                                 List.Extra.groupWhile
@@ -3111,9 +3208,11 @@ backspaceWord editorState =
                                                     ( lastIndex, [] )
                                                     groupedLeaves
 
+                                            groupText : String
                                             groupText =
                                                 textFromGroup group
 
+                                            offsetUpToNewIndex : Int
                                             offsetUpToNewIndex =
                                                 List.sum <|
                                                     List.take
@@ -3121,9 +3220,11 @@ backspaceWord editorState =
                                                     <|
                                                         lengthsFromGroup group
 
+                                            offset : Int
                                             offset =
                                                 offsetUpToNewIndex + RichText.Model.Selection.anchorOffset selection
 
+                                            stringFrom : String
                                             stringFrom =
                                                 String.left offset groupText
                                         in
@@ -3132,9 +3233,11 @@ backspaceWord editorState =
 
                                         else
                                             let
+                                                matches : List Regex.Match
                                                 matches =
                                                     Regex.findAtMost 1 RichText.Internal.DeleteWord.backspaceWordRegex stringFrom
 
+                                                matchOffset : Int
                                                 matchOffset =
                                                     case List.head matches of
                                                         Nothing ->
@@ -3159,20 +3262,21 @@ backspaceWord editorState =
                                                     <|
                                                         lengthsFromGroup group
 
+                                                newIndex : Int
                                                 newIndex =
                                                     lastIndex - (relativeLastIndex - newGroupIndex)
 
+                                                newSelection : RichText.Model.Selection.Selection
                                                 newSelection =
                                                     RichText.Model.Selection.range
                                                         (p ++ [ newIndex ])
                                                         newOffset
-                                                        (anchorNode selection)
+                                                        (RichText.Model.Selection.anchorNode selection)
                                                         (RichText.Model.Selection.anchorOffset selection)
-
-                                                newState =
-                                                    editorState |> RichText.Model.State.withSelection (Just newSelection)
                                             in
-                                            removeRange newState
+                                            editorState
+                                                |> RichText.Model.State.withSelection (Just newSelection)
+                                                |> removeRange
 
                             _ ->
                                 Err "I expected an inline leaf array"
@@ -3244,7 +3348,7 @@ deleteText editorState =
                 Err "I can only backspace a collapsed selection"
 
             else
-                case RichText.Node.nodeAt (anchorNode selection) (RichText.Model.State.root editorState) of
+                case RichText.Node.nodeAt (RichText.Model.Selection.anchorNode selection) (RichText.Model.State.root editorState) of
                     Nothing ->
                         Err "I was given an invalid path to delete text"
 
@@ -3260,6 +3364,7 @@ deleteText editorState =
 
                                     RichText.Model.Node.Text tl ->
                                         let
+                                            textLength : Int
                                             textLength =
                                                 String.length (RichText.Model.Text.text tl)
                                         in
@@ -3269,7 +3374,7 @@ deleteText editorState =
                                         else if RichText.Model.Selection.anchorOffset selection == (textLength - 1) then
                                             case
                                                 RichText.Node.replace
-                                                    (anchorNode selection)
+                                                    (RichText.Model.Selection.anchorNode selection)
                                                     (RichText.Node.Inline
                                                         (RichText.Model.Node.Text
                                                             (tl |> RichText.Model.Text.withText (String.dropRight 1 (RichText.Model.Text.text tl)))
@@ -3284,7 +3389,7 @@ deleteText editorState =
                                                     Ok (editorState |> RichText.Model.State.withRoot newRoot)
 
                                         else
-                                            case RichText.Node.next (anchorNode selection) (RichText.Model.State.root editorState) of
+                                            case RichText.Node.next (RichText.Model.Selection.anchorNode selection) (RichText.Model.State.root editorState) of
                                                 Nothing ->
                                                     Err "I cannot do delete because there is no neighboring text node"
 
@@ -3297,6 +3402,7 @@ deleteText editorState =
                                                             case nextInlineLeafWrapper of
                                                                 RichText.Model.Node.Text _ ->
                                                                     let
+                                                                        newSelection : RichText.Model.Selection.Selection
                                                                         newSelection =
                                                                             RichText.Model.Selection.singleNodeRange nextPath 0 1
                                                                     in
@@ -3323,7 +3429,7 @@ deleteInlineElement editorState =
                 Err "I can only delete an inline element if the selection is collapsed"
 
             else
-                case RichText.Node.nodeAt (anchorNode selection) (RichText.Model.State.root editorState) of
+                case RichText.Node.nodeAt (RichText.Model.Selection.anchorNode selection) (RichText.Model.State.root editorState) of
                     Nothing ->
                         Err "I was given an invalid path to delete text"
 
@@ -3334,6 +3440,7 @@ deleteInlineElement editorState =
 
                             RichText.Node.Inline il ->
                                 let
+                                    length : Int
                                     length =
                                         case il of
                                             RichText.Model.Node.Text t ->
@@ -3347,8 +3454,9 @@ deleteInlineElement editorState =
 
                                 else
                                     let
+                                        incrementedPath : RichText.Model.Node.Path
                                         incrementedPath =
-                                            RichText.Model.Node.increment (anchorNode selection)
+                                            RichText.Model.Node.increment (RichText.Model.Selection.anchorNode selection)
                                     in
                                     case RichText.Node.nodeAt incrementedPath (RichText.Model.State.root editorState) of
                                         Nothing ->
@@ -3436,7 +3544,7 @@ deleteBlock editorState =
                 Err "Cannot delete a block element if we're not at the end of a text block"
 
             else
-                case RichText.Node.next (anchorNode selection) (RichText.Model.State.root editorState) of
+                case RichText.Node.next (RichText.Model.Selection.anchorNode selection) (RichText.Model.State.root editorState) of
                     Nothing ->
                         Err "There is no next node to delete"
 
@@ -3522,19 +3630,20 @@ deleteWord editorState =
                 Err "I cannot remove a word of a range selection"
 
             else
-                case RichText.Node.findTextBlockNodeAncestor (anchorNode selection) (RichText.Model.State.root editorState) of
+                case RichText.Node.findTextBlockNodeAncestor (RichText.Model.Selection.anchorNode selection) (RichText.Model.State.root editorState) of
                     Nothing ->
                         Err "I can only remove a word on a text leaf"
 
                     Just ( p, n ) ->
                         case RichText.Model.Node.childNodes n of
                             RichText.Model.Node.InlineChildren arr ->
-                                case List.Extra.last (anchorNode selection) of
+                                case List.Extra.last (RichText.Model.Selection.anchorNode selection) of
                                     Nothing ->
                                         Err "Somehow the anchor node is the root node"
 
                                     Just lastIndex ->
                                         let
+                                            groupedLeaves : List ( RichText.Model.Node.Inline, List RichText.Model.Node.Inline )
                                             groupedLeaves =
                                                 List.Extra.groupWhile
                                                     groupSameTypeInlineLeaf
@@ -3555,9 +3664,11 @@ deleteWord editorState =
                                                     ( lastIndex, [] )
                                                     groupedLeaves
 
+                                            groupText : String
                                             groupText =
                                                 textFromGroup group
 
+                                            offsetUpToNewIndex : Int
                                             offsetUpToNewIndex =
                                                 List.sum <|
                                                     List.take
@@ -3565,9 +3676,11 @@ deleteWord editorState =
                                                     <|
                                                         lengthsFromGroup group
 
+                                            offset : Int
                                             offset =
                                                 offsetUpToNewIndex + RichText.Model.Selection.anchorOffset selection
 
+                                            stringTo : String
                                             stringTo =
                                                 String.dropLeft offset groupText
                                         in
@@ -3576,9 +3689,11 @@ deleteWord editorState =
 
                                         else
                                             let
+                                                matches : List Regex.Match
                                                 matches =
                                                     Regex.findAtMost 1 RichText.Internal.DeleteWord.deleteWordRegex stringTo
 
+                                                matchOffset : Int
                                                 matchOffset =
                                                     case List.head matches of
                                                         Nothing ->
@@ -3603,20 +3718,21 @@ deleteWord editorState =
                                                     <|
                                                         lengthsFromGroup group
 
+                                                newIndex : Int
                                                 newIndex =
                                                     lastIndex - (relativeLastIndex - newGroupIndex)
 
+                                                newSelection : RichText.Model.Selection.Selection
                                                 newSelection =
                                                     RichText.Model.Selection.range
                                                         (p ++ [ newIndex ])
                                                         newOffset
-                                                        (anchorNode selection)
+                                                        (RichText.Model.Selection.anchorNode selection)
                                                         (RichText.Model.Selection.anchorOffset selection)
-
-                                                newState =
-                                                    editorState |> RichText.Model.State.withSelection (Just newSelection)
                                             in
-                                            removeRange newState
+                                            editorState
+                                                |> RichText.Model.State.withSelection (Just newSelection)
+                                                |> removeRange
 
                             _ ->
                                 Err "I expected an inline leaf array"
@@ -3624,7 +3740,7 @@ deleteWord editorState =
 
 isBlockLeaf : RichText.Model.Selection.Selection -> RichText.Model.Node.Block -> Bool
 isBlockLeaf selection root =
-    case RichText.Node.nodeAt (anchorNode selection) root of
+    case RichText.Node.nodeAt (RichText.Model.Selection.anchorNode selection) root of
         Nothing ->
             False
 
@@ -3717,17 +3833,19 @@ insertAfterBlockLeaf blockToInsert state =
                 Err "I can only insert an element after a block leaf"
 
             else
-                case RichText.Node.insertAfter (anchorNode selection) (RichText.Node.BlockFragment <| Array.fromList [ blockToInsert ]) (RichText.Model.State.root state) of
+                case RichText.Node.insertAfter (RichText.Model.Selection.anchorNode selection) (RichText.Node.BlockFragment <| Array.fromList [ blockToInsert ]) (RichText.Model.State.root state) of
                     Err s ->
                         Err s
 
                     Ok newRoot ->
                         let
+                            relativeSelectablePath : RichText.Model.Node.Path
                             relativeSelectablePath =
                                 Maybe.withDefault [] (firstSelectablePath blockToInsert)
 
+                            newAnchorPath : RichText.Model.Node.Path
                             newAnchorPath =
-                                RichText.Model.Node.increment (anchorNode selection) ++ relativeSelectablePath
+                                RichText.Model.Node.increment (RichText.Model.Selection.anchorNode selection) ++ relativeSelectablePath
                         in
                         Ok (RichText.Model.State.state newRoot (Just <| RichText.Model.Selection.caret newAnchorPath 0))
 
@@ -3739,6 +3857,7 @@ This is a somewhat specialized method, but may be useful outside of its narrow c
 insertNewline : List String -> RichText.Config.Command.Transform
 insertNewline elements editorState =
     let
+        removedRangeEditorState : RichText.Model.State.State
         removedRangeEditorState =
             Result.withDefault editorState (removeRange editorState)
     in
@@ -3751,7 +3870,7 @@ insertNewline elements editorState =
                 Err "I can only try to insert a newline if the selection is collapsed"
 
             else
-                case RichText.Node.findTextBlockNodeAncestor (anchorNode selection) (RichText.Model.State.root removedRangeEditorState) of
+                case RichText.Node.findTextBlockNodeAncestor (RichText.Model.Selection.anchorNode selection) (RichText.Model.State.root removedRangeEditorState) of
                     Nothing ->
                         Err "No textblock node ancestor found"
 
@@ -3779,15 +3898,17 @@ selectBackward state =
 
             else
                 let
+                    root : RichText.Model.Node.Block
                     root =
                         RichText.Model.State.root state
                 in
-                case RichText.Node.findBackwardFromExclusive (\_ n -> RichText.Annotation.isSelectable n) (anchorNode selection) root of
+                case RichText.Node.findBackwardFromExclusive (\_ n -> RichText.Annotation.isSelectable n) (RichText.Model.Selection.anchorNode selection) root of
                     Nothing ->
                         Err "I could not find a selectable node prior to the selected one"
 
                     Just ( newAnchor, n ) ->
                         let
+                            offset : Int
                             offset =
                                 case n of
                                     RichText.Node.Inline i ->
@@ -3801,7 +3922,13 @@ selectBackward state =
                                     _ ->
                                         0
                         in
-                        Ok (state |> RichText.Model.State.withSelection (Just <| RichText.Model.Selection.caret newAnchor offset))
+                        Ok
+                            (state
+                                |> RichText.Model.State.withSelection
+                                    (Just <|
+                                        RichText.Model.Selection.caret newAnchor offset
+                                    )
+                            )
 
 
 {-| If the selection is collapsed at the end of a text block, this will select the next
@@ -3820,10 +3947,11 @@ selectForward state =
 
             else
                 let
+                    root : RichText.Model.Node.Block
                     root =
                         RichText.Model.State.root state
                 in
-                case RichText.Node.findForwardFromExclusive (\_ n -> RichText.Annotation.isSelectable n) (anchorNode selection) root of
+                case RichText.Node.findForwardFromExclusive (\_ n -> RichText.Annotation.isSelectable n) (RichText.Model.Selection.anchorNode selection) root of
                     Nothing ->
                         Err "I could not find a selectable node after the selected one"
 

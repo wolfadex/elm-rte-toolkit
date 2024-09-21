@@ -14,17 +14,17 @@ rendering an editor.
 @docs Editor, init, state, shortKey, history, withHistory, changeCount
 
 
-# Config
+# Configs
 
 @docs Config, config, commandMap, decorations, spec
 
 
-# Update
+# Updates
 
 @docs Message, update, apply, applyList, applyNoForceSelection
 
 
-# View
+# Views
 
 @docs view, readOnlyView
 
@@ -113,33 +113,28 @@ config cfg =
 {-| The decorations from the config object.
 -}
 decorations : Config msg -> RichText.Config.Decorations.Decorations msg
-decorations cfg =
-    case cfg of
-        Config c ->
-            c.decorations
+decorations (Config c) =
+    c.decorations
 
 
 {-| The spec from the config object.
 -}
 spec : Config msg -> RichText.Config.Spec.Spec
-spec cfg =
-    case cfg of
-        Config c ->
-            c.spec
+spec (Config c) =
+    c.spec
 
 
 {-| The commandMap from the config object.
 -}
 commandMap : Config msg -> RichText.Config.Command.CommandMap
-commandMap cfg =
-    case cfg of
-        Config c ->
-            c.commandMap
+commandMap (Config c) =
+    c.commandMap
 
 
 updateSelection : Maybe RichText.Model.Selection.Selection -> RichText.Config.Spec.Spec -> Editor -> Editor
 updateSelection maybeSelection spec_ editor_ =
     let
+        editorState : RichText.Model.State.State
         editorState =
             state editor_
     in
@@ -149,11 +144,13 @@ updateSelection maybeSelection spec_ editor_ =
 
         Just selection ->
             let
+                translatedSelection : Maybe RichText.Model.Selection.Selection
                 translatedSelection =
                     RichText.Internal.Selection.domToEditor spec_ (RichText.Model.State.root editorState) selection
             in
             if RichText.Internal.Editor.isComposing editor_ then
                 let
+                    bufferedState : RichText.Model.State.State
                     bufferedState =
                         Maybe.withDefault editorState (RichText.Internal.Editor.bufferedEditorState editor_)
                 in
@@ -166,9 +163,11 @@ updateSelection maybeSelection spec_ editor_ =
 selectElement : RichText.Model.Node.Path -> RichText.Config.Spec.Spec -> Editor -> Editor
 selectElement path _ editor_ =
     let
+        editorState : RichText.Model.State.State
         editorState =
             state editor_
 
+        selection : RichText.Model.Selection.Selection
         selection =
             case RichText.Node.next path (RichText.Model.State.root editorState) of
                 Just ( b, _ ) ->
@@ -195,9 +194,11 @@ update cfg msg editor_ =
     case cfg of
         Config c ->
             let
+                spec_ : RichText.Config.Spec.Spec
                 spec_ =
                     c.spec
 
+                commandMap_ : RichText.Config.Command.CommandMap
                 commandMap_ =
                     c.commandMap
             in
@@ -271,6 +272,7 @@ textChangesDomToEditor spec_ editorNode changes =
 deriveTextChanges : RichText.Config.Spec.Spec -> RichText.Model.Node.Block -> RichText.Internal.DomNode.DomNode -> Result String (List RichText.Internal.Event.TextChange)
 deriveTextChanges spec_ editorNode domNode =
     let
+        htmlNode : RichText.Model.HtmlNode.HtmlNode
         htmlNode =
             RichText.Internal.HtmlNode.editorBlockNodeToHtmlNode spec_ editorNode
     in
@@ -285,11 +287,8 @@ applyForceFunctionOnEditor rerenderFunc editor_ =
                 editor_
 
             Just bufferedEditorState ->
-                let
-                    newEditor =
-                        RichText.Internal.Editor.updateEditorState "buffered" bufferedEditorState editor_
-                in
-                newEditor
+                editor_
+                    |> RichText.Internal.Editor.updateEditorState "buffered" bufferedEditorState
                     |> RichText.Internal.Editor.withBufferedEditorState Nothing
                     |> RichText.Internal.Editor.withComposing False
         )
@@ -354,14 +353,18 @@ differentText root ( path, t ) =
 updateChangeEventTextChanges : Int -> Bool -> List RichText.Internal.Event.TextChange -> Maybe RichText.Model.Selection.Selection -> RichText.Config.Spec.Spec -> Editor -> Editor
 updateChangeEventTextChanges timestamp composing textChanges selection spec_ editor_ =
     let
+        editorComposing : Bool
         editorComposing =
             composing || RichText.Internal.Editor.isComposing editor_
 
-        -- Fix to issue #4: when composing text, we want to do the text comparison with the
+        -- Fix to https://github.com/mweiss/elm-rte-toolkit/issues/4: when composing text, we want to do the text comparison with the
         -- buffered state if it exists.
+        stateToCompare : RichText.Model.State.State
         stateToCompare =
             if editorComposing then
-                Maybe.withDefault (state editor_) (RichText.Internal.Editor.bufferedEditorState editor_)
+                editor_
+                    |> RichText.Internal.Editor.bufferedEditorState
+                    |> Maybe.withDefault (state editor_)
 
             else
                 state editor_
@@ -372,6 +375,7 @@ updateChangeEventTextChanges timestamp composing textChanges selection spec_ edi
 
         Just changes ->
             let
+                actualChanges : List RichText.Internal.Event.TextChange
                 actualChanges =
                     List.filter (differentText (RichText.Model.State.root stateToCompare)) changes
             in
@@ -380,6 +384,7 @@ updateChangeEventTextChanges timestamp composing textChanges selection spec_ edi
 
             else
                 let
+                    editorState : RichText.Model.State.State
                     editorState =
                         state editor_
                 in
@@ -389,6 +394,7 @@ updateChangeEventTextChanges timestamp composing textChanges selection spec_ edi
 
                     Just replacedEditorNodes ->
                         let
+                            newEditorState : RichText.Model.State.State
                             newEditorState =
                                 editorState
                                     |> RichText.Model.State.withSelection (selection |> Maybe.andThen (RichText.Internal.Selection.domToEditor spec_ (RichText.Model.State.root editorState)))
@@ -399,11 +405,9 @@ updateChangeEventTextChanges timestamp composing textChanges selection spec_ edi
                                 |> RichText.Internal.Editor.withBufferedEditorState (Just newEditorState)
 
                         else
-                            let
-                                newEditor =
-                                    RichText.Internal.Editor.updateEditorStateWithTimestamp (Just timestamp) "textChange" newEditorState editor_
-                            in
-                            applyForceFunctionOnEditor RichText.Internal.Editor.forceReselection newEditor
+                            editor_
+                                |> RichText.Internal.Editor.updateEditorStateWithTimestamp (Just timestamp) "textChange" newEditorState
+                                |> applyForceFunctionOnEditor RichText.Internal.Editor.forceReselection
 
 
 updateChangeEventFullScan : Int -> Bool -> RichText.Internal.DomNode.DomNode -> Maybe RichText.Model.Selection.Selection -> RichText.Config.Spec.Spec -> Editor -> Editor
@@ -430,10 +434,13 @@ needCompleteRerender root =
     case root of
         RichText.Internal.DomNode.DomNode v ->
             let
-                cnodes =
-                    Maybe.withDefault Array.empty v.childNodes
+                cnodesLength : Int
+                cnodesLength =
+                    v.childNodes
+                        |> Maybe.withDefault Array.empty
+                        |> Array.length
             in
-            Array.length cnodes /= 1
+            cnodesLength /= 1
 
 
 editorChangeDecoder : Json.Decode.Decoder Message
@@ -547,6 +554,7 @@ applyTextChange editorNode ( path, text ) =
             case RichText.Model.Node.childNodes editorNode of
                 RichText.Model.Node.BlockChildren array ->
                     let
+                        a : Array RichText.Model.Node.Block
                         a =
                             RichText.Model.Node.toBlockArray array
                     in
@@ -571,6 +579,7 @@ applyTextChange editorNode ( path, text ) =
 
                     else
                         let
+                            a : Array RichText.Model.Node.Inline
                             a =
                                 RichText.Model.Node.toInlineArray array
                         in
@@ -703,18 +712,23 @@ view cfg editor_ =
     case cfg of
         Config c ->
             let
+                tagger : Message -> msg
                 tagger =
                     c.toMsg
 
+                commandMap_ : RichText.Config.Command.CommandMap
                 commandMap_ =
                     c.commandMap
 
+                decorations_ : RichText.Config.Decorations.Decorations msg
                 decorations_ =
                     c.decorations
 
+                spec_ : RichText.Config.Spec.Spec
                 spec_ =
                     c.spec
 
+                state_ : RichText.Model.State.State
                 state_ =
                     state editor_
             in
@@ -770,12 +784,15 @@ readOnlyView cfg editor_ =
     case cfg of
         Config c ->
             let
+                decorations_ : RichText.Config.Decorations.Decorations msg
                 decorations_ =
                     c.decorations
 
+                spec_ : RichText.Config.Spec.Spec
                 spec_ =
                     c.spec
 
+                state_ : RichText.Model.State.State
                 state_ =
                     state editor_
             in
@@ -798,6 +815,7 @@ viewHtmlNode node decorators vdomChildren backwardsRelativePath =
     case node of
         RichText.Model.HtmlNode.ElementNode name attributes children ->
             let
+                childNodes : Array (Html msg)
                 childNodes =
                     if children == RichText.Internal.HtmlNode.childNodesPlaceholder then
                         vdomChildren
@@ -821,16 +839,18 @@ viewHtmlNode node decorators vdomChildren backwardsRelativePath =
 viewMark : RichText.Config.Spec.Spec -> RichText.Config.Decorations.Decorations msg -> RichText.Model.Node.Path -> RichText.Model.Mark.Mark -> Array (Html msg) -> Html msg
 viewMark spec_ decorations_ backwardsNodePath mark children =
     let
+        mDecorators : List (RichText.Config.Decorations.MarkDecoration msg)
         mDecorators =
-            Maybe.withDefault []
-                (Dict.get
-                    (RichText.Model.Mark.name mark)
-                    (RichText.Config.Decorations.markDecorations decorations_)
-                )
+            decorations_
+                |> RichText.Config.Decorations.markDecorations
+                |> Dict.get (RichText.Model.Mark.name mark)
+                |> Maybe.withDefault []
 
+        decorators : List (RichText.Model.Node.Path -> List (Html.Attribute msg))
         decorators =
             List.map (\d -> d (List.reverse backwardsNodePath) mark) mDecorators
 
+        node : RichText.Model.HtmlNode.HtmlNode
         node =
             RichText.Config.MarkDefinition.toHtmlNode (RichText.Internal.Spec.markDefinitionWithDefault mark spec_) mark RichText.Internal.HtmlNode.childNodesPlaceholder
     in
@@ -840,19 +860,22 @@ viewMark spec_ decorations_ backwardsNodePath mark children =
 viewElement : RichText.Config.Spec.Spec -> RichText.Config.Decorations.Decorations msg -> RichText.Model.Element.Element -> RichText.Model.Node.Path -> Array (Html msg) -> Html msg
 viewElement spec_ decorations_ elementParameters backwardsNodePath children =
     let
+        definition : RichText.Config.ElementDefinition.ElementDefinition
         definition =
             RichText.Internal.Spec.elementDefinitionWithDefault elementParameters spec_
 
+        node : RichText.Model.HtmlNode.HtmlNode
         node =
             RichText.Config.ElementDefinition.toHtmlNode definition elementParameters RichText.Internal.HtmlNode.childNodesPlaceholder
 
+        eDecorators : List (RichText.Config.Decorations.ElementDecoration msg)
         eDecorators =
-            Maybe.withDefault []
-                (Dict.get
-                    (RichText.Model.Element.name elementParameters)
-                    (RichText.Config.Decorations.elementDecorations decorations_)
-                )
+            decorations_
+                |> RichText.Config.Decorations.elementDecorations
+                |> Dict.get (RichText.Model.Element.name elementParameters)
+                |> Maybe.withDefault []
 
+        decorators : List (RichText.Model.Node.Path -> List (Html.Attribute msg))
         decorators =
             List.map (\d -> d (List.reverse backwardsNodePath) elementParameters) eDecorators
     in

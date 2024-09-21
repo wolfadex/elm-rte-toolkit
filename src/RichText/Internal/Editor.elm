@@ -104,137 +104,103 @@ type Message
 
 
 completeRerenderCount : Editor -> Int
-completeRerenderCount e =
-    case e of
-        Editor c ->
-            c.completeRerenderCount
+completeRerenderCount (Editor c) =
+    c.completeRerenderCount
 
 
 selectionCount : Editor -> Int
-selectionCount e =
-    case e of
-        Editor c ->
-            c.selectionCount
+selectionCount (Editor c) =
+    c.selectionCount
 
 
 renderCount : Editor -> Int
-renderCount e =
-    case e of
-        Editor c ->
-            c.renderCount
+renderCount (Editor c) =
+    c.renderCount
 
 
 bufferedEditorState : Editor -> Maybe RichText.Model.State.State
-bufferedEditorState e =
-    case e of
-        Editor c ->
-            c.bufferedEditorState
+bufferedEditorState (Editor c) =
+    c.bufferedEditorState
 
 
 isComposing : Editor -> Bool
-isComposing e =
-    case e of
-        Editor c ->
-            c.isComposing
+isComposing (Editor c) =
+    c.isComposing
 
 
 withComposing : Bool -> Editor -> Editor
-withComposing composing e =
-    case e of
-        Editor c ->
-            Editor { c | isComposing = composing }
+withComposing composing (Editor c) =
+    Editor { c | isComposing = composing }
 
 
 withBufferedEditorState : Maybe RichText.Model.State.State -> Editor -> Editor
-withBufferedEditorState s e =
-    case e of
-        Editor c ->
-            Editor { c | bufferedEditorState = s }
+withBufferedEditorState s (Editor c) =
+    Editor { c | bufferedEditorState = s }
 
 
 state : Editor -> RichText.Model.State.State
-state e =
-    case e of
-        Editor c ->
-            c.state
+state (Editor c) =
+    c.state
 
 
 withState : RichText.Model.State.State -> Editor -> Editor
-withState s e =
-    case e of
-        Editor c ->
-            Editor { c | state = s }
+withState s (Editor c) =
+    Editor { c | state = s }
 
 
 history : Editor -> RichText.Internal.History.History
-history e =
-    case e of
-        Editor c ->
-            c.history
+history (Editor c) =
+    c.history
 
 
 changeCount : Editor -> Int
-changeCount e =
-    case e of
-        Editor c ->
-            c.changeCount
+changeCount (Editor c) =
+    c.changeCount
 
 
 shortKey : Editor -> String
-shortKey e =
-    case e of
-        Editor c ->
-            c.shortKey
+shortKey (Editor c) =
+    c.shortKey
 
 
 withHistory : RichText.Internal.History.History -> Editor -> Editor
-withHistory h e =
-    case e of
-        Editor c ->
-            Editor { c | history = h }
+withHistory h (Editor c) =
+    Editor { c | history = h }
 
 
 withShortKey : String -> Editor -> Editor
-withShortKey key e =
-    case e of
-        Editor c ->
-            Editor { c | shortKey = key }
+withShortKey key (Editor c) =
+    Editor { c | shortKey = key }
 
 
 incrementChangeCount : Editor -> Editor
-incrementChangeCount e =
-    case e of
-        Editor c ->
-            Editor { c | changeCount = c.changeCount + 1 }
+incrementChangeCount (Editor c) =
+    Editor { c | changeCount = c.changeCount + 1 }
 
 
 forceRerender : Editor -> Editor
-forceRerender e =
-    case e of
-        Editor c ->
-            Editor { c | renderCount = c.renderCount + 1 }
+forceRerender (Editor c) =
+    Editor { c | renderCount = c.renderCount + 1 }
 
 
 forceReselection : Editor -> Editor
-forceReselection e =
-    case e of
-        Editor c ->
-            Editor { c | selectionCount = c.selectionCount + 1 }
+forceReselection (Editor c) =
+    Editor { c | selectionCount = c.selectionCount + 1 }
 
 
 forceCompleteRerender : Editor -> Editor
-forceCompleteRerender e =
-    case e of
-        Editor c ->
-            Editor { c | completeRerenderCount = c.completeRerenderCount + 1 }
+forceCompleteRerender (Editor c) =
+    Editor { c | completeRerenderCount = c.completeRerenderCount + 1 }
 
 
 handleUndo : Editor -> Editor
 handleUndo editor_ =
     let
+        editorHistory : RichText.Internal.History.Contents
         editorHistory =
             RichText.Internal.History.contents (history editor_)
 
+        editorState : RichText.Model.State.State
         editorState =
             state editor_
 
@@ -247,16 +213,21 @@ handleUndo editor_ =
 
         Just newState ->
             let
+                newHistory : RichText.Internal.History.Contents
                 newHistory =
                     { editorHistory | undoDeque = newUndoDeque, redoStack = editorState :: editorHistory.redoStack, lastTextChangeTimestamp = 0 }
             in
             incrementChangeCount
-                (editor_ |> withState newState |> withHistory (RichText.Internal.History.fromContents newHistory))
+                (editor_
+                    |> withState newState
+                    |> withHistory (RichText.Internal.History.fromContents newHistory)
+                )
 
 
 handleRedo : Editor -> Result String Editor
 handleRedo editor_ =
     let
+        editorHistory : RichText.Internal.History.Contents
         editorHistory =
             RichText.Internal.History.contents (history editor_)
     in
@@ -266,6 +237,7 @@ handleRedo editor_ =
 
         newState :: xs ->
             let
+                newHistory : RichText.Internal.History.Contents
                 newHistory =
                     { editorHistory
                         | undoDeque =
@@ -276,7 +248,10 @@ handleRedo editor_ =
             in
             Ok
                 (incrementChangeCount
-                    (editor_ |> withState newState |> withHistory (RichText.Internal.History.fromContents newHistory))
+                    (editor_
+                        |> withState newState
+                        |> withHistory (RichText.Internal.History.fromContents newHistory)
+                    )
                 )
 
 
@@ -288,12 +263,15 @@ updateEditorState =
 updateEditorStateWithTimestamp : Maybe Int -> String -> RichText.Model.State.State -> Editor -> Editor
 updateEditorStateWithTimestamp maybeTimestamp action newState editor_ =
     let
+        editorHistory : RichText.Internal.History.Contents
         editorHistory =
             RichText.Internal.History.contents (history editor_)
 
+        timestamp : Int
         timestamp =
             Maybe.withDefault 0 maybeTimestamp
 
+        newUndoDeque : BoundedDeque ( String, RichText.Model.State.State )
         newUndoDeque =
             case BoundedDeque.first editorHistory.undoDeque of
                 Nothing ->
@@ -314,6 +292,7 @@ updateEditorStateWithTimestamp maybeTimestamp action newState editor_ =
                     else
                         BoundedDeque.pushFront ( action, state editor_ ) editorHistory.undoDeque
 
+        newHistory : RichText.Internal.History.Contents
         newHistory =
             { editorHistory
                 | undoDeque = newUndoDeque
@@ -366,6 +345,7 @@ applyCommand ( name, command ) spec editor_ =
 
                 Ok v ->
                     let
+                        reducedState : RichText.Model.State.State
                         reducedState =
                             RichText.State.reduce v
                     in
@@ -385,6 +365,7 @@ applyCommandNoForceSelection ( name, command ) spec editor_ =
 
                 Ok v ->
                     let
+                        reducedState : RichText.Model.State.State
                         reducedState =
                             RichText.State.reduce v
                     in

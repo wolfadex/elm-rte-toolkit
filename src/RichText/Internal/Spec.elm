@@ -49,7 +49,7 @@ htmlToElementArray spec html =
                         ++ List.foldr
                             (++)
                             ""
-                            (errList |> List.map ((++) "\n"))
+                            (List.map (\err -> "\n" ++ err) errList)
 
             else
                 Ok <| reduceEditorFragmentArray newArray
@@ -71,9 +71,17 @@ htmlNodeToEditorFragment spec marks node =
 
         _ ->
             let
+                definitions : List RichText.Config.ElementDefinition.ElementDefinition
                 definitions =
                     RichText.Config.Spec.elementDefinitions spec
 
+                maybeElementAndChildren :
+                    Maybe
+                        ( RichText.Config.ElementDefinition.ElementDefinition
+                        , ( RichText.Model.Element.Element
+                          , Array RichText.Model.HtmlNode.HtmlNode
+                          )
+                        )
                 maybeElementAndChildren =
                     List.foldl
                         (\definition result ->
@@ -95,6 +103,7 @@ htmlNodeToEditorFragment spec marks node =
             case maybeElementAndChildren of
                 Just ( definition, ( element, children ) ) ->
                     let
+                        contentType : RichText.Config.ElementDefinition.ContentType
                         contentType =
                             RichText.Config.ElementDefinition.contentType definition
                     in
@@ -108,10 +117,13 @@ htmlNodeToEditorFragment spec marks node =
 
                     else
                         let
+                            childArr : Result String RichText.Model.Node.Children
                             childArr =
-                                Array.map (htmlNodeToEditorFragment spec []) children
+                                children
+                                    |> Array.map (htmlNodeToEditorFragment spec [])
+                                    |> arrayToChildNodes contentType
                         in
-                        case arrayToChildNodes contentType childArr of
+                        case childArr of
                             Err s ->
                                 Err s
 
@@ -125,13 +137,17 @@ htmlNodeToEditorFragment spec marks node =
 
                         Just ( mark, children ) ->
                             let
+                                newMarks : List RichText.Model.Mark.Mark
                                 newMarks =
-                                    RichText.Model.Mark.toggle RichText.Model.Mark.Add (RichText.Model.Mark.markOrderFromSpec spec) mark marks
-
-                                newChildren =
-                                    Array.map (htmlNodeToEditorFragment spec newMarks) children
+                                    RichText.Model.Mark.toggle
+                                        RichText.Model.Mark.Add
+                                        (RichText.Model.Mark.markOrderFromSpec spec)
+                                        mark
+                                        marks
                             in
-                            arrayToFragment newChildren
+                            children
+                                |> Array.map (htmlNodeToEditorFragment spec newMarks)
+                                |> arrayToFragment
 
 
 htmlNodeToMark : RichText.Config.Spec.Spec -> RichText.Model.HtmlNode.HtmlNode -> Maybe ( RichText.Model.Mark.Mark, Array RichText.Model.HtmlNode.HtmlNode )
@@ -221,6 +237,7 @@ arrayToChildNodes contentType results =
 arrayToFragment : Array (Result String RichText.Node.Fragment) -> Result String RichText.Node.Fragment
 arrayToFragment results =
     let
+        aResult : Result String (Array RichText.Node.Fragment)
         aResult =
             Array.foldl
                 (\fragmentResult arrayResult ->
@@ -245,6 +262,7 @@ arrayToFragment results =
 
         Ok result ->
             let
+                reducedArray : Array RichText.Node.Fragment
                 reducedArray =
                     reduceEditorFragmentArray result
             in
@@ -272,8 +290,8 @@ stringToHtmlNodeArray html =
 
 nodeListToHtmlNodeArray : List Html.Parser.Node -> Array RichText.Model.HtmlNode.HtmlNode
 nodeListToHtmlNodeArray nodeList =
-    Array.fromList <|
-        List.concatMap
+    nodeList
+        |> List.concatMap
             (\n ->
                 case n of
                     Html.Parser.Element name attributes children ->
@@ -290,22 +308,32 @@ nodeListToHtmlNodeArray nodeList =
                     Html.Parser.Comment _ ->
                         []
             )
-            nodeList
+        |> Array.fromList
 
 
 markDefinitionWithDefault : RichText.Model.Mark.Mark -> RichText.Config.Spec.Spec -> RichText.Config.MarkDefinition.MarkDefinition
 markDefinitionWithDefault mark spec =
     let
+        name : String
         name =
             RichText.Internal.Definitions.nameFromMark mark
     in
-    Maybe.withDefault (RichText.Config.MarkDefinition.defaultMarkDefinition name) (RichText.Config.Spec.markDefinition name spec)
+    Maybe.withDefault
+        (RichText.Config.MarkDefinition.defaultMarkDefinition name)
+        (RichText.Config.Spec.markDefinition name spec)
 
 
 elementDefinitionWithDefault : RichText.Model.Element.Element -> RichText.Config.Spec.Spec -> RichText.Config.ElementDefinition.ElementDefinition
 elementDefinitionWithDefault ele spec =
     let
+        name : String
         name =
             RichText.Internal.Definitions.nameFromElement ele
     in
-    Maybe.withDefault (RichText.Config.ElementDefinition.defaultElementDefinition name "block" (RichText.Config.ElementDefinition.blockNode [])) (RichText.Config.Spec.elementDefinition name spec)
+    Maybe.withDefault
+        (RichText.Config.ElementDefinition.defaultElementDefinition
+            name
+            "block"
+            (RichText.Config.ElementDefinition.blockNode [])
+        )
+        (RichText.Config.Spec.elementDefinition name spec)

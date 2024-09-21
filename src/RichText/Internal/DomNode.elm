@@ -37,6 +37,7 @@ type DomNode
 {-| The DOM text node nodeType value as specified by the w3c spec [w3c spec][w3c-custom-types-text-node]
 [w3c-custom-types-text-node]: <https://www.w3.org/TR/domcore/#dom-node-text_node>
 -}
+domTextNodeType : Int
 domTextNodeType =
     3
 
@@ -44,6 +45,7 @@ domTextNodeType =
 {-| The DOM element node nodeType value as specified by the [w3c spec][w3c-custom-types-element-node]
 [w3c-custom-types-element-node]: <https://www.w3.org/TR/domcore/#dom-node-element_node>
 -}
+domElementNodeType : Int
 domElementNodeType =
     1
 
@@ -103,6 +105,7 @@ findTextChangesRec htmlNode domNode backwardsNodePath =
 
                     else
                         let
+                            domChildNodes : Array DomNode
                             domChildNodes =
                                 Maybe.withDefault Array.empty domNodeContents.childNodes
                         in
@@ -115,6 +118,7 @@ findTextChangesRec htmlNode domNode backwardsNodePath =
 
                         else
                             let
+                                indexedNodePairs : Array ( Int, ( RichText.Model.HtmlNode.HtmlNode, DomNode ) )
                                 indexedNodePairs =
                                     Array.indexedMap Tuple.pair <| Array.Extra.map2 Tuple.pair children domChildNodes
                             in
@@ -146,6 +150,7 @@ findTextChangesRec htmlNode domNode backwardsNodePath =
 
                             Just domNodeText ->
                                 let
+                                    domNodeSanitizedText : String
                                     domNodeSanitizedText =
                                         if domNodeText == RichText.Internal.Constants.zeroWidthSpace then
                                             ""

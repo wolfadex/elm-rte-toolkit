@@ -20,12 +20,15 @@ import RichText.Node
 handlePaste : RichText.Internal.Event.PasteEvent -> RichText.Config.Spec.Spec -> RichText.Internal.Editor.Editor -> RichText.Internal.Editor.Editor
 handlePaste event spec editor =
     let
+        commandArray : List ( String, RichText.Config.Command.Command )
         commandArray =
             [ ( "pasteHtml", RichText.Config.Command.transform <| pasteHtml spec event.html )
             , ( "pasteText", RichText.Config.Command.transform <| pasteText event.text )
             ]
     in
-    Result.withDefault editor (RichText.Internal.Editor.applyNamedCommandList commandArray spec editor)
+    editor
+        |> RichText.Internal.Editor.applyNamedCommandList commandArray spec
+        |> Result.withDefault editor
 
 
 pasteText : String -> RichText.Config.Command.Transform
@@ -49,9 +52,13 @@ pasteText text editorState =
 
                         Just ( _, tbNode ) ->
                             let
+                                lines : List String
                                 lines =
-                                    String.split "\n" (String.replace RichText.Internal.Constants.zeroWidthSpace "" text)
+                                    text
+                                        |> String.replace RichText.Internal.Constants.zeroWidthSpace ""
+                                        |> String.split "\n"
 
+                                newLines : List RichText.Model.Node.Block
                                 newLines =
                                     List.map
                                         (\line ->
@@ -64,6 +71,7 @@ pasteText text editorState =
                                         )
                                         lines
 
+                                fragment : RichText.Node.Fragment
                                 fragment =
                                     RichText.Node.BlockFragment (Array.fromList newLines)
                             in
@@ -144,9 +152,11 @@ pasteInlineArray inlineFragment editorState =
                                                             ( previous, next ) =
                                                                 RichText.Node.splitTextLeaf (RichText.Model.Selection.anchorOffset selection) tl
 
+                                                            newFragment : Array RichText.Model.Node.Inline
                                                             newFragment =
                                                                 Array.fromList <| RichText.Model.Node.Text previous :: (Array.toList inlineFragment ++ [ RichText.Model.Node.Text next ])
 
+                                                            replaceResult : Result String RichText.Model.Node.Block
                                                             replaceResult =
                                                                 RichText.Node.replaceWithFragment (RichText.Model.Selection.anchorNode selection)
                                                                     (RichText.Node.InlineFragment newFragment)
@@ -158,6 +168,7 @@ pasteInlineArray inlineFragment editorState =
 
                                                             Ok newRoot ->
                                                                 let
+                                                                    newSelection : RichText.Model.Selection.Selection
                                                                     newSelection =
                                                                         RichText.Model.Selection.caret (path ++ [ index + Array.length inlineFragment + 1 ]) 0
                                                                 in
@@ -169,8 +180,12 @@ pasteInlineArray inlineFragment editorState =
 
                                                     RichText.Model.Node.InlineElement _ ->
                                                         let
+                                                            replaceResult : Result String RichText.Model.Node.Block
                                                             replaceResult =
-                                                                RichText.Node.replaceWithFragment (RichText.Model.Selection.anchorNode selection) (RichText.Node.InlineFragment inlineFragment) (RichText.Model.State.root editorState)
+                                                                RichText.Node.replaceWithFragment
+                                                                    (RichText.Model.Selection.anchorNode selection)
+                                                                    (RichText.Node.InlineFragment inlineFragment)
+                                                                    (RichText.Model.State.root editorState)
                                                         in
                                                         case replaceResult of
                                                             Err s ->
@@ -178,6 +193,7 @@ pasteInlineArray inlineFragment editorState =
 
                                                             Ok newRoot ->
                                                                 let
+                                                                    newSelection : RichText.Model.Selection.Selection
                                                                     newSelection =
                                                                         RichText.Model.Selection.caret (path ++ [ index + Array.length inlineFragment - 1 ]) 0
                                                                 in
@@ -201,6 +217,7 @@ pasteBlockArray blockFragment editorState =
 
             else
                 let
+                    parentPath : RichText.Model.Node.Path
                     parentPath =
                         RichText.Model.Node.parent (RichText.Model.Selection.anchorNode selection)
                 in
@@ -234,6 +251,7 @@ pasteBlockArray blockFragment editorState =
 
                                                     Just index ->
                                                         let
+                                                            newSelection : RichText.Model.Selection.Selection
                                                             newSelection =
                                                                 RichText.Model.Selection.caret (parentPath ++ [ index + Array.length blockFragment - 1 ]) 0
                                                         in
@@ -255,6 +273,7 @@ pasteBlockArray blockFragment editorState =
 
                                                     Just splitSelection ->
                                                         let
+                                                            annotatedSelectionRoot : RichText.Model.Node.Block
                                                             annotatedSelectionRoot =
                                                                 RichText.Annotation.annotateSelection splitSelection (RichText.Model.State.root splitEditorState)
                                                         in
@@ -264,31 +283,34 @@ pasteBlockArray blockFragment editorState =
 
                                                             Ok addedNodesRoot ->
                                                                 let
+                                                                    addNodesEditorState : RichText.Model.State.State
                                                                     addNodesEditorState =
                                                                         editorState |> RichText.Model.State.withRoot addedNodesRoot
 
+                                                                    joinBeginningState : RichText.Model.State.State
                                                                     joinBeginningState =
-                                                                        Result.withDefault
-                                                                            addNodesEditorState
-                                                                            (RichText.Commands.joinForward
-                                                                                (addNodesEditorState
-                                                                                    |> RichText.Model.State.withSelection
-                                                                                        (Just <|
-                                                                                            RichText.Model.Selection.caret
-                                                                                                (RichText.Model.Selection.anchorNode selection)
-                                                                                                (RichText.Model.Selection.anchorOffset selection)
-                                                                                        )
+                                                                        (addNodesEditorState
+                                                                            |> RichText.Model.State.withSelection
+                                                                                (Just <|
+                                                                                    RichText.Model.Selection.caret
+                                                                                        (RichText.Model.Selection.anchorNode selection)
+                                                                                        (RichText.Model.Selection.anchorOffset selection)
                                                                                 )
-                                                                            )
+                                                                        )
+                                                                            |> RichText.Commands.joinForward
+                                                                            |> Result.withDefault addNodesEditorState
 
+                                                                    annotatedSelection : Maybe RichText.Model.Selection.Selection
                                                                     annotatedSelection =
                                                                         RichText.Annotation.selectionFromAnnotations (RichText.Model.State.root joinBeginningState)
                                                                             (RichText.Model.Selection.anchorOffset splitSelection)
                                                                             (RichText.Model.Selection.focusOffset splitSelection)
 
+                                                                    joinEndState : RichText.Model.State.State
                                                                     joinEndState =
-                                                                        Result.withDefault
-                                                                            joinBeginningState
-                                                                            (RichText.Commands.joinBackward (joinBeginningState |> RichText.Model.State.withSelection annotatedSelection))
+                                                                        joinBeginningState
+                                                                            |> RichText.Model.State.withSelection annotatedSelection
+                                                                            |> RichText.Commands.joinBackward
+                                                                            |> Result.withDefault joinBeginningState
                                                                 in
                                                                 Ok (joinEndState |> RichText.Model.State.withRoot (RichText.Annotation.clearSelectionAnnotations (RichText.Model.State.root joinEndState)))

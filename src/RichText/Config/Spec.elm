@@ -1,12 +1,17 @@
-module RichText.Config.Spec exposing (Spec, emptySpec, markDefinitions, markDefinition, elementDefinitions, elementDefinition, withMarkDefinitions, withElementDefinitions)
+module RichText.Config.Spec exposing
+    ( Spec, emptySpec, markDefinitions, markDefinition, elementDefinitions, elementDefinition, withMarkDefinitions, withElementDefinitions
+    , MarkDefinition
+    )
 
 {-| A spec describes what nodes and marks can be in an editor.
 
 @docs Spec, emptySpec, markDefinitions, markDefinition, elementDefinitions, elementDefinition, withMarkDefinitions, withElementDefinitions
+@docs MarkDefinition
 
 -}
 
 import Dict exposing (Dict)
+import RichText.Config.ElementDefinition
 import RichText.Internal.Definitions
 
 
@@ -34,6 +39,12 @@ type Spec
     = Spec SpecContents
 
 
+{-| A mark definition defines how a mark is encoded an decoded.
+-}
+type alias MarkDefinition =
+    RichText.Internal.Definitions.MarkDefinition
+
+
 {-| An empty spec
 -}
 emptySpec : Spec
@@ -43,7 +54,7 @@ emptySpec =
 
 {-| list of `MarkDefinition` from a spec
 -}
-markDefinitions : Spec -> List RichText.Internal.Definitions.MarkDefinition
+markDefinitions : Spec -> List MarkDefinition
 markDefinitions spec =
     case spec of
         Spec c ->
@@ -52,7 +63,7 @@ markDefinitions spec =
 
 {-| list of `ElementDefinition` from a spec
 -}
-elementDefinitions : Spec -> List RichText.Internal.Definitions.ElementDefinition
+elementDefinitions : Spec -> List RichText.Config.ElementDefinition.ElementDefinition
 elementDefinitions spec =
     case spec of
         Spec c ->
@@ -61,7 +72,7 @@ elementDefinitions spec =
 
 {-| a spec with the given mark definitions
 -}
-withMarkDefinitions : List RichText.Internal.Definitions.MarkDefinition -> Spec -> Spec
+withMarkDefinitions : List MarkDefinition -> Spec -> Spec
 withMarkDefinitions marks spec =
     case spec of
         Spec c ->
@@ -82,7 +93,7 @@ withMarkDefinitions marks spec =
 
 {-| a spec with the given element definitions
 -}
-withElementDefinitions : List RichText.Internal.Definitions.ElementDefinition -> Spec -> Spec
+withElementDefinitions : List RichText.Config.ElementDefinition.ElementDefinition -> Spec -> Spec
 withElementDefinitions nodes spec =
     case spec of
         Spec c ->
@@ -107,7 +118,7 @@ withElementDefinitions nodes spec =
     --> Just (bold mark definition)
 
 -}
-markDefinition : String -> Spec -> Maybe RichText.Internal.Definitions.MarkDefinition
+markDefinition : String -> Spec -> Maybe MarkDefinition
 markDefinition name spec =
     case spec of
         Spec c ->
@@ -120,7 +131,7 @@ markDefinition name spec =
     --> Just (paragraph element definition)
 
 -}
-elementDefinition : String -> Spec -> Maybe RichText.Internal.Definitions.ElementDefinition
+elementDefinition : String -> Spec -> Maybe RichText.Config.ElementDefinition.ElementDefinition
 elementDefinition name spec =
     case spec of
         Spec c ->
@@ -130,6 +141,6 @@ elementDefinition name spec =
 type alias SpecContents =
     { marks : List RichText.Internal.Definitions.MarkDefinition
     , nameToMark : Dict String RichText.Internal.Definitions.MarkDefinition
-    , elements : List RichText.Internal.Definitions.ElementDefinition
-    , nameToElement : Dict String RichText.Internal.Definitions.ElementDefinition
+    , elements : List RichText.Config.ElementDefinition.ElementDefinition
+    , nameToElement : Dict String RichText.Config.ElementDefinition.ElementDefinition
     }

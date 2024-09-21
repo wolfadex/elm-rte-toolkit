@@ -18,7 +18,9 @@ type alias Element =
     RichText.Internal.Definitions.Element
 
 
-{-| -}
+{-| A `ElementDefinition` contains information on how to serialize/deserialize an editor node,
+as well as describes what type of node and what children the node can have.
+-}
 type alias ElementDefinition =
     RichText.Internal.Definitions.ElementDefinition
 

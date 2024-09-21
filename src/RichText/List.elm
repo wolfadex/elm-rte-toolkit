@@ -83,9 +83,11 @@ using `RichText.Model.Command.combine`:
 defaultCommandMap : ListDefinition -> RichText.Config.Command.CommandMap
 defaultCommandMap definition =
     let
+        backspaceCommand : RichText.Model.State.State -> Result String RichText.Model.State.State
         backspaceCommand =
             joinBackward definition
 
+        deleteCommand : RichText.Model.State.State -> Result String RichText.Model.State.State
         deleteCommand =
             joinForward definition
     in
@@ -358,13 +360,12 @@ isListNode definition node =
 
         RichText.Node.Block bn ->
             let
+                bnName : String
                 bnName =
                     RichText.Model.Element.name (RichText.Model.Node.element bn)
             in
-            bnName
-                == RichText.Model.Element.name (ordered definition)
-                || bnName
-                == RichText.Model.Element.name (unordered definition)
+            (bnName == RichText.Model.Element.name (ordered definition))
+                || (bnName == RichText.Model.Element.name (unordered definition))
 
 
 addLiftAnnotationAtPathAndChildren : RichText.Model.Node.Path -> RichText.Model.Node.Block -> Result String RichText.Model.Node.Block
@@ -419,6 +420,7 @@ addLiftMarkToListItems definition selection root =
 
                     else
                         let
+                            ancestor : RichText.Model.Node.Path
                             ancestor =
                                 RichText.Model.Node.commonAncestor start end
                         in
@@ -549,12 +551,15 @@ lift definition editorState =
 
         Just selection ->
             let
+                normalizedSelection : RichText.Model.Selection.Selection
                 normalizedSelection =
                     RichText.Model.Selection.normalize selection
             in
             case
-                addLiftMarkToListItems definition normalizedSelection <|
-                    RichText.Annotation.annotateSelection normalizedSelection (RichText.Model.State.root editorState)
+                editorState
+                    |> RichText.Model.State.root
+                    |> RichText.Annotation.annotateSelection normalizedSelection
+                    |> addLiftMarkToListItems definition normalizedSelection
             of
                 Err s ->
                     Err s
@@ -562,11 +567,18 @@ lift definition editorState =
                 Ok markedRoot ->
                     let
                         -- this logic looks suspicious... but it seems to work
+                        liftedRoot : RichText.Model.Node.Block
                         liftedRoot =
-                            RichText.Annotation.doLift <| RichText.Annotation.doLift markedRoot
+                            markedRoot
+                                |> RichText.Annotation.doLift
+                                |> RichText.Annotation.doLift
 
+                        newSelection : Maybe RichText.Model.Selection.Selection
                         newSelection =
-                            RichText.Annotation.selectionFromAnnotations liftedRoot (RichText.Model.Selection.anchorOffset normalizedSelection) (RichText.Model.Selection.focusOffset normalizedSelection)
+                            RichText.Annotation.selectionFromAnnotations
+                                liftedRoot
+                                (RichText.Model.Selection.anchorOffset normalizedSelection)
+                                (RichText.Model.Selection.focusOffset normalizedSelection)
                     in
                     Ok
                         (editorState
@@ -715,6 +727,7 @@ isBeginningOfListItem definition selection root =
 
             Just ( p, _ ) ->
                 let
+                    relativePath : List Int
                     relativePath =
                         List.drop (List.length p) (RichText.Model.Selection.anchorNode selection)
                 in
@@ -821,9 +834,11 @@ joinBackward definition editorState =
 
             else
                 let
+                    normalizedSelection : RichText.Model.Selection.Selection
                     normalizedSelection =
                         RichText.Model.Selection.normalize selection
 
+                    markedRoot : RichText.Model.Node.Block
                     markedRoot =
                         RichText.Annotation.annotateSelection normalizedSelection (RichText.Model.State.root editorState)
                 in
@@ -838,6 +853,7 @@ joinBackward definition editorState =
 
                         else
                             let
+                                prevLiPath : RichText.Model.Node.Path
                                 prevLiPath =
                                     RichText.Model.Node.decrement liPath
                             in
@@ -857,6 +873,7 @@ joinBackward definition editorState =
 
                                                 Just joinedLi ->
                                                     let
+                                                        joinedNodes : Result String RichText.Model.Node.Block
                                                         joinedNodes =
                                                             RichText.Node.replace prevLiPath (RichText.Node.Block joinedLi) markedRoot
                                                                 |> Result.andThen
@@ -1016,6 +1033,7 @@ joinForward definition editorState =
                     normalizedSelection =
                         RichText.Model.Selection.normalize selection
 
+                    markedRoot : RichText.Model.Node.Block
                     markedRoot =
                         RichText.Annotation.annotateSelection normalizedSelection (RichText.Model.State.root editorState)
                 in
@@ -1025,6 +1043,7 @@ joinForward definition editorState =
 
                     Just ( liPath, liNode ) ->
                         let
+                            nextLiPath : RichText.Model.Node.Path
                             nextLiPath =
                                 RichText.Model.Node.increment liPath
                         in
@@ -1044,6 +1063,7 @@ joinForward definition editorState =
 
                                             Just joinedLi ->
                                                 let
+                                                    joinedNodes : Result String RichText.Model.Node.Block
                                                     joinedNodes =
                                                         markedRoot
                                                             |> RichText.Node.replace liPath (RichText.Node.Block joinedLi)

@@ -186,6 +186,7 @@ heading =
 headingToHtml : RichText.Config.ElementDefinition.ElementToHtml
 headingToHtml parameters children =
     let
+        level : Int
         level =
             Maybe.withDefault 1 <| RichText.Model.Attribute.findIntegerAttribute "level" (RichText.Model.Element.attributes parameters)
     in
@@ -197,6 +198,7 @@ htmlToHeading def node =
     case node of
         RichText.Model.HtmlNode.ElementNode name _ children ->
             let
+                maybeLevel : Maybe Int
                 maybeLevel =
                     case name of
                         "h1" ->
@@ -302,6 +304,7 @@ image =
 imageToHtmlNode : RichText.Config.ElementDefinition.ElementToHtml
 imageToHtmlNode parameters _ =
     let
+        attr : List RichText.Model.HtmlNode.HtmlAttribute
         attr =
             filterAttributesToHtml
                 [ ( "src", Just <| Maybe.withDefault "" (RichText.Model.Attribute.findStringAttribute "src" (RichText.Model.Element.attributes parameters)) )
@@ -320,6 +323,7 @@ htmlNodeToImage def node =
         RichText.Model.HtmlNode.ElementNode name attributes _ ->
             if name == "img" then
                 let
+                    elementNodeAttributes : List RichText.Model.Attribute.Attribute
                     elementNodeAttributes =
                         List.filterMap
                             (\( k, v ) ->
@@ -489,6 +493,7 @@ link =
 linkToHtmlNode : RichText.Config.MarkDefinition.MarkToHtml
 linkToHtmlNode mark children =
     let
+        attributes : List RichText.Model.HtmlNode.HtmlAttribute
         attributes =
             filterAttributesToHtml
                 [ ( "href", Just <| Maybe.withDefault "" (RichText.Model.Attribute.findStringAttribute "href" (RichText.Model.Mark.attributes mark)) )
@@ -506,6 +511,7 @@ htmlNodeToLink def node =
         RichText.Model.HtmlNode.ElementNode name attributes children ->
             if name == "a" then
                 let
+                    elementNodeAttributes : List RichText.Model.Attribute.Attribute
                     elementNodeAttributes =
                         List.filterMap
                             (\( k, v ) ->

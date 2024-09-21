@@ -1,5 +1,6 @@
 module RichText.Config.Decorations exposing
     ( Decorations, ElementDecoration, MarkDecoration, emptyDecorations, elementDecorations, markDecorations, topLevelAttributes, withMarkDecorations, withElementDecorations, withTopLevelAttributes
+    , Tagger
     , addElementDecoration, addMarkDecoration, selectableDecoration
     )
 
@@ -10,6 +11,7 @@ useful for adding things like event listeners and conditional styles/attributes 
 # Decorations
 
 @docs Decorations, ElementDecoration, MarkDecoration, emptyDecorations, elementDecorations, markDecorations, topLevelAttributes, withMarkDecorations, withElementDecorations, withTopLevelAttributes
+@docs Tagger
 
 
 # Helpers
@@ -51,6 +53,12 @@ type alias DecorationsContents msg =
     , elements : Dict String (List (ElementDecoration msg))
     , topLevelAttributes : List (Html.Attribute msg)
     }
+
+
+{-| Translates an editor message type into your message type.
+-}
+type alias Tagger msg =
+    RichText.Internal.Editor.Tagger msg
 
 
 {-| `ElementDecoration` is a type alias for an element decoration function. The arguments
@@ -111,56 +119,44 @@ emptyDecorations =
 {-| A dictionary of mark name to a list of mark decorations.
 -}
 markDecorations : Decorations msg -> Dict String (List (MarkDecoration msg))
-markDecorations d =
-    case d of
-        Decorations c ->
-            c.marks
+markDecorations (Decorations c) =
+    c.marks
 
 
 {-| A dictionary of element names to a list of mark decorations.
 -}
 elementDecorations : Decorations msg -> Dict String (List (ElementDecoration msg))
-elementDecorations d =
-    case d of
-        Decorations c ->
-            c.elements
+elementDecorations (Decorations c) =
+    c.elements
 
 
 {-| The extra attributes added to the node with `contenteditable="true"` set.
 -}
 topLevelAttributes : Decorations msg -> List (Html.Attribute msg)
-topLevelAttributes d =
-    case d of
-        Decorations c ->
-            c.topLevelAttributes
+topLevelAttributes (Decorations c) =
+    c.topLevelAttributes
 
 
 {-| Creates a decorations object with the given mark decorations set
 -}
 withMarkDecorations : Dict String (List (MarkDecoration msg)) -> Decorations msg -> Decorations msg
-withMarkDecorations marks d =
-    case d of
-        Decorations c ->
-            Decorations { c | marks = marks }
+withMarkDecorations marks (Decorations c) =
+    Decorations { c | marks = marks }
 
 
 {-| Creates a decorations object with the given element decorations set
 -}
 withElementDecorations : Dict String (List (ElementDecoration msg)) -> Decorations msg -> Decorations msg
-withElementDecorations elements d =
-    case d of
-        Decorations c ->
-            Decorations { c | elements = elements }
+withElementDecorations elements (Decorations c) =
+    Decorations { c | elements = elements }
 
 
 {-| Creates a decorations object with the given top level attributes, e.g. extra attributes that are added
 to the editor node with `contenteditable="true"` set.
 -}
 withTopLevelAttributes : List (Html.Attribute msg) -> Decorations msg -> Decorations msg
-withTopLevelAttributes topLevelAttributes_ d =
-    case d of
-        Decorations c ->
-            Decorations { c | topLevelAttributes = topLevelAttributes_ }
+withTopLevelAttributes topLevelAttributes_ (Decorations c) =
+    Decorations { c | topLevelAttributes = topLevelAttributes_ }
 
 
 {-| Adds an element decoration for a defined node.
@@ -176,12 +172,15 @@ withTopLevelAttributes topLevelAttributes_ d =
 addElementDecoration : RichText.Config.ElementDefinition.ElementDefinition -> ElementDecoration msg -> Decorations msg -> Decorations msg
 addElementDecoration definition decorator decorations =
     let
+        eleDecorators : Dict String (List (ElementDecoration msg))
         eleDecorators =
             elementDecorations decorations
 
+        name : String
         name =
             RichText.Config.ElementDefinition.name definition
 
+        previousDecorations : List (ElementDecoration msg)
         previousDecorations =
             Maybe.withDefault [] (Dict.get name eleDecorators)
     in
@@ -202,12 +201,15 @@ addElementDecoration definition decorator decorations =
 addMarkDecoration : RichText.Config.MarkDefinition.MarkDefinition -> MarkDecoration msg -> Decorations msg -> Decorations msg
 addMarkDecoration definition decorator decorations =
     let
+        mDecorators : Dict String (List (MarkDecoration msg))
         mDecorators =
             markDecorations decorations
 
+        name : String
         name =
             RichText.Config.MarkDefinition.name definition
 
+        previousDecorations : List (MarkDecoration msg)
         previousDecorations =
             Maybe.withDefault [] (Dict.get name mDecorators)
     in
@@ -218,7 +220,7 @@ addMarkDecoration definition decorator decorations =
 {-| Useful decoration for selectable elements. Adds an onclick listener that will select the element,
 as well as adds an rte-selected class if this item is selected.
 -}
-selectableDecoration : RichText.Internal.Editor.Tagger msg -> RichText.Model.Node.Path -> RichText.Model.Element.Element -> RichText.Model.Node.Path -> List (Html.Attribute msg)
+selectableDecoration : Tagger msg -> RichText.Model.Node.Path -> RichText.Model.Element.Element -> RichText.Model.Node.Path -> List (Html.Attribute msg)
 selectableDecoration tagger editorNodePath elementParameters _ =
     (if Set.member RichText.Internal.Constants.selection (RichText.Model.Element.annotations elementParameters) then
         [ Html.Attributes.class "rte-selected" ]

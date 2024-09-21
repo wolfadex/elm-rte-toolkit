@@ -18,7 +18,7 @@ module RichText.Config.Command exposing
 @docs CommandMap, CommandBinding, key, inputEvent, emptyCommandMap, set, withDefaultInputEventCommand, withDefaultKeyCommand, defaultKeyCommand, defaultInputEventCommand, combine
 
 
-# Transform
+# Transforms
 
 @docs Transform
 
@@ -158,21 +158,19 @@ type alias KeyboardEvent =
 {-| Derives a named command list from an input event.
 -}
 namedCommandListFromInputEvent : InputEvent -> CommandMap -> NamedCommandList
-namedCommandListFromInputEvent event map =
-    case map of
-        CommandMap contents ->
-            Maybe.withDefault (contents.defaultInputEventCommand event)
-                (Dict.get event.inputType contents.inputEventTypeMap)
+namedCommandListFromInputEvent event (CommandMap contents) =
+    contents.inputEventTypeMap
+        |> Dict.get event.inputType
+        |> Maybe.withDefault (contents.defaultInputEventCommand event)
 
 
 keyboardEventToDictKey : String -> KeyboardEvent -> List String
 keyboardEventToDictKey shortKey keyboardEvent =
-    ([ keyboardEvent.key ]
+    [ keyboardEvent.key ]
         |> addShiftKey keyboardEvent
         |> addMetaKey keyboardEvent
         |> addCtrlKey keyboardEvent
         |> addAltKey keyboardEvent
-    )
         |> List.map
             (\v ->
                 if v == shortKey then
@@ -228,6 +226,7 @@ namedCommandListFromKeyboardEvent shortKey event map =
     case map of
         CommandMap contents ->
             let
+                mapping : List String
                 mapping =
                     keyboardEventToDictKey shortKey event
             in
@@ -313,19 +312,15 @@ set bindings func map =
 {-| `defaultKeyCommand` is used if there are no key bindings set for a keyboard event.
 -}
 defaultKeyCommand : CommandMap -> (KeyboardEvent -> NamedCommandList)
-defaultKeyCommand map =
-    case map of
-        CommandMap m ->
-            m.defaultKeyCommand
+defaultKeyCommand (CommandMap m) =
+    m.defaultKeyCommand
 
 
 {-| `defaultInputEventCommand` is used if there are no input event bindings set for an input event type.
 -}
 defaultInputEventCommand : CommandMap -> (InputEvent -> NamedCommandList)
-defaultInputEventCommand map =
-    case map of
-        CommandMap m ->
-            m.defaultInputEventCommand
+defaultInputEventCommand (CommandMap m) =
+    m.defaultInputEventCommand
 
 
 {-| Returns a commandMap with the defaultKeyCommand set to the provided value.
@@ -335,10 +330,8 @@ defaultInputEventCommand map =
 
 -}
 withDefaultKeyCommand : (KeyboardEvent -> NamedCommandList) -> CommandMap -> CommandMap
-withDefaultKeyCommand func map =
-    case map of
-        CommandMap m ->
-            CommandMap { m | defaultKeyCommand = func }
+withDefaultKeyCommand func (CommandMap m) =
+    CommandMap { m | defaultKeyCommand = func }
 
 
 {-| Returns a commandMap with the defaultKeyCommand set to the provided value. The defaultInputEventCommand
@@ -349,10 +342,8 @@ is used if there are no key bindings set for a keyboard event.
 
 -}
 withDefaultInputEventCommand : (InputEvent -> NamedCommandList) -> CommandMap -> CommandMap
-withDefaultInputEventCommand func map =
-    case map of
-        CommandMap m ->
-            CommandMap { m | defaultInputEventCommand = func }
+withDefaultInputEventCommand func (CommandMap m) =
+    CommandMap { m | defaultInputEventCommand = func }
 
 
 compose : comparable -> NamedCommandList -> Dict comparable NamedCommandList -> Dict comparable NamedCommandList
@@ -390,10 +381,6 @@ combine m1 m2 =
                         }
 
 
-emptyFunction =
-    \_ -> []
-
-
 {-| An empty command map
 -}
 emptyCommandMap : CommandMap
@@ -401,6 +388,6 @@ emptyCommandMap =
     CommandMap
         { keyMap = Dict.empty
         , inputEventTypeMap = Dict.empty
-        , defaultKeyCommand = emptyFunction
-        , defaultInputEventCommand = emptyFunction
+        , defaultKeyCommand = \_ -> []
+        , defaultInputEventCommand = \_ -> []
         }

@@ -36,7 +36,8 @@ type alias Mark =
     RichText.Internal.Definitions.Mark
 
 
-{-| -}
+{-| The definition powering a `Mark`
+-}
 type alias MarkDefinition =
     RichText.Internal.Definitions.MarkDefinition
 

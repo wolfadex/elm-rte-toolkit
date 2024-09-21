@@ -52,6 +52,7 @@ beforeInputDecoder =
 handleInputEvent : RichText.Config.Command.CommandMap -> RichText.Config.Spec.Spec -> RichText.Internal.Editor.Editor -> RichText.Internal.Event.InputEvent -> Result String RichText.Internal.Editor.Editor
 handleInputEvent commandMap spec editor inputEvent =
     let
+        namedCommandList : RichText.Config.Command.NamedCommandList
         namedCommandList =
             RichText.Config.Command.namedCommandListFromInputEvent inputEvent commandMap
     in

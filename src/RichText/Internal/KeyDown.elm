@@ -55,6 +55,7 @@ keyDownDecoder =
 handleKeyDownEvent : RichText.Config.Command.CommandMap -> RichText.Config.Spec.Spec -> RichText.Internal.Editor.Editor -> RichText.Internal.Event.KeyboardEvent -> Result String RichText.Internal.Editor.Editor
 handleKeyDownEvent commandMap spec editor event =
     let
+        namedCommandList : RichText.Config.Command.NamedCommandList
         namedCommandList =
             RichText.Config.Command.namedCommandListFromKeyboardEvent (RichText.Internal.Editor.shortKey editor) event commandMap
     in

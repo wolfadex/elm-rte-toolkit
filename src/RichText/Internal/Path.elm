@@ -26,9 +26,11 @@ domToEditorInlineLeafTree spec tree path =
 
         RichText.Model.Node.MarkNode n ->
             let
+                markDefinition : RichText.Model.Mark.MarkDefinition
                 markDefinition =
                     RichText.Internal.Spec.markDefinitionWithDefault n.mark spec
 
+                structure : RichText.Model.HtmlNode.HtmlNode
                 structure =
                     RichText.Config.MarkDefinition.toHtmlNode markDefinition n.mark RichText.Internal.HtmlNode.childNodesPlaceholder
             in
@@ -60,12 +62,15 @@ domToEditor spec node path =
 
     else
         let
+            parameters : RichText.Model.Element.Element
             parameters =
                 RichText.Model.Node.element node
 
+            elementDefinition : RichText.Config.ElementDefinition.ElementDefinition
             elementDefinition =
                 RichText.Internal.Spec.elementDefinitionWithDefault parameters spec
 
+            structure : RichText.Model.HtmlNode.HtmlNode
             structure =
                 RichText.Config.ElementDefinition.toHtmlNode elementDefinition parameters RichText.Internal.HtmlNode.childNodesPlaceholder
         in
@@ -230,13 +235,13 @@ pathToChildContents node =
 pathToChildContentsFromMark : RichText.Config.Spec.Spec -> RichText.Model.Mark.Mark -> Maybe RichText.Model.Node.Path
 pathToChildContentsFromMark spec mark =
     let
+        markDefinition : RichText.Config.MarkDefinition.MarkDefinition
         markDefinition =
             RichText.Internal.Spec.markDefinitionWithDefault mark spec
-
-        markStructure =
-            RichText.Config.MarkDefinition.toHtmlNode markDefinition mark RichText.Internal.HtmlNode.childNodesPlaceholder
     in
-    pathToChildContents markStructure
+    RichText.Internal.HtmlNode.childNodesPlaceholder
+        |> RichText.Config.MarkDefinition.toHtmlNode markDefinition mark
+        |> pathToChildContents
 
 
 
@@ -246,13 +251,13 @@ pathToChildContentsFromMark spec mark =
 pathToChildContentsFromElementParameters : RichText.Config.Spec.Spec -> RichText.Model.Element.Element -> Maybe RichText.Model.Node.Path
 pathToChildContentsFromElementParameters spec parameters =
     let
+        elementDefinition : RichText.Config.ElementDefinition.ElementDefinition
         elementDefinition =
             RichText.Internal.Spec.elementDefinitionWithDefault parameters spec
-
-        nodeStructure =
-            RichText.Config.ElementDefinition.toHtmlNode elementDefinition parameters RichText.Internal.HtmlNode.childNodesPlaceholder
     in
-    pathToChildContents nodeStructure
+    RichText.Internal.HtmlNode.childNodesPlaceholder
+        |> RichText.Config.ElementDefinition.toHtmlNode elementDefinition parameters
+        |> pathToChildContents
 
 
 pathToChildContentsFromInlineTreePath : RichText.Config.Spec.Spec -> Array RichText.Model.Node.Inline -> Array RichText.Model.Node.InlineTree -> RichText.Model.Node.Path -> Maybe RichText.Model.Node.Path
