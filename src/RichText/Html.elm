@@ -9,13 +9,13 @@ as html.
 -}
 
 import Array exposing (Array)
-import Html.Parser exposing (Node(..), nodeToString)
-import RichText.Config.Spec exposing (Spec)
-import RichText.Internal.HtmlNode exposing (editorBlockNodeToHtmlNode)
-import RichText.Internal.Spec exposing (htmlToElementArray)
-import RichText.Model.HtmlNode exposing (HtmlNode(..))
-import RichText.Model.Node exposing (Block)
-import RichText.Node exposing (Fragment(..))
+import Html.Parser
+import RichText.Config.Spec
+import RichText.Internal.HtmlNode
+import RichText.Internal.Spec
+import RichText.Model.HtmlNode
+import RichText.Model.Node
+import RichText.Node
 
 
 {-| Converts a block to an HtmlNode.
@@ -54,19 +54,19 @@ import RichText.Node exposing (Fragment(..))
     --> True
 
 -}
-toHtmlNode : Spec -> Block -> HtmlNode
+toHtmlNode : RichText.Config.Spec.Spec -> RichText.Model.Node.Block -> RichText.Model.HtmlNode.HtmlNode
 toHtmlNode =
-    editorBlockNodeToHtmlNode
+    RichText.Internal.HtmlNode.editorBlockNodeToHtmlNode
 
 
-htmlNodeToNode : HtmlNode -> Node
+htmlNodeToNode : RichText.Model.HtmlNode.HtmlNode -> Html.Parser.Node
 htmlNodeToNode htmlNode =
     case htmlNode of
-        ElementNode tag attrs children ->
-            Element tag attrs (List.map htmlNodeToNode (Array.toList children))
+        RichText.Model.HtmlNode.ElementNode tag attrs children ->
+            Html.Parser.Element tag attrs (List.map htmlNodeToNode (Array.toList children))
 
-        TextNode t ->
-            Text t
+        RichText.Model.HtmlNode.TextNode t ->
+            Html.Parser.Text t
 
 
 {-| Converts a block to an html string.
@@ -97,9 +97,9 @@ htmlNodeToNode htmlNode =
     --> True
 
 -}
-toHtml : Spec -> Block -> String
+toHtml : RichText.Config.Spec.Spec -> RichText.Model.Node.Block -> String
 toHtml spec block =
-    nodeToString <| htmlNodeToNode <| toHtmlNode spec block
+    Html.Parser.nodeToString <| htmlNodeToNode <| toHtmlNode spec block
 
 
 {-| Decodes an html string to an array of editor fragments, or returns an error if there was an
@@ -136,9 +136,9 @@ issue decoding the html.
     --> True
 
 -}
-fromHtml : Spec -> String -> Result String (Array Fragment)
+fromHtml : RichText.Config.Spec.Spec -> String -> Result String (Array RichText.Node.Fragment)
 fromHtml =
-    htmlToElementArray
+    RichText.Internal.Spec.htmlToElementArray
 
 
 {-| Convenience function that parses html and returns the first editor block that was decoded,
@@ -170,7 +170,7 @@ or an error if there was an issue decoding the html.
     --> True
 
 -}
-blockFromHtml : Spec -> String -> Result String Block
+blockFromHtml : RichText.Config.Spec.Spec -> String -> Result String RichText.Model.Node.Block
 blockFromHtml spec html =
     Result.andThen
         (\fragment ->
@@ -180,7 +180,7 @@ blockFromHtml spec html =
 
                 Just f ->
                     case f of
-                        BlockFragment bf ->
+                        RichText.Node.BlockFragment bf ->
                             case Array.get 0 bf of
                                 Nothing ->
                                     Err "Invalid initial fragment"
@@ -191,4 +191,4 @@ blockFromHtml spec html =
                         _ ->
                             Err "I was expecting a block, but instead I received an inline"
         )
-        (htmlToElementArray spec html)
+        (RichText.Internal.Spec.htmlToElementArray spec html)

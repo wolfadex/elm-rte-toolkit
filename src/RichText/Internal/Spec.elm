@@ -1,31 +1,20 @@
 module RichText.Internal.Spec exposing (elementDefinitionWithDefault, htmlToElementArray, markDefinitionWithDefault)
 
 import Array exposing (Array)
-import Html.Parser as Html exposing (Node)
+import Html.Parser
 import Result exposing (Result)
-import RichText.Config.ElementDefinition as ElementDefinition exposing (ElementDefinition, blockNode, defaultElementDefinition)
-import RichText.Config.MarkDefinition as MarkDefinition exposing (MarkDefinition, defaultMarkDefinition)
-import RichText.Config.Spec exposing (Spec, elementDefinition, elementDefinitions, markDefinition, markDefinitions)
-import RichText.Internal.Constants exposing (zeroWidthSpace)
-import RichText.Internal.Definitions exposing (ContentType(..), nameFromElement, nameFromMark)
-import RichText.Model.Element exposing (Element)
-import RichText.Model.HtmlNode exposing (HtmlNode(..))
-import RichText.Model.InlineElement exposing (inlineElement)
+import RichText.Config.ElementDefinition
+import RichText.Config.MarkDefinition
+import RichText.Config.Spec
+import RichText.Internal.Constants
+import RichText.Internal.Definitions
+import RichText.Model.Element
+import RichText.Model.HtmlNode
+import RichText.Model.InlineElement
 import RichText.Model.Mark
-    exposing
-        ( Mark
-        , ToggleAction(..)
-        , markOrderFromSpec
-        , toggle
-        )
-import RichText.Model.Node as Node
-    exposing
-        ( Children(..)
-        , blockChildren
-        , inlineChildren
-        )
-import RichText.Model.Text as Text
-import RichText.Node exposing (Fragment(..))
+import RichText.Model.Node
+import RichText.Model.Text
+import RichText.Node
 
 
 resultFilterMap : (a -> Result String b) -> Array a -> ( Array b, List String )
@@ -43,7 +32,7 @@ resultFilterMap f xs =
     Array.foldl (maybePush f) ( Array.empty, [] ) xs
 
 
-htmlToElementArray : Spec -> String -> Result String (Array Fragment)
+htmlToElementArray : RichText.Config.Spec.Spec -> String -> Result String (Array RichText.Node.Fragment)
 htmlToElementArray spec html =
     case stringToHtmlNodeArray html of
         Err s ->
@@ -66,31 +55,31 @@ htmlToElementArray spec html =
                 Ok <| reduceEditorFragmentArray newArray
 
 
-htmlNodeToEditorFragment : Spec -> List Mark -> HtmlNode -> Result String Fragment
+htmlNodeToEditorFragment : RichText.Config.Spec.Spec -> List RichText.Model.Mark.Mark -> RichText.Model.HtmlNode.HtmlNode -> Result String RichText.Node.Fragment
 htmlNodeToEditorFragment spec marks node =
     case node of
-        TextNode s ->
+        RichText.Model.HtmlNode.TextNode s ->
             Ok <|
-                InlineFragment <|
+                RichText.Node.InlineFragment <|
                     Array.fromList
-                        [ Node.Text <|
-                            (Text.empty
-                                |> Text.withText (String.replace zeroWidthSpace "" s)
-                                |> Text.withMarks marks
+                        [ RichText.Model.Node.Text <|
+                            (RichText.Model.Text.empty
+                                |> RichText.Model.Text.withText (String.replace RichText.Internal.Constants.zeroWidthSpace "" s)
+                                |> RichText.Model.Text.withMarks marks
                             )
                         ]
 
         _ ->
             let
                 definitions =
-                    elementDefinitions spec
+                    RichText.Config.Spec.elementDefinitions spec
 
                 maybeElementAndChildren =
                     List.foldl
                         (\definition result ->
                             case result of
                                 Nothing ->
-                                    case ElementDefinition.fromHtmlNode definition definition node of
+                                    case RichText.Config.ElementDefinition.fromHtmlNode definition definition node of
                                         Nothing ->
                                             Nothing
 
@@ -109,12 +98,12 @@ htmlNodeToEditorFragment spec marks node =
                         contentType =
                             ElementDefinition.contentType definition
                     in
-                    if contentType == InlineLeafNodeType then
+                    if contentType == RichText.Internal.Definitions.InlineLeafNodeType then
                         Ok <|
-                            InlineFragment <|
+                            RichText.Node.InlineFragment <|
                                 Array.fromList
-                                    [ Node.InlineElement <|
-                                        inlineElement element marks
+                                    [ RichText.Model.Node.InlineElement <|
+                                        RichText.Model.InlineElement.inlineElement element marks
                                     ]
 
                     else
@@ -127,7 +116,7 @@ htmlNodeToEditorFragment spec marks node =
                                 Err s
 
                             Ok childNodes ->
-                                Ok <| BlockFragment <| Array.fromList [ Node.block element childNodes ]
+                                Ok <| RichText.Node.BlockFragment <| Array.fromList [ RichText.Model.Node.block element childNodes ]
 
                 Nothing ->
                     case htmlNodeToMark spec node of
@@ -137,7 +126,7 @@ htmlNodeToEditorFragment spec marks node =
                         Just ( mark, children ) ->
                             let
                                 newMarks =
-                                    toggle Add (markOrderFromSpec spec) mark marks
+                                    RichText.Model.Mark.toggle RichText.Model.Mark.Add (RichText.Model.Mark.markOrderFromSpec spec) mark marks
 
                                 newChildren =
                                     Array.map (htmlNodeToEditorFragment spec newMarks) children
@@ -145,13 +134,13 @@ htmlNodeToEditorFragment spec marks node =
                             arrayToFragment newChildren
 
 
-htmlNodeToMark : Spec -> HtmlNode -> Maybe ( Mark, Array HtmlNode )
+htmlNodeToMark : RichText.Config.Spec.Spec -> RichText.Model.HtmlNode.HtmlNode -> Maybe ( RichText.Model.Mark.Mark, Array RichText.Model.HtmlNode.HtmlNode )
 htmlNodeToMark spec node =
     List.foldl
         (\definition result ->
             case result of
                 Nothing ->
-                    case MarkDefinition.fromHtmlNode definition definition node of
+                    case RichText.Config.MarkDefinition.fromHtmlNode definition definition node of
                         Nothing ->
                             Nothing
 
@@ -162,10 +151,10 @@ htmlNodeToMark spec node =
                     result
         )
         Nothing
-        (markDefinitions spec)
+        (RichText.Config.Spec.markDefinitions spec)
 
 
-reduceEditorFragmentArray : Array Fragment -> Array Fragment
+reduceEditorFragmentArray : Array RichText.Node.Fragment -> Array RichText.Node.Fragment
 reduceEditorFragmentArray fragmentArray =
     Array.foldl
         (\fragment arr ->
@@ -175,32 +164,32 @@ reduceEditorFragmentArray fragmentArray =
 
                 Just prevFragment ->
                     case prevFragment of
-                        InlineFragment pilf ->
+                        RichText.Node.InlineFragment pilf ->
                             case fragment of
-                                InlineFragment ilf ->
-                                    Array.set (Array.length arr - 1) (InlineFragment (Array.append pilf ilf)) arr
+                                RichText.Node.InlineFragment ilf ->
+                                    Array.set (Array.length arr - 1) (RichText.Node.InlineFragment (Array.append pilf ilf)) arr
 
-                                BlockFragment _ ->
+                                RichText.Node.BlockFragment _ ->
                                     Array.push fragment arr
 
-                        BlockFragment pbnf ->
+                        RichText.Node.BlockFragment pbnf ->
                             case fragment of
-                                InlineFragment _ ->
+                                RichText.Node.InlineFragment _ ->
                                     Array.push fragment arr
 
-                                BlockFragment bnf ->
-                                    Array.set (Array.length arr - 1) (BlockFragment (Array.append pbnf bnf)) arr
+                                RichText.Node.BlockFragment bnf ->
+                                    Array.set (Array.length arr - 1) (RichText.Node.BlockFragment (Array.append pbnf bnf)) arr
         )
         Array.empty
         fragmentArray
 
 
-arrayToChildNodes : ContentType -> Array (Result String Fragment) -> Result String Children
+arrayToChildNodes : RichText.Internal.Definitions.ContentType -> Array (Result String RichText.Node.Fragment) -> Result String RichText.Model.Node.Children
 arrayToChildNodes contentType results =
     if Array.isEmpty results then
         case contentType of
-            BlockLeafNodeType ->
-                Ok Leaf
+            RichText.Internal.Definitions.BlockLeafNodeType ->
+                Ok RichText.Model.Node.Leaf
 
             _ ->
                 Err "Invalid node type for empty fragment result array"
@@ -212,24 +201,24 @@ arrayToChildNodes contentType results =
 
             Ok fragment ->
                 case fragment of
-                    InlineFragment ilf ->
+                    RichText.Node.InlineFragment ilf ->
                         case contentType of
-                            TextBlockNodeType _ ->
-                                Ok <| inlineChildren ilf
+                            RichText.Internal.Definitions.TextBlockNodeType _ ->
+                                Ok <| RichText.Model.Node.inlineChildren ilf
 
                             _ ->
                                 Err "I received an inline leaf fragment, but the node I parsed doesn't accept this child type"
 
-                    BlockFragment bnf ->
+                    RichText.Node.BlockFragment bnf ->
                         case contentType of
-                            BlockNodeType _ ->
-                                Ok <| blockChildren bnf
+                            RichText.Internal.Definitions.BlockNodeType _ ->
+                                Ok <| RichText.Model.Node.blockChildren bnf
 
                             _ ->
                                 Err "I received a block node fragment, but the node I parsed doesn't accept this child type"
 
 
-arrayToFragment : Array (Result String Fragment) -> Result String Fragment
+arrayToFragment : Array (Result String RichText.Node.Fragment) -> Result String RichText.Node.Fragment
 arrayToFragment results =
     let
         aResult =
@@ -271,9 +260,9 @@ arrayToFragment results =
                         Ok fragment
 
 
-stringToHtmlNodeArray : String -> Result String (Array HtmlNode)
+stringToHtmlNodeArray : String -> Result String (Array RichText.Model.HtmlNode.HtmlNode)
 stringToHtmlNodeArray html =
-    case Html.run html of
+    case Html.Parser.run html of
         Err _ ->
             Err "Could not parse html string"
 
@@ -281,42 +270,42 @@ stringToHtmlNodeArray html =
             Ok <| nodeListToHtmlNodeArray nodeList
 
 
-nodeListToHtmlNodeArray : List Node -> Array HtmlNode
+nodeListToHtmlNodeArray : List Html.Parser.Node -> Array RichText.Model.HtmlNode.HtmlNode
 nodeListToHtmlNodeArray nodeList =
     Array.fromList <|
         List.concatMap
             (\n ->
                 case n of
-                    Html.Element name attributes children ->
+                    Html.Parser.Element name attributes children ->
                         -- We filter meta tags because chrome adds it to the pasted text/html
                         if String.toLower name /= "meta" then
-                            [ ElementNode name attributes <| nodeListToHtmlNodeArray children ]
+                            [ RichText.Model.HtmlNode.ElementNode name attributes <| nodeListToHtmlNodeArray children ]
 
                         else
                             []
 
-                    Html.Text s ->
-                        [ TextNode s ]
+                    Html.Parser.Text s ->
+                        [ RichText.Model.HtmlNode.TextNode s ]
 
-                    Html.Comment _ ->
+                    Html.Parser.Comment _ ->
                         []
             )
             nodeList
 
 
-markDefinitionWithDefault : Mark -> Spec -> MarkDefinition
+markDefinitionWithDefault : RichText.Model.Mark.Mark -> RichText.Config.Spec.Spec -> RichText.Config.MarkDefinition.MarkDefinition
 markDefinitionWithDefault mark spec =
     let
         name =
-            nameFromMark mark
+            RichText.Internal.Definitions.nameFromMark mark
     in
-    Maybe.withDefault (defaultMarkDefinition name) (markDefinition name spec)
+    Maybe.withDefault (RichText.Config.MarkDefinition.defaultMarkDefinition name) (RichText.Config.Spec.markDefinition name spec)
 
 
-elementDefinitionWithDefault : Element -> Spec -> ElementDefinition
+elementDefinitionWithDefault : RichText.Model.Element.Element -> RichText.Config.Spec.Spec -> RichText.Config.ElementDefinition.ElementDefinition
 elementDefinitionWithDefault ele spec =
     let
         name =
-            nameFromElement ele
+            RichText.Internal.Definitions.nameFromElement ele
     in
-    Maybe.withDefault (defaultElementDefinition name "block" (blockNode [])) (elementDefinition name spec)
+    Maybe.withDefault (RichText.Config.ElementDefinition.defaultElementDefinition name "block" (RichText.Config.ElementDefinition.blockNode [])) (RichText.Config.Spec.elementDefinition name spec)

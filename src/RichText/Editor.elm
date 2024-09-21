@@ -36,84 +36,35 @@ import Html exposing (Html)
 import Html.Attributes
 import Html.Events
 import Html.Keyed
-import Json.Decode as D
-import RichText.Annotation exposing (annotateSelection)
-import RichText.Commands exposing (removeRange)
-import RichText.Config.Command exposing (CommandMap, NamedCommand, NamedCommandList, transform)
-import RichText.Config.Decorations exposing (Decorations, elementDecorations, markDecorations, topLevelAttributes)
-import RichText.Config.ElementDefinition as ElementDefinition
-import RichText.Config.MarkDefinition as MarkDefinition
-import RichText.Config.Spec exposing (Spec)
-import RichText.Internal.BeforeInput as BeforeInput
-import RichText.Internal.Constants exposing (zeroWidthSpace)
+import Json.Decode
+import RichText.Annotation
+import RichText.Commands
+import RichText.Config.Command
+import RichText.Config.Decorations
+import RichText.Config.ElementDefinition
+import RichText.Config.MarkDefinition
+import RichText.Config.Spec
+import RichText.Internal.BeforeInput
+import RichText.Internal.Constants
 import RichText.Internal.DomNode
-    exposing
-        ( DomNode(..)
-        , decodeDomNode
-        , extractRootEditorBlockNode
-        , findTextChanges
-        )
-import RichText.Internal.Editor as InternalEditor
-    exposing
-        ( Editor
-        , Message(..)
-        , Tagger
-        , bufferedEditorState
-        , completeRerenderCount
-        , forceCompleteRerender
-        , forceRerender
-        , forceReselection
-        , isComposing
-        , renderCount
-        , selectionCount
-        , updateEditorStateWithTimestamp
-        , withBufferedEditorState
-        , withComposing
-        , withShortKey
-        , withState
-        )
-import RichText.Internal.Event exposing (EditorChange, InitEvent, PasteEvent, TextChange)
-import RichText.Internal.HtmlNode exposing (childNodesPlaceholder, editorBlockNodeToHtmlNode)
-import RichText.Internal.KeyDown as KeyDown
-import RichText.Internal.Paste as Paste
-import RichText.Internal.Path as NodePath
-import RichText.Internal.Selection exposing (domToEditor, editorToDom)
-import RichText.Internal.Spec exposing (elementDefinitionWithDefault, markDefinitionWithDefault)
-import RichText.Model.Element as Element exposing (Element)
-import RichText.Model.History exposing (History)
-import RichText.Model.HtmlNode exposing (HtmlNode(..))
-import RichText.Model.InlineElement as InlineElement
-import RichText.Model.Mark as Mark exposing (Mark)
+import RichText.Internal.Editor exposing (Editor)
+import RichText.Internal.Event
+import RichText.Internal.HtmlNode
+import RichText.Internal.KeyDown
+import RichText.Internal.Paste
+import RichText.Internal.Path
+import RichText.Internal.Selection
+import RichText.Internal.Spec
+import RichText.Model.Element
+import RichText.Model.History
+import RichText.Model.HtmlNode
+import RichText.Model.InlineElement
+import RichText.Model.Mark
 import RichText.Model.Node
-    exposing
-        ( Block
-        , Children(..)
-        , Inline(..)
-        , InlineTree(..)
-        , Path
-        , blockChildren
-        , childNodes
-        , element
-        , inlineChildren
-        , toBlockArray
-        , toInlineArray
-        , toInlineTree
-        , toString
-        , withChildNodes
-        )
 import RichText.Model.Selection
-    exposing
-        ( Selection
-        , anchorNode
-        , anchorOffset
-        , focusNode
-        , focusOffset
-        , isCollapsed
-        , range
-        )
-import RichText.Model.State as State exposing (State, withRoot, withSelection)
-import RichText.Model.Text as Text
-import RichText.Node exposing (Node(..), nodeAt)
+import RichText.Model.State
+import RichText.Model.Text
+import RichText.Node
 
 
 {-| This type represents your Editor configuration, e.g. the non-comparable things that define
@@ -122,9 +73,9 @@ bindings, decorative functions, and tagger function.
 -}
 type Config msg
     = Config
-        { decorations : Decorations msg
-        , spec : Spec
-        , commandMap : CommandMap
+        { decorations : RichText.Config.Decorations.Decorations msg
+        , spec : RichText.Config.Spec.Spec
+        , commandMap : RichText.Config.Command.CommandMap
         , toMsg : Message -> msg
         }
 
@@ -149,9 +100,9 @@ type Config msg
 
 -}
 config :
-    { decorations : Decorations msg
-    , spec : Spec
-    , commandMap : CommandMap
+    { decorations : RichText.Config.Decorations.Decorations msg
+    , spec : RichText.Config.Spec.Spec
+    , commandMap : RichText.Config.Command.CommandMap
     , toMsg : Message -> msg
     }
     -> Config msg
@@ -161,7 +112,7 @@ config cfg =
 
 {-| The decorations from the config object.
 -}
-decorations : Config msg -> Decorations msg
+decorations : Config msg -> RichText.Config.Decorations.Decorations msg
 decorations cfg =
     case cfg of
         Config c ->
@@ -170,7 +121,7 @@ decorations cfg =
 
 {-| The spec from the config object.
 -}
-spec : Config msg -> Spec
+spec : Config msg -> RichText.Config.Spec.Spec
 spec cfg =
     case cfg of
         Config c ->
@@ -179,14 +130,14 @@ spec cfg =
 
 {-| The commandMap from the config object.
 -}
-commandMap : Config msg -> CommandMap
+commandMap : Config msg -> RichText.Config.Command.CommandMap
 commandMap cfg =
     case cfg of
         Config c ->
             c.commandMap
 
 
-updateSelection : Maybe Selection -> Spec -> Editor -> Editor
+updateSelection : Maybe RichText.Model.Selection.Selection -> RichText.Config.Spec.Spec -> Editor -> Editor
 updateSelection maybeSelection spec_ editor_ =
     let
         editorState =
@@ -194,39 +145,39 @@ updateSelection maybeSelection spec_ editor_ =
     in
     case maybeSelection of
         Nothing ->
-            editor_ |> withState (editorState |> withSelection maybeSelection)
+            editor_ |> RichText.Internal.Editor.withState (editorState |> RichText.Model.State.withSelection maybeSelection)
 
         Just selection ->
             let
                 translatedSelection =
-                    domToEditor spec_ (State.root editorState) selection
+                    RichText.Internal.Selection.domToEditor spec_ (RichText.Model.State.root editorState) selection
             in
-            if isComposing editor_ then
+            if RichText.Internal.Editor.isComposing editor_ then
                 let
                     bufferedState =
-                        Maybe.withDefault editorState (bufferedEditorState editor_)
+                        Maybe.withDefault editorState (RichText.Internal.Editor.bufferedEditorState editor_)
                 in
-                editor_ |> withBufferedEditorState (Just (bufferedState |> withSelection translatedSelection))
+                editor_ |> RichText.Internal.Editor.withBufferedEditorState (Just (bufferedState |> RichText.Model.State.withSelection translatedSelection))
 
             else
-                editor_ |> withState (editorState |> withSelection translatedSelection)
+                editor_ |> RichText.Internal.Editor.withState (editorState |> RichText.Model.State.withSelection translatedSelection)
 
 
-selectElement : Path -> Spec -> Editor -> Editor
+selectElement : RichText.Model.Node.Path -> RichText.Config.Spec.Spec -> Editor -> Editor
 selectElement path _ editor_ =
     let
         editorState =
             state editor_
 
         selection =
-            case RichText.Node.next path (State.root editorState) of
+            case RichText.Node.next path (RichText.Model.State.root editorState) of
                 Just ( b, _ ) ->
-                    range b 0 path 0
+                    RichText.Model.Selection.range b 0 path 0
 
                 Nothing ->
                     RichText.Model.Selection.caret path 0
     in
-    editor_ |> withState (editorState |> withSelection (Just selection)) |> forceReselection
+    editor_ |> RichText.Internal.Editor.withState (editorState |> RichText.Model.State.withSelection (Just selection)) |> RichText.Internal.Editor.forceReselection
 
 
 {-| The editor's internal update function. It's important that the editor process all `Message`
@@ -251,53 +202,53 @@ update cfg msg editor_ =
                     c.commandMap
             in
             case msg of
-                ChangeEvent change ->
+                RichText.Internal.Editor.ChangeEvent change ->
                     updateChangeEvent change spec_ editor_
 
-                SelectionEvent selection ->
+                RichText.Internal.Editor.SelectionEvent selection ->
                     updateSelection selection spec_ editor_
 
-                SelectElement path ->
+                RichText.Internal.Editor.SelectElement path ->
                     selectElement path spec_ editor_
 
-                BeforeInputEvent inputEvent ->
-                    BeforeInput.handleBeforeInput inputEvent commandMap_ spec_ editor_
+                RichText.Internal.Editor.BeforeInputEvent inputEvent ->
+                    RichText.Internal.BeforeInput.handleBeforeInput inputEvent commandMap_ spec_ editor_
 
-                CompositionStart ->
+                RichText.Internal.Editor.CompositionStart ->
                     handleCompositionStart editor_
 
-                CompositionEnd ->
+                RichText.Internal.Editor.CompositionEnd ->
                     handleCompositionEnd editor_
 
-                KeyDownEvent e ->
-                    KeyDown.handleKeyDown e commandMap_ spec_ editor_
+                RichText.Internal.Editor.KeyDownEvent e ->
+                    RichText.Internal.KeyDown.handleKeyDown e commandMap_ spec_ editor_
 
-                PasteWithDataEvent e ->
-                    Paste.handlePaste e spec_ editor_
+                RichText.Internal.Editor.PasteWithDataEvent e ->
+                    RichText.Internal.Paste.handlePaste e spec_ editor_
 
-                CutEvent ->
+                RichText.Internal.Editor.CutEvent ->
                     handleCut spec_ editor_
 
-                Init e ->
+                RichText.Internal.Editor.Init e ->
                     handleInitEvent e editor_
 
 
-handleInitEvent : InitEvent -> Editor -> Editor
+handleInitEvent : RichText.Internal.Event.InitEvent -> Editor -> Editor
 handleInitEvent initEvent editor_ =
-    editor_ |> withShortKey initEvent.shortKey
+    editor_ |> RichText.Internal.Editor.withShortKey initEvent.shortKey
 
 
-handleCut : Spec -> Editor -> Editor
+handleCut : RichText.Config.Spec.Spec -> Editor -> Editor
 handleCut spec_ editor_ =
-    case applyList [ ( "removeRangeSelection", transform removeRange ) ] spec_ editor_ of
+    case applyList [ ( "removeRangeSelection", RichText.Config.Command.transform RichText.Commands.removeRange ) ] spec_ editor_ of
         Err _ ->
             editor_
 
         Ok e ->
-            forceRerender e
+            RichText.Internal.Editor.forceRerender e
 
 
-textChangesDomToEditor : Spec -> Block -> List TextChange -> Maybe (List TextChange)
+textChangesDomToEditor : RichText.Config.Spec.Spec -> RichText.Model.Node.Block -> List RichText.Internal.Event.TextChange -> Maybe (List RichText.Internal.Event.TextChange)
 textChangesDomToEditor spec_ editorNode changes =
     List.foldl
         (\( p, text ) maybeAgg ->
@@ -306,7 +257,7 @@ textChangesDomToEditor spec_ editorNode changes =
                     Nothing
 
                 Just agg ->
-                    case NodePath.domToEditor spec_ editorNode p of
+                    case RichText.Internal.Path.domToEditor spec_ editorNode p of
                         Nothing ->
                             Nothing
 
@@ -317,38 +268,38 @@ textChangesDomToEditor spec_ editorNode changes =
         changes
 
 
-deriveTextChanges : Spec -> Block -> DomNode -> Result String (List TextChange)
+deriveTextChanges : RichText.Config.Spec.Spec -> RichText.Model.Node.Block -> RichText.Internal.DomNode.DomNode -> Result String (List RichText.Internal.Event.TextChange)
 deriveTextChanges spec_ editorNode domNode =
     let
         htmlNode =
-            editorBlockNodeToHtmlNode spec_ editorNode
+            RichText.Internal.HtmlNode.editorBlockNodeToHtmlNode spec_ editorNode
     in
-    findTextChanges htmlNode domNode
+    RichText.Internal.DomNode.findTextChanges htmlNode domNode
 
 
 applyForceFunctionOnEditor : (Editor -> Editor) -> Editor -> Editor
 applyForceFunctionOnEditor rerenderFunc editor_ =
     rerenderFunc
-        (case bufferedEditorState editor_ of
+        (case RichText.Internal.Editor.bufferedEditorState editor_ of
             Nothing ->
                 editor_
 
             Just bufferedEditorState ->
                 let
                     newEditor =
-                        InternalEditor.updateEditorState "buffered" bufferedEditorState editor_
+                        RichText.Internal.Editor.updateEditorState "buffered" bufferedEditorState editor_
                 in
                 newEditor
-                    |> withBufferedEditorState Nothing
-                    |> withComposing False
+                    |> RichText.Internal.Editor.withBufferedEditorState Nothing
+                    |> RichText.Internal.Editor.withComposing False
         )
 
 
-updateChangeEvent : EditorChange -> Spec -> Editor -> Editor
+updateChangeEvent : RichText.Internal.Event.EditorChange -> RichText.Config.Spec.Spec -> Editor -> Editor
 updateChangeEvent change spec_ editor_ =
     case change.characterDataMutations of
         Nothing ->
-            case D.decodeValue decodeDomNode change.root of
+            case Json.Decode.decodeValue RichText.Internal.DomNode.decodeDomNode change.root of
                 Err _ ->
                     editor_
 
@@ -365,11 +316,11 @@ updateChangeEvent change spec_ editor_ =
                 editor_
 
 
-sanitizeMutations : List TextChange -> List TextChange
+sanitizeMutations : List RichText.Internal.Event.TextChange -> List RichText.Internal.Event.TextChange
 sanitizeMutations changes =
     List.map
         (\( p, t ) ->
-            if t == zeroWidthSpace then
+            if t == RichText.Internal.Constants.zeroWidthSpace then
                 ( p, "" )
 
             else
@@ -378,19 +329,19 @@ sanitizeMutations changes =
         changes
 
 
-differentText : Block -> TextChange -> Bool
+differentText : RichText.Model.Node.Block -> RichText.Internal.Event.TextChange -> Bool
 differentText root ( path, t ) =
-    case nodeAt path root of
+    case RichText.Node.nodeAt path root of
         Nothing ->
             True
 
         -- We'll mark invalid paths as different since it will resolve later when we try to replace the node
         Just node ->
             case node of
-                Inline il ->
+                RichText.Node.Inline il ->
                     case il of
-                        Text tl ->
-                            Text.text tl /= t
+                        RichText.Model.Node.Text tl ->
+                            RichText.Model.Text.text tl /= t
 
                         _ ->
                             True
@@ -400,29 +351,29 @@ differentText root ( path, t ) =
                     True
 
 
-updateChangeEventTextChanges : Int -> Bool -> List TextChange -> Maybe Selection -> Spec -> Editor -> Editor
+updateChangeEventTextChanges : Int -> Bool -> List RichText.Internal.Event.TextChange -> Maybe RichText.Model.Selection.Selection -> RichText.Config.Spec.Spec -> Editor -> Editor
 updateChangeEventTextChanges timestamp composing textChanges selection spec_ editor_ =
     let
         editorComposing =
-            composing || isComposing editor_
+            composing || RichText.Internal.Editor.isComposing editor_
 
         -- Fix to issue #4: when composing text, we want to do the text comparison with the
         -- buffered state if it exists.
         stateToCompare =
             if editorComposing then
-                Maybe.withDefault (state editor_) (bufferedEditorState editor_)
+                Maybe.withDefault (state editor_) (RichText.Internal.Editor.bufferedEditorState editor_)
 
             else
                 state editor_
     in
-    case textChangesDomToEditor spec_ (State.root stateToCompare) textChanges of
+    case textChangesDomToEditor spec_ (RichText.Model.State.root stateToCompare) textChanges of
         Nothing ->
-            applyForceFunctionOnEditor forceRerender editor_
+            applyForceFunctionOnEditor RichText.Internal.Editor.forceRerender editor_
 
         Just changes ->
             let
                 actualChanges =
-                    List.filter (differentText (State.root stateToCompare)) changes
+                    List.filter (differentText (RichText.Model.State.root stateToCompare)) changes
             in
             if List.isEmpty actualChanges then
                 editor_
@@ -432,52 +383,52 @@ updateChangeEventTextChanges timestamp composing textChanges selection spec_ edi
                     editorState =
                         state editor_
                 in
-                case replaceText (State.root editorState) actualChanges of
+                case replaceText (RichText.Model.State.root editorState) actualChanges of
                     Nothing ->
-                        applyForceFunctionOnEditor forceRerender editor_
+                        applyForceFunctionOnEditor RichText.Internal.Editor.forceRerender editor_
 
                     Just replacedEditorNodes ->
                         let
                             newEditorState =
                                 editorState
-                                    |> withSelection (selection |> Maybe.andThen (domToEditor spec_ (State.root editorState)))
-                                    |> withRoot replacedEditorNodes
+                                    |> RichText.Model.State.withSelection (selection |> Maybe.andThen (RichText.Internal.Selection.domToEditor spec_ (RichText.Model.State.root editorState)))
+                                    |> RichText.Model.State.withRoot replacedEditorNodes
                         in
                         if editorComposing then
                             editor_
-                                |> withBufferedEditorState (Just newEditorState)
+                                |> RichText.Internal.Editor.withBufferedEditorState (Just newEditorState)
 
                         else
                             let
                                 newEditor =
-                                    updateEditorStateWithTimestamp (Just timestamp) "textChange" newEditorState editor_
+                                    RichText.Internal.Editor.updateEditorStateWithTimestamp (Just timestamp) "textChange" newEditorState editor_
                             in
-                            applyForceFunctionOnEditor forceReselection newEditor
+                            applyForceFunctionOnEditor RichText.Internal.Editor.forceReselection newEditor
 
 
-updateChangeEventFullScan : Int -> Bool -> DomNode -> Maybe Selection -> Spec -> Editor -> Editor
+updateChangeEventFullScan : Int -> Bool -> RichText.Internal.DomNode.DomNode -> Maybe RichText.Model.Selection.Selection -> RichText.Config.Spec.Spec -> Editor -> Editor
 updateChangeEventFullScan timestamp isComposing domRoot selection spec_ editor_ =
-    case extractRootEditorBlockNode domRoot of
+    case RichText.Internal.DomNode.extractRootEditorBlockNode domRoot of
         Nothing ->
-            applyForceFunctionOnEditor forceCompleteRerender editor_
+            applyForceFunctionOnEditor RichText.Internal.Editor.forceCompleteRerender editor_
 
         Just editorRootDomNode ->
             if needCompleteRerender domRoot then
-                applyForceFunctionOnEditor forceCompleteRerender editor_
+                applyForceFunctionOnEditor RichText.Internal.Editor.forceCompleteRerender editor_
 
             else
-                case deriveTextChanges spec_ (State.root (state editor_)) editorRootDomNode of
+                case deriveTextChanges spec_ (RichText.Model.State.root (state editor_)) editorRootDomNode of
                     Ok changes ->
                         updateChangeEventTextChanges timestamp isComposing changes selection spec_ editor_
 
                     Err _ ->
-                        applyForceFunctionOnEditor forceRerender editor_
+                        applyForceFunctionOnEditor RichText.Internal.Editor.forceRerender editor_
 
 
-needCompleteRerender : DomNode -> Bool
+needCompleteRerender : RichText.Internal.DomNode.DomNode -> Bool
 needCompleteRerender root =
     case root of
-        DomNode v ->
+        RichText.Internal.DomNode.DomNode v ->
             let
                 cnodes =
                     Maybe.withDefault Array.empty v.childNodes
@@ -485,93 +436,93 @@ needCompleteRerender root =
             Array.length cnodes /= 1
 
 
-editorChangeDecoder : D.Decoder Message
+editorChangeDecoder : Json.Decode.Decoder Message
 editorChangeDecoder =
-    D.map ChangeEvent
-        (D.map5 EditorChange
-            (D.at [ "detail", "root" ] D.value)
-            (D.at [ "detail", "selection" ] selectionDecoder)
-            (D.maybe (D.at [ "detail", "characterDataMutations" ] characterDataMutationsDecoder))
-            (D.at [ "detail", "timestamp" ] D.int)
-            (D.at [ "detail", "isComposing" ] (D.oneOf [ D.bool, D.succeed False ]))
+    Json.Decode.map RichText.Internal.Editor.ChangeEvent
+        (Json.Decode.map5 RichText.Internal.Event.EditorChange
+            (Json.Decode.at [ "detail", "root" ] Json.Decode.value)
+            (Json.Decode.at [ "detail", "selection" ] selectionDecoder)
+            (Json.Decode.maybe (Json.Decode.at [ "detail", "characterDataMutations" ] characterDataMutationsDecoder))
+            (Json.Decode.at [ "detail", "timestamp" ] Json.Decode.int)
+            (Json.Decode.at [ "detail", "isComposing" ] (Json.Decode.oneOf [ Json.Decode.bool, Json.Decode.succeed False ]))
         )
 
 
-characterDataMutationsDecoder : D.Decoder (List TextChange)
+characterDataMutationsDecoder : Json.Decode.Decoder (List RichText.Internal.Event.TextChange)
 characterDataMutationsDecoder =
-    D.list (D.map2 Tuple.pair (D.field "path" (D.list D.int)) (D.field "text" D.string))
+    Json.Decode.list (Json.Decode.map2 Tuple.pair (Json.Decode.field "path" (Json.Decode.list Json.Decode.int)) (Json.Decode.field "text" Json.Decode.string))
 
 
 onEditorChange : (Message -> msg) -> Html.Attribute msg
 onEditorChange msgFunc =
-    Html.Events.on "editorchange" (D.map msgFunc editorChangeDecoder)
+    Html.Events.on "editorchange" (Json.Decode.map msgFunc editorChangeDecoder)
 
 
-selectionDecoder : D.Decoder (Maybe Selection)
+selectionDecoder : Json.Decode.Decoder (Maybe RichText.Model.Selection.Selection)
 selectionDecoder =
-    D.maybe
-        (D.map4 range
-            (D.at [ "anchorNode" ] (D.list D.int))
-            (D.at [ "anchorOffset" ] D.int)
-            (D.at [ "focusNode" ] (D.list D.int))
-            (D.at [ "focusOffset" ] D.int)
+    Json.Decode.maybe
+        (Json.Decode.map4 RichText.Model.Selection.range
+            (Json.Decode.at [ "anchorNode" ] (Json.Decode.list Json.Decode.int))
+            (Json.Decode.at [ "anchorOffset" ] Json.Decode.int)
+            (Json.Decode.at [ "focusNode" ] (Json.Decode.list Json.Decode.int))
+            (Json.Decode.at [ "focusOffset" ] Json.Decode.int)
         )
 
 
-editorSelectionChangeDecoder : D.Decoder Message
+editorSelectionChangeDecoder : Json.Decode.Decoder Message
 editorSelectionChangeDecoder =
-    D.map SelectionEvent
-        (D.at [ "detail" ] selectionDecoder)
+    Json.Decode.map RichText.Internal.Editor.SelectionEvent
+        (Json.Decode.at [ "detail" ] selectionDecoder)
 
 
-pasteWithDataDecoder : D.Decoder Message
+pasteWithDataDecoder : Json.Decode.Decoder Message
 pasteWithDataDecoder =
-    D.map PasteWithDataEvent <|
-        D.map2
-            PasteEvent
-            (D.at [ "detail", "text" ] D.string)
-            (D.at [ "detail", "html" ] D.string)
+    Json.Decode.map RichText.Internal.Editor.PasteWithDataEvent <|
+        Json.Decode.map2
+            RichText.Internal.Event.PasteEvent
+            (Json.Decode.at [ "detail", "text" ] Json.Decode.string)
+            (Json.Decode.at [ "detail", "html" ] Json.Decode.string)
 
 
-initDecoder : D.Decoder Message
+initDecoder : Json.Decode.Decoder Message
 initDecoder =
-    D.map Init <|
-        D.map
-            InitEvent
-            (D.at [ "detail", "shortKey" ] D.string)
+    Json.Decode.map RichText.Internal.Editor.Init <|
+        Json.Decode.map
+            RichText.Internal.Event.InitEvent
+            (Json.Decode.at [ "detail", "shortKey" ] Json.Decode.string)
 
 
 onCompositionStart : (Message -> msg) -> Html.Attribute msg
 onCompositionStart msgFunc =
-    Html.Events.on "compositionstart" (D.succeed (msgFunc CompositionStart))
+    Html.Events.on "compositionstart" (Json.Decode.succeed (msgFunc RichText.Internal.Editor.CompositionStart))
 
 
 onCompositionEnd : (Message -> msg) -> Html.Attribute msg
 onCompositionEnd msgFunc =
-    Html.Events.on "editorcompositionend" (D.succeed (msgFunc CompositionEnd))
+    Html.Events.on "editorcompositionend" (Json.Decode.succeed (msgFunc RichText.Internal.Editor.CompositionEnd))
 
 
 onPasteWithData : (Message -> msg) -> Html.Attribute msg
 onPasteWithData msgFunc =
-    Html.Events.on "pastewithdata" (D.map msgFunc pasteWithDataDecoder)
+    Html.Events.on "pastewithdata" (Json.Decode.map msgFunc pasteWithDataDecoder)
 
 
 onCut : (Message -> msg) -> Html.Attribute msg
 onCut msgFunc =
-    Html.Events.on "cut" (D.succeed (msgFunc CutEvent))
+    Html.Events.on "cut" (Json.Decode.succeed (msgFunc RichText.Internal.Editor.CutEvent))
 
 
 onInit : (Message -> msg) -> Html.Attribute msg
 onInit msgFunc =
-    Html.Events.on "editorinit" (D.map msgFunc initDecoder)
+    Html.Events.on "editorinit" (Json.Decode.map msgFunc initDecoder)
 
 
 onEditorSelectionChange : (Message -> msg) -> Html.Attribute msg
 onEditorSelectionChange msgFunc =
-    Html.Events.on "editorselectionchange" (D.map msgFunc editorSelectionChangeDecoder)
+    Html.Events.on "editorselectionchange" (Json.Decode.map msgFunc editorSelectionChangeDecoder)
 
 
-replaceText : Block -> List TextChange -> Maybe Block
+replaceText : RichText.Model.Node.Block -> List RichText.Internal.Event.TextChange -> Maybe RichText.Model.Node.Block
 replaceText editorNode changes =
     List.foldl
         (\change maybeNode ->
@@ -586,18 +537,18 @@ replaceText editorNode changes =
         changes
 
 
-applyTextChange : Block -> TextChange -> Maybe Block
+applyTextChange : RichText.Model.Node.Block -> RichText.Internal.Event.TextChange -> Maybe RichText.Model.Node.Block
 applyTextChange editorNode ( path, text ) =
     case path of
         [] ->
             Nothing
 
         x :: xs ->
-            case childNodes editorNode of
-                BlockChildren array ->
+            case RichText.Model.Node.childNodes editorNode of
+                RichText.Model.Node.BlockChildren array ->
                     let
                         a =
-                            toBlockArray array
+                            RichText.Model.Node.toBlockArray array
                     in
                     case Array.get x a of
                         Nothing ->
@@ -611,17 +562,17 @@ applyTextChange editorNode ( path, text ) =
                                 Just textChangeNode ->
                                     Just <|
                                         (editorNode
-                                            |> withChildNodes (blockChildren <| Array.set x textChangeNode a)
+                                            |> RichText.Model.Node.withChildNodes (RichText.Model.Node.blockChildren <| Array.set x textChangeNode a)
                                         )
 
-                InlineChildren array ->
+                RichText.Model.Node.InlineChildren array ->
                     if not <| List.isEmpty xs then
                         Nothing
 
                     else
                         let
                             a =
-                                toInlineArray array
+                                RichText.Model.Node.toInlineArray array
                         in
                         case Array.get x a of
                             Nothing ->
@@ -629,14 +580,14 @@ applyTextChange editorNode ( path, text ) =
 
                             Just inlineNode ->
                                 case inlineNode of
-                                    Text contents ->
+                                    RichText.Model.Node.Text contents ->
                                         Just
                                             (editorNode
-                                                |> withChildNodes
-                                                    (inlineChildren <|
+                                                |> RichText.Model.Node.withChildNodes
+                                                    (RichText.Model.Node.inlineChildren <|
                                                         Array.set x
-                                                            (Text
-                                                                (contents |> Text.withText (String.replace zeroWidthSpace "" text))
+                                                            (RichText.Model.Node.Text
+                                                                (contents |> RichText.Model.Text.withText (String.replace RichText.Internal.Constants.zeroWidthSpace "" text))
                                                             )
                                                             a
                                                     )
@@ -645,11 +596,11 @@ applyTextChange editorNode ( path, text ) =
                                     _ ->
                                         Nothing
 
-                Leaf ->
+                RichText.Model.Node.Leaf ->
                     Nothing
 
 
-selectionAttribute : Maybe Selection -> Int -> Int -> String
+selectionAttribute : Maybe RichText.Model.Selection.Selection -> Int -> Int -> String
 selectionAttribute maybeSelection renderCount selectionCount =
     case maybeSelection of
         Nothing ->
@@ -657,92 +608,92 @@ selectionAttribute maybeSelection renderCount selectionCount =
 
         Just selection ->
             String.join ","
-                [ "anchor-offset=" ++ String.fromInt (anchorOffset selection)
-                , "anchor-node=" ++ toString (anchorNode selection)
-                , "focus-offset=" ++ String.fromInt (focusOffset selection)
-                , "focus-node=" ++ toString (focusNode selection)
+                [ "anchor-offset=" ++ String.fromInt (RichText.Model.Selection.anchorOffset selection)
+                , "anchor-node=" ++ RichText.Model.Node.toString (RichText.Model.Selection.anchorNode selection)
+                , "focus-offset=" ++ String.fromInt (RichText.Model.Selection.focusOffset selection)
+                , "focus-node=" ++ RichText.Model.Node.toString (RichText.Model.Selection.focusNode selection)
                 , "render-count=" ++ String.fromInt renderCount
                 , "selection-count=" ++ String.fromInt selectionCount
                 ]
 
 
-onBeforeInput : Tagger msg -> CommandMap -> Spec -> Editor -> Html.Attribute msg
+onBeforeInput : RichText.Internal.Editor.Tagger msg -> RichText.Config.Command.CommandMap -> RichText.Config.Spec.Spec -> Editor -> Html.Attribute msg
 onBeforeInput tagger commandMap_ spec_ editor_ =
-    Html.Events.preventDefaultOn "beforeinput" (BeforeInput.preventDefaultOnBeforeInputDecoder tagger commandMap_ spec_ editor_)
+    Html.Events.preventDefaultOn "beforeinput" (RichText.Internal.BeforeInput.preventDefaultOnBeforeInputDecoder tagger commandMap_ spec_ editor_)
 
 
-onKeyDown : Tagger msg -> CommandMap -> Spec -> Editor -> Html.Attribute msg
+onKeyDown : RichText.Internal.Editor.Tagger msg -> RichText.Config.Command.CommandMap -> RichText.Config.Spec.Spec -> Editor -> Html.Attribute msg
 onKeyDown tagger commandMap_ spec_ editor_ =
-    Html.Events.preventDefaultOn "keydown" (KeyDown.preventDefaultOnKeyDownDecoder tagger commandMap_ spec_ editor_)
+    Html.Events.preventDefaultOn "keydown" (RichText.Internal.KeyDown.preventDefaultOnKeyDownDecoder tagger commandMap_ spec_ editor_)
 
 
 handleCompositionStart : Editor -> Editor
 handleCompositionStart editor_ =
     editor_
-        |> withComposing True
+        |> RichText.Internal.Editor.withComposing True
 
 
 handleCompositionEnd : Editor -> Editor
 handleCompositionEnd editor_ =
-    case bufferedEditorState editor_ of
+    case RichText.Internal.Editor.bufferedEditorState editor_ of
         Nothing ->
-            editor_ |> withComposing False
+            editor_ |> RichText.Internal.Editor.withComposing False
 
         Just _ ->
-            applyForceFunctionOnEditor forceReselection editor_
+            applyForceFunctionOnEditor RichText.Internal.Editor.forceReselection editor_
 
 
-shouldHideCaret : State -> Bool
+shouldHideCaret : RichText.Model.State.State -> Bool
 shouldHideCaret editorState =
-    case State.selection editorState of
+    case RichText.Model.State.selection editorState of
         Nothing ->
             True
 
         Just selection ->
-            if not <| isCollapsed selection then
+            if not <| RichText.Model.Selection.isCollapsed selection then
                 False
 
             else
-                case nodeAt (anchorNode selection) (State.root editorState) of
+                case RichText.Node.nodeAt (RichText.Model.Selection.anchorNode selection) (RichText.Model.State.root editorState) of
                     Nothing ->
                         False
 
                     Just node ->
                         case node of
-                            Block _ ->
+                            RichText.Node.Block _ ->
                                 True
 
-                            Inline leaf ->
+                            RichText.Node.Inline leaf ->
                                 case leaf of
-                                    InlineElement _ ->
+                                    RichText.Model.Node.InlineElement _ ->
                                         True
 
                                     _ ->
                                         False
 
 
-markCaretSelectionOnEditorNodes : State -> Block
+markCaretSelectionOnEditorNodes : RichText.Model.State.State -> RichText.Model.Node.Block
 markCaretSelectionOnEditorNodes editorState =
-    case State.selection editorState of
+    case RichText.Model.State.selection editorState of
         Nothing ->
-            State.root editorState
+            RichText.Model.State.root editorState
 
         Just selection ->
-            if isCollapsed selection then
-                annotateSelection selection (State.root editorState)
+            if RichText.Model.Selection.isCollapsed selection then
+                RichText.Annotation.annotateSelection selection (RichText.Model.State.root editorState)
 
             else
-                State.root editorState
+                RichText.Model.State.root editorState
 
 
-editorToDomSelection : Spec -> Editor -> Maybe Selection
+editorToDomSelection : RichText.Config.Spec.Spec -> Editor -> Maybe RichText.Model.Selection.Selection
 editorToDomSelection spec_ editor_ =
-    case State.selection (state editor_) of
+    case RichText.Model.State.selection (state editor_) of
         Nothing ->
             Nothing
 
         Just selection ->
-            editorToDom spec_ (State.root (state editor_)) selection
+            RichText.Internal.Selection.editorToDom spec_ (RichText.Model.State.root (state editor_)) selection
 
 
 {-| Take an editor model and config and render it in the DOM.
@@ -776,7 +727,7 @@ view cfg editor_ =
                 , onCut tagger
                 , onInit tagger
                 ]
-                [ ( String.fromInt (completeRerenderCount editor_)
+                [ ( String.fromInt (RichText.Internal.Editor.completeRerenderCount editor_)
                   , Html.Keyed.node "div"
                         ([ Html.Attributes.contenteditable True
                          , Html.Attributes.class "rte-main"
@@ -785,9 +736,9 @@ view cfg editor_ =
                          , onBeforeInput tagger commandMap_ spec_ editor_
                          , onKeyDown tagger commandMap_ spec_ editor_
                          ]
-                            ++ topLevelAttributes decorations_
+                            ++ RichText.Config.Decorations.topLevelAttributes decorations_
                         )
-                        [ ( String.fromInt (renderCount editor_)
+                        [ ( String.fromInt (RichText.Internal.Editor.renderCount editor_)
                           , viewEditorBlockNode
                                 spec_
                                 decorations_
@@ -802,8 +753,8 @@ view cfg editor_ =
                             "selection"
                             (selectionAttribute
                                 (editorToDomSelection spec_ editor_)
-                                (renderCount editor_)
-                                (selectionCount editor_)
+                                (RichText.Internal.Editor.renderCount editor_)
+                                (RichText.Internal.Editor.selectionCount editor_)
                             )
                         ]
                         []
@@ -832,7 +783,7 @@ readOnlyView cfg editor_ =
                 ([ Html.Attributes.class "rte-main"
                  , Html.Attributes.attribute "data-rte-main" "true"
                  ]
-                    ++ topLevelAttributes decorations_
+                    ++ RichText.Config.Decorations.topLevelAttributes decorations_
                 )
                 [ viewEditorBlockNode
                     spec_
@@ -842,13 +793,13 @@ readOnlyView cfg editor_ =
                 ]
 
 
-viewHtmlNode : HtmlNode -> List (Path -> List (Html.Attribute msg)) -> Array (Html msg) -> Path -> Html msg
+viewHtmlNode : RichText.Model.HtmlNode.HtmlNode -> List (RichText.Model.Node.Path -> List (Html.Attribute msg)) -> Array (Html msg) -> RichText.Model.Node.Path -> Html msg
 viewHtmlNode node decorators vdomChildren backwardsRelativePath =
     case node of
-        ElementNode name attributes children ->
+        RichText.Model.HtmlNode.ElementNode name attributes children ->
             let
                 childNodes =
-                    if children == childNodesPlaceholder then
+                    if children == RichText.Internal.HtmlNode.childNodesPlaceholder then
                         vdomChildren
 
                     else
@@ -863,43 +814,43 @@ viewHtmlNode node decorators vdomChildren backwardsRelativePath =
                 )
                 (Array.toList childNodes)
 
-        TextNode v ->
+        RichText.Model.HtmlNode.TextNode v ->
             Html.text v
 
 
-viewMark : Spec -> Decorations msg -> Path -> Mark -> Array (Html msg) -> Html msg
+viewMark : RichText.Config.Spec.Spec -> RichText.Config.Decorations.Decorations msg -> RichText.Model.Node.Path -> RichText.Model.Mark.Mark -> Array (Html msg) -> Html msg
 viewMark spec_ decorations_ backwardsNodePath mark children =
     let
         mDecorators =
             Maybe.withDefault []
                 (Dict.get
-                    (Mark.name mark)
-                    (markDecorations decorations_)
+                    (RichText.Model.Mark.name mark)
+                    (RichText.Config.Decorations.markDecorations decorations_)
                 )
 
         decorators =
             List.map (\d -> d (List.reverse backwardsNodePath) mark) mDecorators
 
         node =
-            MarkDefinition.toHtmlNode (markDefinitionWithDefault mark spec_) mark childNodesPlaceholder
+            RichText.Config.MarkDefinition.toHtmlNode (RichText.Internal.Spec.markDefinitionWithDefault mark spec_) mark RichText.Internal.HtmlNode.childNodesPlaceholder
     in
     viewHtmlNode node decorators children []
 
 
-viewElement : Spec -> Decorations msg -> Element -> Path -> Array (Html msg) -> Html msg
+viewElement : RichText.Config.Spec.Spec -> RichText.Config.Decorations.Decorations msg -> RichText.Model.Element.Element -> RichText.Model.Node.Path -> Array (Html msg) -> Html msg
 viewElement spec_ decorations_ elementParameters backwardsNodePath children =
     let
         definition =
-            elementDefinitionWithDefault elementParameters spec_
+            RichText.Internal.Spec.elementDefinitionWithDefault elementParameters spec_
 
         node =
-            ElementDefinition.toHtmlNode definition elementParameters childNodesPlaceholder
+            RichText.Config.ElementDefinition.toHtmlNode definition elementParameters RichText.Internal.HtmlNode.childNodesPlaceholder
 
         eDecorators =
             Maybe.withDefault []
                 (Dict.get
-                    (Element.name elementParameters)
-                    (elementDecorations decorations_)
+                    (RichText.Model.Element.name elementParameters)
+                    (RichText.Config.Decorations.elementDecorations decorations_)
                 )
 
         decorators =
@@ -908,10 +859,10 @@ viewElement spec_ decorations_ elementParameters backwardsNodePath children =
     viewHtmlNode node decorators children []
 
 
-viewInlineLeafTree : Spec -> Decorations msg -> Path -> Array Inline -> InlineTree -> Html msg
+viewInlineLeafTree : RichText.Config.Spec.Spec -> RichText.Config.Decorations.Decorations msg -> RichText.Model.Node.Path -> Array RichText.Model.Node.Inline -> RichText.Model.Node.InlineTree -> Html msg
 viewInlineLeafTree spec_ decorations_ backwardsPath inlineLeafArray inlineLeafTree =
     case inlineLeafTree of
-        LeafNode i ->
+        RichText.Model.Node.LeafNode i ->
             case Array.get i inlineLeafArray of
                 Just l ->
                     viewInlineLeaf spec_ decorations_ (i :: backwardsPath) l
@@ -921,25 +872,25 @@ viewInlineLeafTree spec_ decorations_ backwardsPath inlineLeafArray inlineLeafTr
                     -- This state should be impossible though.
                     Html.div [ Html.Attributes.class "rte-error" ] [ Html.text "Invalid leaf tree." ]
 
-        MarkNode n ->
+        RichText.Model.Node.MarkNode n ->
             viewMark spec_ decorations_ backwardsPath n.mark <|
                 Array.map (viewInlineLeafTree spec_ decorations_ backwardsPath inlineLeafArray) n.children
 
 
-viewEditorBlockNode : Spec -> Decorations msg -> Path -> Block -> Html msg
+viewEditorBlockNode : RichText.Config.Spec.Spec -> RichText.Config.Decorations.Decorations msg -> RichText.Model.Node.Path -> RichText.Model.Node.Block -> Html msg
 viewEditorBlockNode spec_ decorations_ backwardsPath node =
     viewElement spec_
         decorations_
-        (element node)
+        (RichText.Model.Node.element node)
         backwardsPath
-        (case childNodes node of
-            BlockChildren l ->
-                Array.indexedMap (\i n -> viewEditorBlockNode spec_ decorations_ (i :: backwardsPath) n) (toBlockArray l)
+        (case RichText.Model.Node.childNodes node of
+            RichText.Model.Node.BlockChildren l ->
+                Array.indexedMap (\i n -> viewEditorBlockNode spec_ decorations_ (i :: backwardsPath) n) (RichText.Model.Node.toBlockArray l)
 
-            InlineChildren l ->
-                Array.map (\n -> viewInlineLeafTree spec_ decorations_ backwardsPath (toInlineArray l) n) (toInlineTree l)
+            RichText.Model.Node.InlineChildren l ->
+                Array.map (\n -> viewInlineLeafTree spec_ decorations_ backwardsPath (RichText.Model.Node.toInlineArray l) n) (RichText.Model.Node.toInlineTree l)
 
-            Leaf ->
+            RichText.Model.Node.Leaf ->
                 Array.empty
         )
 
@@ -948,27 +899,27 @@ viewText : String -> Html msg
 viewText text =
     Html.text
         (if String.isEmpty text then
-            zeroWidthSpace
+            RichText.Internal.Constants.zeroWidthSpace
 
          else
             text
         )
 
 
-viewInlineLeaf : Spec -> Decorations msg -> Path -> Inline -> Html msg
+viewInlineLeaf : RichText.Config.Spec.Spec -> RichText.Config.Decorations.Decorations msg -> RichText.Model.Node.Path -> RichText.Model.Node.Inline -> Html msg
 viewInlineLeaf spec_ decorations_ backwardsPath leaf =
     case leaf of
-        InlineElement l ->
-            viewElement spec_ decorations_ (InlineElement.element l) backwardsPath Array.empty
+        RichText.Model.Node.InlineElement l ->
+            viewElement spec_ decorations_ (RichText.Model.InlineElement.element l) backwardsPath Array.empty
 
-        Text v ->
-            viewText (Text.text v)
+        RichText.Model.Node.Text v ->
+            viewText (RichText.Model.Text.text v)
 
 
 {-| `Editor` represents the entire state of the editor, and is what you store in your model.
 -}
 type alias Editor =
-    InternalEditor.Editor
+    RichText.Internal.Editor.Editor
 
 
 {-| Initializes an editor
@@ -988,27 +939,27 @@ type alias Editor =
     init <| State.state docNode Nothing
 
 -}
-init : State -> Editor
+init : RichText.Model.State.State -> Editor
 init =
-    InternalEditor.editor
+    RichText.Internal.Editor.editor
 
 
 {-| The internal events that an editor has to respond to.
 -}
 type alias Message =
-    InternalEditor.Message
+    RichText.Internal.Editor.Message
 
 
 {-| Retrieves the current state from the editor
 -}
-state : Editor -> State
+state : Editor -> RichText.Model.State.State
 state =
     InternalEditor.state
 
 
 {-| Retrieves the current history from the editor
 -}
-history : Editor -> History
+history : Editor -> RichText.Model.History.History
 history =
     InternalEditor.history
 
@@ -1039,7 +990,7 @@ changeCount =
         |> withHistory newHistory
 
 -}
-withHistory : History -> Editor -> Editor
+withHistory : RichText.Model.History.History -> Editor -> Editor
 withHistory =
     InternalEditor.withHistory
 
@@ -1075,9 +1026,9 @@ the editor state is reduced and the history is updated.
         }
 
 -}
-applyList : NamedCommandList -> Spec -> Editor -> Result String Editor
+applyList : RichText.Config.Command.NamedCommandList -> RichText.Config.Spec.Spec -> Editor -> Result String Editor
 applyList =
-    InternalEditor.applyNamedCommandList
+    RichText.Internal.Editor.applyNamedCommandList
 
 
 {-| Apply a named command to the editor. If the command was successful, the resulting editor
@@ -1105,15 +1056,15 @@ an error is returned. If the command is successful and validated, the resulting 
         }
 
 -}
-apply : NamedCommand -> Spec -> Editor -> Result String Editor
+apply : RichText.Config.Command.NamedCommand -> RichText.Config.Spec.Spec -> Editor -> Result String Editor
 apply =
-    InternalEditor.applyCommand
+    RichText.Internal.Editor.applyCommand
 
 
 {-| Same as `apply`, but the selection state is not forced to update if it hasn't changed. This normally
 should not be used, but can be useful for situations like if you have an embedded input element in a
 "contentediable=false" wrapper that requires focus or independent selection.
 -}
-applyNoForceSelection : NamedCommand -> Spec -> Editor -> Result String Editor
+applyNoForceSelection : RichText.Config.Command.NamedCommand -> RichText.Config.Spec.Spec -> Editor -> Result String Editor
 applyNoForceSelection =
-    InternalEditor.applyCommandNoForceSelection
+    RichText.Internal.Editor.applyCommandNoForceSelection

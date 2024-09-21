@@ -4,9 +4,9 @@ module RichText.Internal.Event exposing (EditorChange, InitEvent, InputEvent, Ke
 as a few custom events.
 -}
 
-import Json.Encode as E
-import RichText.Model.Node exposing (Path)
-import RichText.Model.Selection exposing (Selection)
+import Json.Encode
+import RichText.Model.Node
+import RichText.Model.Selection
 
 
 {-| Whenever the elm-editor MutationObserver detects a change, it triggers an editor change event
@@ -15,8 +15,8 @@ change event so that the VirtualDOM doesn't try to render when the DOM is not in
 it's expecting.
 -}
 type alias EditorChange =
-    { root : E.Value
-    , selection : Maybe Selection
+    { root : Json.Encode.Value
+    , selection : Maybe RichText.Model.Selection.Selection
     , characterDataMutations : Maybe (List TextChange)
     , timestamp : Int
     , isComposing : Bool
@@ -61,4 +61,4 @@ type alias InitEvent =
 is the new text at that path.
 -}
 type alias TextChange =
-    ( Path, String )
+    ( RichText.Model.Node.Path, String )

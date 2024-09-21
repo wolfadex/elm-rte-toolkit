@@ -7,7 +7,7 @@ module RichText.Model.Mark exposing
 {-| A mark is a piece of information that can be attached to an inline node (like color, font, and link information).
 
 
-# Mark
+# Marks
 
 @docs Mark, MarkDefinition, mark, name, attributes, withAttributes
 

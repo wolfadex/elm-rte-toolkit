@@ -32,69 +32,44 @@ The definitions used in the markdown specification.
 -}
 
 import Array
-import RichText.Annotation exposing (selectable)
+import RichText.Annotation
 import RichText.Config.ElementDefinition
-    exposing
-        ( ElementDefinition
-        , ElementToHtml
-        , HtmlToElement
-        , blockLeaf
-        , blockNode
-        , defaultElementToHtml
-        , defaultHtmlToElement
-        , elementDefinition
-        , inlineLeaf
-        , textBlock
-        )
 import RichText.Config.MarkDefinition
-    exposing
-        ( HtmlToMark
-        , MarkDefinition
-        , MarkToHtml
-        , defaultHtmlToMark
-        , markDefinition
-        )
 import RichText.Config.Spec
-    exposing
-        ( Spec
-        , emptySpec
-        , withElementDefinitions
-        , withMarkDefinitions
-        )
-import RichText.Model.Attribute exposing (Attribute(..), findIntegerAttribute, findStringAttribute)
-import RichText.Model.Element as Element exposing (attributes, element)
-import RichText.Model.HtmlNode exposing (HtmlNode(..))
-import RichText.Model.Mark as Mark exposing (mark)
+import RichText.Model.Attribute
+import RichText.Model.Element
+import RichText.Model.HtmlNode
+import RichText.Model.Mark
 import Set
 
 
 {-| The root element of a document.
 -}
-doc : ElementDefinition
+doc : RichText.Config.ElementDefinition.ElementDefinition
 doc =
-    elementDefinition
+    RichText.Config.ElementDefinition.elementDefinition
         { name = "doc"
         , group = "root"
-        , contentType = blockNode [ "block" ]
+        , contentType = RichText.Config.ElementDefinition.blockNode [ "block" ]
         , toHtmlNode = docToHtml
         , fromHtmlNode = htmlToDoc
         , selectable = False
         }
 
 
-docToHtml : ElementToHtml
+docToHtml : RichText.Config.ElementDefinition.ElementToHtml
 docToHtml _ children =
-    ElementNode "div"
+    RichText.Model.HtmlNode.ElementNode "div"
         [ ( "data-rte-doc", "true" ) ]
         children
 
 
-htmlToDoc : HtmlToElement
+htmlToDoc : RichText.Config.ElementDefinition.HtmlToElement
 htmlToDoc definition node =
     case node of
-        ElementNode name attrs children ->
+        RichText.Model.HtmlNode.ElementNode name attrs children ->
             if name == "div" && attrs == [ ( "data-rte-doc", "true" ) ] then
-                Just <| ( element definition [], children )
+                Just <| ( RichText.Model.Element.element definition [], children )
 
             else
                 Nothing
@@ -105,29 +80,29 @@ htmlToDoc definition node =
 
 {-| A paragraph element. It can have inline children.
 -}
-paragraph : ElementDefinition
+paragraph : RichText.Config.ElementDefinition.ElementDefinition
 paragraph =
-    elementDefinition
+    RichText.Config.ElementDefinition.elementDefinition
         { name = "paragraph"
         , group = "block"
-        , contentType = textBlock { allowedGroups = [ "inline" ], allowedMarks = [] }
+        , contentType = RichText.Config.ElementDefinition.textBlock { allowedGroups = [ "inline" ], allowedMarks = [] }
         , toHtmlNode = paragraphToHtml
         , fromHtmlNode = htmlToParagraph
         , selectable = False
         }
 
 
-paragraphToHtml : ElementToHtml
+paragraphToHtml : RichText.Config.ElementDefinition.ElementToHtml
 paragraphToHtml _ children =
-    ElementNode "p" [] children
+    RichText.Model.HtmlNode.ElementNode "p" [] children
 
 
-htmlToParagraph : HtmlToElement
+htmlToParagraph : RichText.Config.ElementDefinition.HtmlToElement
 htmlToParagraph definition node =
     case node of
-        ElementNode name _ children ->
+        RichText.Model.HtmlNode.ElementNode name _ children ->
             if name == "p" then
-                Just <| ( element definition [], children )
+                Just <| ( RichText.Model.Element.element definition [], children )
 
             else
                 Nothing
@@ -138,53 +113,53 @@ htmlToParagraph definition node =
 
 {-| A blockquote element. It can have block children.
 -}
-blockquote : ElementDefinition
+blockquote : RichText.Config.ElementDefinition.ElementDefinition
 blockquote =
-    elementDefinition
+    RichText.Config.ElementDefinition.elementDefinition
         { name = "blockquote"
         , group = "block"
-        , contentType = blockNode [ "block" ]
+        , contentType = RichText.Config.ElementDefinition.blockNode [ "block" ]
         , toHtmlNode = blockquoteToHtml
         , fromHtmlNode = htmlToBlockquote
         , selectable = False
         }
 
 
-blockquoteToHtml : ElementToHtml
+blockquoteToHtml : RichText.Config.ElementDefinition.ElementToHtml
 blockquoteToHtml =
-    defaultElementToHtml "blockquote"
+    RichText.Config.ElementDefinition.defaultElementToHtml "blockquote"
 
 
-htmlToBlockquote : HtmlToElement
+htmlToBlockquote : RichText.Config.ElementDefinition.HtmlToElement
 htmlToBlockquote =
-    defaultHtmlToElement "blockquote"
+    RichText.Config.ElementDefinition.defaultHtmlToElement "blockquote"
 
 
 {-| A horizontal rule element. It is a block leaf, e.g. it can have no children.
 -}
-horizontalRule : ElementDefinition
+horizontalRule : RichText.Config.ElementDefinition.ElementDefinition
 horizontalRule =
-    elementDefinition
+    RichText.Config.ElementDefinition.elementDefinition
         { name = "horizontal_rule"
         , group = "block"
-        , contentType = blockLeaf
+        , contentType = RichText.Config.ElementDefinition.blockLeaf
         , toHtmlNode = horizontalRuleToHtml
         , fromHtmlNode = htmlToHorizontalRule
         , selectable = True
         }
 
 
-horizontalRuleToHtml : ElementToHtml
+horizontalRuleToHtml : RichText.Config.ElementDefinition.ElementToHtml
 horizontalRuleToHtml =
-    defaultElementToHtml "hr"
+    RichText.Config.ElementDefinition.defaultElementToHtml "hr"
 
 
-htmlToHorizontalRule : HtmlToElement
+htmlToHorizontalRule : RichText.Config.ElementDefinition.HtmlToElement
 htmlToHorizontalRule def node =
     case node of
-        ElementNode name _ _ ->
+        RichText.Model.HtmlNode.ElementNode name _ _ ->
             if name == "hr" then
-                Just ( element def [] |> Element.withAnnotations (Set.singleton selectable), Array.empty )
+                Just ( RichText.Model.Element.element def [] |> RichText.Model.Element.withAnnotations (Set.singleton RichText.Annotation.selectable), Array.empty )
 
             else
                 Nothing
@@ -196,31 +171,31 @@ htmlToHorizontalRule def node =
 {-| A heading element. It can have inline children. It supports one integer attribute `level`,
 which defaults to 1 if not set.
 -}
-heading : ElementDefinition
+heading : RichText.Config.ElementDefinition.ElementDefinition
 heading =
-    elementDefinition
+    RichText.Config.ElementDefinition.elementDefinition
         { name = "heading"
         , group = "block"
-        , contentType = textBlock { allowedGroups = [ "inline" ], allowedMarks = [] }
+        , contentType = RichText.Config.ElementDefinition.textBlock { allowedGroups = [ "inline" ], allowedMarks = [] }
         , toHtmlNode = headingToHtml
         , fromHtmlNode = htmlToHeading
         , selectable = False
         }
 
 
-headingToHtml : ElementToHtml
+headingToHtml : RichText.Config.ElementDefinition.ElementToHtml
 headingToHtml parameters children =
     let
         level =
-            Maybe.withDefault 1 <| findIntegerAttribute "level" (attributes parameters)
+            Maybe.withDefault 1 <| RichText.Model.Attribute.findIntegerAttribute "level" (RichText.Model.Element.attributes parameters)
     in
-    ElementNode ("h" ++ String.fromInt level) [] children
+    RichText.Model.HtmlNode.ElementNode ("h" ++ String.fromInt level) [] children
 
 
-htmlToHeading : HtmlToElement
+htmlToHeading : RichText.Config.ElementDefinition.HtmlToElement
 htmlToHeading def node =
     case node of
-        ElementNode name _ children ->
+        RichText.Model.HtmlNode.ElementNode name _ children ->
             let
                 maybeLevel =
                     case name of
@@ -251,8 +226,8 @@ htmlToHeading def node =
 
                 Just level ->
                     Just <|
-                        ( element def
-                            [ IntegerAttribute "level" level ]
+                        ( RichText.Model.Element.element def
+                            [ RichText.Model.Attribute.IntegerAttribute "level" level ]
                         , children
                         )
 
@@ -262,29 +237,29 @@ htmlToHeading def node =
 
 {-| A code block element.
 -}
-codeBlock : ElementDefinition
+codeBlock : RichText.Config.ElementDefinition.ElementDefinition
 codeBlock =
-    elementDefinition
+    RichText.Config.ElementDefinition.elementDefinition
         { name = "code_block"
         , group = "block"
-        , contentType = textBlock { allowedGroups = [ "text" ], allowedMarks = [ "__nothing__" ] }
+        , contentType = RichText.Config.ElementDefinition.textBlock { allowedGroups = [ "text" ], allowedMarks = [ "__nothing__" ] }
         , toHtmlNode = codeBlockToHtmlNode
         , fromHtmlNode = htmlNodeToCodeBlock
         , selectable = False
         }
 
 
-codeBlockToHtmlNode : ElementToHtml
+codeBlockToHtmlNode : RichText.Config.ElementDefinition.ElementToHtml
 codeBlockToHtmlNode _ children =
-    ElementNode "pre"
+    RichText.Model.HtmlNode.ElementNode "pre"
         []
-        (Array.fromList [ ElementNode "code" [] children ])
+        (Array.fromList [ RichText.Model.HtmlNode.ElementNode "code" [] children ])
 
 
-htmlNodeToCodeBlock : HtmlToElement
+htmlNodeToCodeBlock : RichText.Config.ElementDefinition.HtmlToElement
 htmlNodeToCodeBlock def node =
     case node of
-        ElementNode name _ children ->
+        RichText.Model.HtmlNode.ElementNode name _ children ->
             if name == "pre" && Array.length children == 1 then
                 case Array.get 0 children of
                     Nothing ->
@@ -292,8 +267,8 @@ htmlNodeToCodeBlock def node =
 
                     Just n ->
                         case n of
-                            ElementNode _ _ childChildren ->
-                                Just ( element def [], childChildren )
+                            RichText.Model.HtmlNode.ElementNode _ _ childChildren ->
+                                Just ( RichText.Model.Element.element def [], childChildren )
 
                             _ ->
                                 Nothing
@@ -312,37 +287,37 @@ htmlNodeToCodeBlock def node =
   - `title` is the title of the image
 
 -}
-image : ElementDefinition
+image : RichText.Config.ElementDefinition.ElementDefinition
 image =
-    elementDefinition
+    RichText.Config.ElementDefinition.elementDefinition
         { name = "image"
         , group = "inline"
-        , contentType = inlineLeaf
+        , contentType = RichText.Config.ElementDefinition.inlineLeaf
         , toHtmlNode = imageToHtmlNode
         , fromHtmlNode = htmlNodeToImage
         , selectable = True
         }
 
 
-imageToHtmlNode : ElementToHtml
+imageToHtmlNode : RichText.Config.ElementDefinition.ElementToHtml
 imageToHtmlNode parameters _ =
     let
         attr =
             filterAttributesToHtml
-                [ ( "src", Just <| Maybe.withDefault "" (findStringAttribute "src" (attributes parameters)) )
-                , ( "alt", findStringAttribute "alt" (attributes parameters) )
-                , ( "title", findStringAttribute "title" (attributes parameters) )
+                [ ( "src", Just <| Maybe.withDefault "" (RichText.Model.Attribute.findStringAttribute "src" (RichText.Model.Element.attributes parameters)) )
+                , ( "alt", RichText.Model.Attribute.findStringAttribute "alt" (RichText.Model.Element.attributes parameters) )
+                , ( "title", RichText.Model.Attribute.findStringAttribute "title" (RichText.Model.Element.attributes parameters) )
                 ]
     in
-    ElementNode "img"
+    RichText.Model.HtmlNode.ElementNode "img"
         attr
         Array.empty
 
 
-htmlNodeToImage : HtmlToElement
+htmlNodeToImage : RichText.Config.ElementDefinition.HtmlToElement
 htmlNodeToImage def node =
     case node of
-        ElementNode name attributes _ ->
+        RichText.Model.HtmlNode.ElementNode name attributes _ ->
             if name == "img" then
                 let
                     elementNodeAttributes =
@@ -350,25 +325,25 @@ htmlNodeToImage def node =
                             (\( k, v ) ->
                                 case k of
                                     "src" ->
-                                        Just <| StringAttribute "src" v
+                                        Just <| RichText.Model.Attribute.StringAttribute "src" v
 
                                     "alt" ->
-                                        Just <| StringAttribute "alt" v
+                                        Just <| RichText.Model.Attribute.StringAttribute "alt" v
 
                                     "title" ->
-                                        Just <| StringAttribute "title" v
+                                        Just <| RichText.Model.Attribute.StringAttribute "title" v
 
                                     _ ->
                                         Nothing
                             )
                             attributes
                 in
-                if findStringAttribute "src" elementNodeAttributes /= Nothing then
+                if RichText.Model.Attribute.findStringAttribute "src" elementNodeAttributes /= Nothing then
                     Just
-                        ( element
+                        ( RichText.Model.Element.element
                             def
                             elementNodeAttributes
-                            |> Element.withAnnotations (Set.singleton selectable)
+                            |> RichText.Model.Element.withAnnotations (Set.singleton RichText.Annotation.selectable)
                         , Array.empty
                         )
 
@@ -384,26 +359,26 @@ htmlNodeToImage def node =
 
 {-| Hard break is an inline leaf which represents a line break in a document.
 -}
-hardBreak : ElementDefinition
+hardBreak : RichText.Config.ElementDefinition.ElementDefinition
 hardBreak =
-    elementDefinition
+    RichText.Config.ElementDefinition.elementDefinition
         { name = "hard_break"
         , group = "inline"
-        , contentType = inlineLeaf
+        , contentType = RichText.Config.ElementDefinition.inlineLeaf
         , toHtmlNode = hardBreakToHtml
         , fromHtmlNode = htmlToHardBreak
         , selectable = False
         }
 
 
-hardBreakToHtml : ElementToHtml
+hardBreakToHtml : RichText.Config.ElementDefinition.ElementToHtml
 hardBreakToHtml =
-    defaultElementToHtml "br"
+    RichText.Config.ElementDefinition.defaultElementToHtml "br"
 
 
-htmlToHardBreak : HtmlToElement
+htmlToHardBreak : RichText.Config.ElementDefinition.HtmlToElement
 htmlToHardBreak =
-    defaultHtmlToElement "br"
+    RichText.Config.ElementDefinition.defaultHtmlToElement "br"
 
 
 filterAttributesToHtml : List ( String, Maybe String ) -> List ( String, String )
@@ -426,74 +401,74 @@ filterAttributesToHtml attrs =
 
 {-| An ordered list element definition. It can have list item children.
 -}
-orderedList : ElementDefinition
+orderedList : RichText.Config.ElementDefinition.ElementDefinition
 orderedList =
-    elementDefinition
+    RichText.Config.ElementDefinition.elementDefinition
         { name = "ordered_list"
         , group = "block"
-        , contentType = blockNode [ "list_item" ]
+        , contentType = RichText.Config.ElementDefinition.blockNode [ "list_item" ]
         , toHtmlNode = orderedListToHtml
         , fromHtmlNode = htmlToOrderedList
         , selectable = False
         }
 
 
-orderedListToHtml : ElementToHtml
+orderedListToHtml : RichText.Config.ElementDefinition.ElementToHtml
 orderedListToHtml _ children =
-    ElementNode "ol" [] children
+    RichText.Model.HtmlNode.ElementNode "ol" [] children
 
 
-htmlToOrderedList : HtmlToElement
+htmlToOrderedList : RichText.Config.ElementDefinition.HtmlToElement
 htmlToOrderedList =
-    defaultHtmlToElement "ol"
+    RichText.Config.ElementDefinition.defaultHtmlToElement "ol"
 
 
 {-| An unordered list element definition. It can have list item children.
 -}
-unorderedList : ElementDefinition
+unorderedList : RichText.Config.ElementDefinition.ElementDefinition
 unorderedList =
-    elementDefinition
+    RichText.Config.ElementDefinition.elementDefinition
         { name = "unordered_list"
         , group = "block"
-        , contentType = blockNode [ "list_item" ]
+        , contentType = RichText.Config.ElementDefinition.blockNode [ "list_item" ]
         , toHtmlNode = unorderedListToHtml
         , fromHtmlNode = htmlToUnorderedList
         , selectable = False
         }
 
 
-unorderedListToHtml : ElementToHtml
+unorderedListToHtml : RichText.Config.ElementDefinition.ElementToHtml
 unorderedListToHtml _ children =
-    ElementNode "ul" [] children
+    RichText.Model.HtmlNode.ElementNode "ul" [] children
 
 
-htmlToUnorderedList : HtmlToElement
+htmlToUnorderedList : RichText.Config.ElementDefinition.HtmlToElement
 htmlToUnorderedList =
-    defaultHtmlToElement "ul"
+    RichText.Config.ElementDefinition.defaultHtmlToElement "ul"
 
 
 {-| A list item element definition. It can have block children.
 -}
-listItem : ElementDefinition
+listItem : RichText.Config.ElementDefinition.ElementDefinition
 listItem =
-    elementDefinition
+    RichText.Config.ElementDefinition.elementDefinition
         { name = "list_item"
         , group = "list_item"
-        , contentType = blockNode [ "block" ]
+        , contentType = RichText.Config.ElementDefinition.blockNode [ "block" ]
         , toHtmlNode = listItemToHtml
         , fromHtmlNode = htmlToListItem
         , selectable = False
         }
 
 
-listItemToHtml : ElementToHtml
+listItemToHtml : RichText.Config.ElementDefinition.ElementToHtml
 listItemToHtml _ children =
-    ElementNode "li" [] children
+    RichText.Model.HtmlNode.ElementNode "li" [] children
 
 
-htmlToListItem : HtmlToElement
+htmlToListItem : RichText.Config.ElementDefinition.HtmlToElement
 htmlToListItem =
-    defaultHtmlToElement "li"
+    RichText.Config.ElementDefinition.defaultHtmlToElement "li"
 
 
 
@@ -506,29 +481,29 @@ htmlToListItem =
   - `title` is the title of the link
 
 -}
-link : MarkDefinition
+link : RichText.Config.MarkDefinition.MarkDefinition
 link =
-    markDefinition { name = "link", toHtmlNode = linkToHtmlNode, fromHtmlNode = htmlNodeToLink }
+    RichText.Config.MarkDefinition.markDefinition { name = "link", toHtmlNode = linkToHtmlNode, fromHtmlNode = htmlNodeToLink }
 
 
-linkToHtmlNode : MarkToHtml
+linkToHtmlNode : RichText.Config.MarkDefinition.MarkToHtml
 linkToHtmlNode mark children =
     let
         attributes =
             filterAttributesToHtml
-                [ ( "href", Just <| Maybe.withDefault "" (findStringAttribute "href" (Mark.attributes mark)) )
-                , ( "title", findStringAttribute "title" (Mark.attributes mark) )
+                [ ( "href", Just <| Maybe.withDefault "" (RichText.Model.Attribute.findStringAttribute "href" (Mark.attributes mark)) )
+                , ( "title", RichText.Model.Attribute.findStringAttribute "title" (Mark.attributes mark) )
                 ]
     in
-    ElementNode "a"
+    RichText.Model.HtmlNode.ElementNode "a"
         attributes
         children
 
 
-htmlNodeToLink : HtmlToMark
+htmlNodeToLink : RichText.Config.MarkDefinition.HtmlToMark
 htmlNodeToLink def node =
     case node of
-        ElementNode name attributes children ->
+        RichText.Model.HtmlNode.ElementNode name attributes children ->
             if name == "a" then
                 let
                     elementNodeAttributes =
@@ -536,19 +511,19 @@ htmlNodeToLink def node =
                             (\( k, v ) ->
                                 case k of
                                     "href" ->
-                                        Just <| StringAttribute "href" v
+                                        Just <| RichText.Model.Attribute.StringAttribute "href" v
 
                                     "title" ->
-                                        Just <| StringAttribute "title" v
+                                        Just <| RichText.Model.Attribute.StringAttribute "title" v
 
                                     _ ->
                                         Nothing
                             )
                             attributes
                 in
-                if findStringAttribute "href" elementNodeAttributes /= Nothing then
+                if RichText.Model.Attribute.findStringAttribute "href" elementNodeAttributes /= Nothing then
                     Just
-                        ( mark
+                        ( RichText.Model.Mark.mark
                             def
                             elementNodeAttributes
                         , children
@@ -566,65 +541,65 @@ htmlNodeToLink def node =
 
 {-| A bold mark definition.
 -}
-bold : MarkDefinition
+bold : RichText.Config.MarkDefinition.MarkDefinition
 bold =
-    markDefinition { name = "bold", toHtmlNode = boldToHtmlNode, fromHtmlNode = htmlNodeToBold }
+    RichText.Config.MarkDefinition.markDefinition { name = "bold", toHtmlNode = boldToHtmlNode, fromHtmlNode = htmlNodeToBold }
 
 
-boldToHtmlNode : MarkToHtml
+boldToHtmlNode : RichText.Config.MarkDefinition.MarkToHtml
 boldToHtmlNode _ children =
-    ElementNode "b" [] children
+    RichText.Model.HtmlNode.ElementNode "b" [] children
 
 
-htmlNodeToBold : HtmlToMark
+htmlNodeToBold : RichText.Config.MarkDefinition.HtmlToMark
 htmlNodeToBold =
-    defaultHtmlToMark "b"
+    RichText.Config.MarkDefinition.defaultHtmlToMark "b"
 
 
 {-| An italic mark definition.
 -}
-italic : MarkDefinition
+italic : RichText.Config.MarkDefinition.MarkDefinition
 italic =
-    markDefinition
+    RichText.Config.MarkDefinition.markDefinition
         { name = "italic"
         , toHtmlNode = italicToHtmlNode
         , fromHtmlNode = htmlNodeToItalic
         }
 
 
-italicToHtmlNode : MarkToHtml
+italicToHtmlNode : RichText.Config.MarkDefinition.MarkToHtml
 italicToHtmlNode _ children =
-    ElementNode "i" [] children
+    RichText.Model.HtmlNode.ElementNode "i" [] children
 
 
-htmlNodeToItalic : HtmlToMark
+htmlNodeToItalic : RichText.Config.MarkDefinition.HtmlToMark
 htmlNodeToItalic =
-    defaultHtmlToMark "i"
+    RichText.Config.MarkDefinition.defaultHtmlToMark "i"
 
 
 {-| A code mark definition.
 -}
-code : MarkDefinition
+code : RichText.Config.MarkDefinition.MarkDefinition
 code =
-    markDefinition { name = "code", toHtmlNode = codeToHtmlNode, fromHtmlNode = htmlNodeToCode }
+    RichText.Config.MarkDefinition.markDefinition { name = "code", toHtmlNode = codeToHtmlNode, fromHtmlNode = htmlNodeToCode }
 
 
-codeToHtmlNode : MarkToHtml
+codeToHtmlNode : RichText.Config.MarkDefinition.MarkToHtml
 codeToHtmlNode _ children =
-    ElementNode "code" [] children
+    RichText.Model.HtmlNode.ElementNode "code" [] children
 
 
-htmlNodeToCode : HtmlToMark
+htmlNodeToCode : RichText.Config.MarkDefinition.HtmlToMark
 htmlNodeToCode =
-    defaultHtmlToMark "code"
+    RichText.Config.MarkDefinition.defaultHtmlToMark "code"
 
 
 {-| A spec which is compatible with the CommonMark flavor of markdown.
 -}
-markdown : Spec
+markdown : RichText.Config.Spec.Spec
 markdown =
-    emptySpec
-        |> withElementDefinitions
+    RichText.Config.Spec.emptySpec
+        |> RichText.Config.Spec.withElementDefinitions
             [ doc
             , paragraph
             , blockquote
@@ -637,7 +612,7 @@ markdown =
             , orderedList
             , listItem
             ]
-        |> withMarkDefinitions
+        |> RichText.Config.Spec.withMarkDefinitions
             [ link
             , bold
             , italic

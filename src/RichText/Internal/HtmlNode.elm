@@ -4,93 +4,83 @@ module RichText.Internal.HtmlNode exposing
     )
 
 import Array exposing (Array)
-import RichText.Config.ElementDefinition as ElementDefinition
-import RichText.Config.MarkDefinition as MarkDefinition
-import RichText.Config.Spec exposing (Spec)
-import RichText.Internal.Spec exposing (elementDefinitionWithDefault, markDefinitionWithDefault)
-import RichText.Model.Element exposing (Element)
-import RichText.Model.HtmlNode exposing (HtmlNode(..))
-import RichText.Model.InlineElement as InlineElement
-import RichText.Model.Mark exposing (Mark)
-import RichText.Model.Node as Node
-    exposing
-        ( Block
-        , Children(..)
-        , Inline(..)
-        , InlineTree(..)
-        , childNodes
-        , toBlockArray
-        , toInlineArray
-        , toInlineTree
-        )
-import RichText.Model.Text exposing (text)
+import RichText.Config.ElementDefinition
+import RichText.Config.MarkDefinition
+import RichText.Config.Spec
+import RichText.Internal.Spec
+import RichText.Model.Element
+import RichText.Model.HtmlNode
+import RichText.Model.InlineElement
+import RichText.Model.Mark
+import RichText.Model.Node
+import RichText.Model.Text
 
 
 childNodesPlaceholder =
     Array.fromList
-        [ ElementNode "__child_node_marker__" [] Array.empty ]
+        [ RichText.Model.HtmlNode.ElementNode "__child_node_marker__" [] Array.empty ]
 
 
 {-| Renders marks to their HtmlNode representation.
 -}
-markToHtmlNode : Spec -> Mark -> Array HtmlNode -> HtmlNode
+markToHtmlNode : RichText.Config.Spec.Spec -> RichText.Model.Mark.Mark -> Array RichText.Model.HtmlNode.HtmlNode -> RichText.Model.HtmlNode.HtmlNode
 markToHtmlNode spec mark children =
     let
         markDefinition =
-            markDefinitionWithDefault mark spec
+            RichText.Internal.Spec.markDefinitionWithDefault mark spec
     in
-    MarkDefinition.toHtmlNode markDefinition mark children
+    RichText.Config.MarkDefinition.toHtmlNode markDefinition mark children
 
 
 {-| Renders element parameters to their HtmlNode representation.
 -}
-elementToHtmlNode : Spec -> Element -> Array HtmlNode -> HtmlNode
+elementToHtmlNode : RichText.Config.Spec.Spec -> RichText.Model.Element.Element -> Array RichText.Model.HtmlNode.HtmlNode -> RichText.Model.HtmlNode.HtmlNode
 elementToHtmlNode spec parameters children =
     let
         elementDefinition =
-            elementDefinitionWithDefault parameters spec
+            RichText.Internal.Spec.elementDefinitionWithDefault parameters spec
     in
-    ElementDefinition.toHtmlNode elementDefinition parameters children
+    RichText.Config.ElementDefinition.toHtmlNode elementDefinition parameters children
 
 
 {-| Renders element block nodes to their HtmlNode representation.
 -}
-editorBlockNodeToHtmlNode : Spec -> Block -> HtmlNode
+editorBlockNodeToHtmlNode : RichText.Config.Spec.Spec -> RichText.Model.Node.Block -> RichText.Model.HtmlNode.HtmlNode
 editorBlockNodeToHtmlNode spec node =
-    elementToHtmlNode spec (Node.element node) (childNodesToHtmlNode spec (childNodes node))
+    elementToHtmlNode spec (RichText.Model.Node.element node) (childNodesToHtmlNode spec (RichText.Model.Node.childNodes node))
 
 
 {-| Renders child nodes to their HtmlNode representation.
 -}
-childNodesToHtmlNode : Spec -> Children -> Array HtmlNode
+childNodesToHtmlNode : RichText.Config.Spec.Spec -> RichText.Model.Node.Children -> Array RichText.Model.HtmlNode.HtmlNode
 childNodesToHtmlNode spec childNodes =
     case childNodes of
-        BlockChildren blockArray ->
-            Array.map (editorBlockNodeToHtmlNode spec) (toBlockArray blockArray)
+        RichText.Model.Node.BlockChildren blockArray ->
+            Array.map (editorBlockNodeToHtmlNode spec) (RichText.Model.Node.toBlockArray blockArray)
 
-        InlineChildren inlineLeafArray ->
-            Array.map (editorInlineLeafTreeToHtmlNode spec (toInlineArray inlineLeafArray)) (toInlineTree inlineLeafArray)
+        RichText.Model.Node.InlineChildren inlineLeafArray ->
+            Array.map (editorInlineLeafTreeToHtmlNode spec (RichText.Model.Node.toInlineArray inlineLeafArray)) (RichText.Model.Node.toInlineTree inlineLeafArray)
 
-        Leaf ->
+        RichText.Model.Node.Leaf ->
             Array.empty
 
 
 {-| Renders text nodes to their HtmlNode representation.
 -}
-textToHtmlNode : String -> HtmlNode
+textToHtmlNode : String -> RichText.Model.HtmlNode.HtmlNode
 textToHtmlNode text =
-    TextNode text
+    RichText.Model.HtmlNode.TextNode text
 
 
-errorNode : HtmlNode
+errorNode : RichText.Model.HtmlNode.HtmlNode
 errorNode =
-    ElementNode "div" [ ( "class", "rte-error" ) ] Array.empty
+    RichText.Model.HtmlNode.ElementNode "div" [ ( "class", "rte-error" ) ] Array.empty
 
 
-editorInlineLeafTreeToHtmlNode : Spec -> Array Inline -> InlineTree -> HtmlNode
+editorInlineLeafTreeToHtmlNode : RichText.Config.Spec.Spec -> Array RichText.Model.Node.Inline -> RichText.Model.Node.InlineTree -> RichText.Model.HtmlNode.HtmlNode
 editorInlineLeafTreeToHtmlNode spec array tree =
     case tree of
-        LeafNode i ->
+        RichText.Model.Node.LeafNode i ->
             case Array.get i array of
                 Nothing ->
                     errorNode
@@ -98,17 +88,17 @@ editorInlineLeafTreeToHtmlNode spec array tree =
                 Just l ->
                     editorInlineLeafToHtmlNode spec l
 
-        MarkNode n ->
+        RichText.Model.Node.MarkNode n ->
             markToHtmlNode spec n.mark (Array.map (editorInlineLeafTreeToHtmlNode spec array) n.children)
 
 
 {-| Renders inline leaf nodes to their HtmlNode representation.
 -}
-editorInlineLeafToHtmlNode : Spec -> Inline -> HtmlNode
+editorInlineLeafToHtmlNode : RichText.Config.Spec.Spec -> RichText.Model.Node.Inline -> RichText.Model.HtmlNode.HtmlNode
 editorInlineLeafToHtmlNode spec node =
     case node of
-        Text contents ->
-            textToHtmlNode (text contents)
+        RichText.Model.Node.Text contents ->
+            textToHtmlNode (RichText.Model.Text.text contents)
 
-        InlineElement l ->
-            elementToHtmlNode spec (InlineElement.element l) Array.empty
+        RichText.Model.Node.InlineElement l ->
+            elementToHtmlNode spec (RichText.Model.InlineElement.element l) Array.empty

@@ -28,15 +28,15 @@ import RichText.Internal.Spec
 import RichText.Model.Element
 import RichText.Model.InlineElement
 import RichText.Model.Mark
-import RichText.Model.Node exposing (Children(..), Inline(..))
+import RichText.Model.Node
 import RichText.Model.Selection
-import RichText.Model.State exposing (State)
+import RichText.Model.State
 import RichText.Model.Text
-import RichText.Node exposing (Node(..))
+import RichText.Node
 import Set exposing (Set)
 
 
-removeExtraEmptyTextLeaves : List Inline -> List Inline
+removeExtraEmptyTextLeaves : List RichText.Model.Node.Inline -> List RichText.Model.Node.Inline
 removeExtraEmptyTextLeaves inlineLeaves =
     case inlineLeaves of
         [] ->
@@ -47,9 +47,9 @@ removeExtraEmptyTextLeaves inlineLeaves =
 
         x :: y :: xs ->
             case x of
-                Text xL ->
+                RichText.Model.Node.Text xL ->
                     case y of
-                        Text yL ->
+                        RichText.Model.Node.Text yL ->
                             if
                                 String.isEmpty (RichText.Model.Text.text xL)
                                     && (not <|
@@ -73,14 +73,14 @@ removeExtraEmptyTextLeaves inlineLeaves =
                             else
                                 x :: removeExtraEmptyTextLeaves (y :: xs)
 
-                        InlineElement _ ->
+                        RichText.Model.Node.InlineElement _ ->
                             x :: removeExtraEmptyTextLeaves (y :: xs)
 
-                InlineElement _ ->
+                RichText.Model.Node.InlineElement _ ->
                     x :: removeExtraEmptyTextLeaves (y :: xs)
 
 
-mergeSimilarInlineLeaves : List Inline -> List Inline
+mergeSimilarInlineLeaves : List RichText.Model.Node.Inline -> List RichText.Model.Node.Inline
 mergeSimilarInlineLeaves inlineLeaves =
     case inlineLeaves of
         [] ->
@@ -91,12 +91,12 @@ mergeSimilarInlineLeaves inlineLeaves =
 
         x :: y :: xs ->
             case x of
-                Text xL ->
+                RichText.Model.Node.Text xL ->
                     case y of
-                        Text yL ->
+                        RichText.Model.Node.Text yL ->
                             if RichText.Model.Text.marks xL == RichText.Model.Text.marks yL then
                                 mergeSimilarInlineLeaves
-                                    (Text
+                                    (RichText.Model.Node.Text
                                         (xL
                                             |> RichText.Model.Text.withText
                                                 (RichText.Model.Text.text xL
@@ -109,10 +109,10 @@ mergeSimilarInlineLeaves inlineLeaves =
                             else
                                 x :: mergeSimilarInlineLeaves (y :: xs)
 
-                        InlineElement _ ->
+                        RichText.Model.Node.InlineElement _ ->
                             x :: mergeSimilarInlineLeaves (y :: xs)
 
-                InlineElement _ ->
+                RichText.Model.Node.InlineElement _ ->
                     x :: mergeSimilarInlineLeaves (y :: xs)
 
 
@@ -125,7 +125,7 @@ reduceNode node =
                     RichText.Node.Block bn ->
                         case RichText.Model.Node.childNodes bn of
                             RichText.Model.Node.InlineChildren a ->
-                                Block <|
+                                RichText.Node.Block <|
                                     (bn
                                         |> RichText.Model.Node.withChildNodes
                                             (a
@@ -144,7 +144,7 @@ reduceNode node =
                     _ ->
                         x
             )
-            (Block node)
+            (RichText.Node.Block node)
     of
         RichText.Node.Block newNode ->
             newNode
@@ -261,14 +261,14 @@ translatePath old new path offset =
 
                     else
                         case RichText.Model.Node.childNodes oldN of
-                            InlineChildren oldA ->
+                            RichText.Model.Node.InlineChildren oldA ->
                                 case List.Extra.last path of
                                     Nothing ->
                                         ( path, offset )
 
                                     Just lastIndex ->
                                         case RichText.Model.Node.childNodes newN of
-                                            InlineChildren newA ->
+                                            RichText.Model.Node.InlineChildren newA ->
                                                 let
                                                     pOff : Int
                                                     pOff =
@@ -290,14 +290,14 @@ translatePath old new path offset =
                                 ( path, offset )
 
 
-parentOffset : Array Inline -> Int -> Int -> Int
+parentOffset : Array RichText.Model.Node.Inline -> Int -> Int -> Int
 parentOffset leaves index offset =
     let
         ( _, newOffset ) =
             Array.foldl
                 (\l ( i, accOffset ) ->
                     case l of
-                        Text tl ->
+                        RichText.Model.Node.Text tl ->
                             ( i + 1
                             , if i < index then
                                 accOffset + String.length (RichText.Model.Text.text tl)
@@ -306,7 +306,7 @@ parentOffset leaves index offset =
                                 accOffset
                             )
 
-                        InlineElement _ ->
+                        RichText.Model.Node.InlineElement _ ->
                             ( i + 1
                             , if i < index then
                                 accOffset + 1
@@ -321,7 +321,7 @@ parentOffset leaves index offset =
     newOffset
 
 
-childOffset : Array Inline -> Int -> ( Int, Int )
+childOffset : Array RichText.Model.Node.Inline -> Int -> ( Int, Int )
 childOffset leaves offset =
     let
         ( newIndex, newOffset, _ ) =
@@ -335,14 +335,14 @@ childOffset leaves offset =
 
                     else
                         case l of
-                            Text tl ->
+                            RichText.Model.Node.Text tl ->
                                 if accOffset <= String.length (RichText.Model.Text.text tl) then
                                     ( i, accOffset, True )
 
                                 else
                                     ( i + 1, accOffset - String.length (RichText.Model.Text.text tl), False )
 
-                            InlineElement _ ->
+                            RichText.Model.Node.InlineElement _ ->
                                 ( i + 1, accOffset - 1, False )
                 )
                 ( 0, offset, False )
@@ -373,7 +373,7 @@ returns a comma separated string of error messages.
     --> True
 
 -}
-validate : RichText.Config.Spec.Spec -> RichText.Model.State.State -> Result String State
+validate : RichText.Config.Spec.Spec -> RichText.Model.State.State -> Result String RichText.Model.State.State
 validate spec editorState =
     let
         root : RichText.Model.Node.Block
@@ -388,7 +388,7 @@ validate spec editorState =
             Err <| String.join ", " result
 
 
-validateAllowedMarks : Maybe (Set String) -> Inline -> List String
+validateAllowedMarks : Maybe (Set String) -> RichText.Model.Node.Inline -> List String
 validateAllowedMarks allowedMarks leaf =
     case allowedMarks of
         Nothing ->
@@ -417,7 +417,7 @@ validateAllowedMarks allowedMarks leaf =
                 ]
 
 
-validateInlineLeaf : RichText.Config.Spec.Spec -> Maybe (Set String) -> Maybe (Set String) -> Inline -> List String
+validateInlineLeaf : RichText.Config.Spec.Spec -> Maybe (Set String) -> Maybe (Set String) -> RichText.Model.Node.Inline -> List String
 validateInlineLeaf spec allowedGroups allowedMarks leaf =
     validateAllowedMarks allowedMarks leaf
         ++ (case leaf of
@@ -487,7 +487,7 @@ validateEditorBlockNode spec allowedGroups node =
                 RichText.Config.ElementDefinition.contentType definition
         in
         case RichText.Model.Node.childNodes node of
-            BlockChildren ba ->
+            RichText.Model.Node.BlockChildren ba ->
                 case contentType of
                     RichText.Internal.Definitions.BlockNodeType groups ->
                         List.concatMap
@@ -499,7 +499,7 @@ validateEditorBlockNode spec allowedGroups node =
                             ++ RichText.Internal.Definitions.toStringContentType contentType
                         ]
 
-            InlineChildren la ->
+            RichText.Model.Node.InlineChildren la ->
                 case contentType of
                     RichText.Internal.Definitions.TextBlockNodeType config ->
                         List.concatMap (validateInlineLeaf spec config.allowedGroups config.allowedMarks) (Array.toList (RichText.Model.Node.toInlineArray la))
@@ -507,7 +507,7 @@ validateEditorBlockNode spec allowedGroups node =
                     _ ->
                         [ "I was expecting textblock content type, but instead I got " ++ RichText.Internal.Definitions.toStringContentType contentType ]
 
-            Leaf ->
+            RichText.Model.Node.Leaf ->
                 if contentType == RichText.Config.ElementDefinition.blockLeaf then
                     []
 

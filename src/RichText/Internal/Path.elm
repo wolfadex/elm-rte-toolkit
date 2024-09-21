@@ -7,43 +7,30 @@ module RichText.Internal.Path exposing
 -}
 
 import Array exposing (Array)
-import RichText.Config.ElementDefinition as ElementDefinition
-import RichText.Config.MarkDefinition as MarkDefinition
-import RichText.Config.Spec exposing (Spec)
-import RichText.Internal.HtmlNode exposing (childNodesPlaceholder)
-import RichText.Internal.Spec exposing (elementDefinitionWithDefault, markDefinitionWithDefault)
-import RichText.Model.Element exposing (Element)
-import RichText.Model.HtmlNode exposing (HtmlNode(..))
-import RichText.Model.Mark exposing (Mark)
+import RichText.Config.ElementDefinition
+import RichText.Config.MarkDefinition
+import RichText.Config.Spec
+import RichText.Internal.HtmlNode
+import RichText.Internal.Spec
+import RichText.Model.Element
+import RichText.Model.HtmlNode
+import RichText.Model.Mark
 import RichText.Model.Node
-    exposing
-        ( Block
-        , Children(..)
-        , Inline
-        , InlineTree(..)
-        , Path
-        , childNodes
-        , element
-        , reverseLookup
-        , toBlockArray
-        , toInlineArray
-        , toInlineTree
-        )
 
 
-domToEditorInlineLeafTree : Spec -> InlineTree -> Path -> Maybe Path
+domToEditorInlineLeafTree : RichText.Config.Spec.Spec -> RichText.Model.Node.InlineTree -> RichText.Model.Node.Path -> Maybe RichText.Model.Node.Path
 domToEditorInlineLeafTree spec tree path =
     case tree of
-        LeafNode i ->
+        RichText.Model.Node.LeafNode i ->
             Just [ i ]
 
-        MarkNode n ->
+        RichText.Model.Node.MarkNode n ->
             let
                 markDefinition =
-                    markDefinitionWithDefault n.mark spec
+                    RichText.Internal.Spec.markDefinitionWithDefault n.mark spec
 
                 structure =
-                    MarkDefinition.toHtmlNode markDefinition n.mark childNodesPlaceholder
+                    RichText.Config.MarkDefinition.toHtmlNode markDefinition n.mark RichText.Internal.HtmlNode.childNodesPlaceholder
             in
             case removePathUpToChildContents structure path of
                 Nothing ->
@@ -66,7 +53,7 @@ domToEditorInlineLeafTree spec tree path =
 {-| Translates a DOM node path to an editor node path. Returns Nothing if the
 path is invalid.
 -}
-domToEditor : Spec -> Block -> Path -> Maybe Path
+domToEditor : RichText.Config.Spec.Spec -> RichText.Model.Node.Block -> RichText.Model.Node.Path -> Maybe RichText.Model.Node.Path
 domToEditor spec node path =
     if List.isEmpty path then
         Just []
@@ -74,13 +61,13 @@ domToEditor spec node path =
     else
         let
             parameters =
-                element node
+                RichText.Model.Node.element node
 
             elementDefinition =
-                elementDefinitionWithDefault parameters spec
+                RichText.Internal.Spec.elementDefinitionWithDefault parameters spec
 
             structure =
-                ElementDefinition.toHtmlNode elementDefinition parameters childNodesPlaceholder
+                RichText.Config.ElementDefinition.toHtmlNode elementDefinition parameters RichText.Internal.HtmlNode.childNodesPlaceholder
         in
         case removePathUpToChildContents structure path of
             Nothing ->
@@ -92,9 +79,9 @@ domToEditor spec node path =
                         Just []
 
                     Just i ->
-                        case childNodes node of
-                            BlockChildren l ->
-                                case Array.get i (toBlockArray l) of
+                        case RichText.Model.Node.childNodes node of
+                            RichText.Model.Node.BlockChildren l ->
+                                case Array.get i (RichText.Model.Node.toBlockArray l) of
                                     Nothing ->
                                         Nothing
 
@@ -106,8 +93,8 @@ domToEditor spec node path =
                                             Just p ->
                                                 Just (i :: p)
 
-                            InlineChildren l ->
-                                case Array.get i (toInlineTree l) of
+                            RichText.Model.Node.InlineChildren l ->
+                                case Array.get i (RichText.Model.Node.toInlineTree l) of
                                     Nothing ->
                                         Nothing
 
@@ -115,7 +102,7 @@ domToEditor spec node path =
                                         -- we assume the content of the leaf node is valid, but maybe we should validate its content?
                                         domToEditorInlineLeafTree spec tree (List.drop 1 rest)
 
-                            Leaf ->
+                            RichText.Model.Node.Leaf ->
                                 -- If we still have path left, it means the path is invalid, so we return Nothing
                                 Nothing
 
@@ -123,21 +110,21 @@ domToEditor spec node path =
 {-| Translates an editor node path to a DOM node path. Returns Nothing if the
 path is invalid.
 -}
-editorToDom : Spec -> Block -> Path -> Maybe Path
+editorToDom : RichText.Config.Spec.Spec -> RichText.Model.Node.Block -> RichText.Model.Node.Path -> Maybe RichText.Model.Node.Path
 editorToDom spec node path =
     case path of
         [] ->
             Just []
 
         x :: xs ->
-            case pathToChildContentsFromElementParameters spec (element node) of
+            case pathToChildContentsFromElementParameters spec (RichText.Model.Node.element node) of
                 Nothing ->
                     Nothing
 
                 Just childPath ->
-                    case childNodes node of
-                        BlockChildren l ->
-                            case Array.get x (toBlockArray l) of
+                    case RichText.Model.Node.childNodes node of
+                        RichText.Model.Node.BlockChildren l ->
+                            case Array.get x (RichText.Model.Node.toBlockArray l) of
                                 Nothing ->
                                     Nothing
 
@@ -149,8 +136,8 @@ editorToDom spec node path =
                                         Just p ->
                                             Just (childPath ++ (x :: p))
 
-                        InlineChildren l ->
-                            case Array.get x (reverseLookup l) of
+                        RichText.Model.Node.InlineChildren l ->
+                            case Array.get x (RichText.Model.Node.reverseLookup l) of
                                 Nothing ->
                                     Nothing
 
@@ -158,8 +145,8 @@ editorToDom spec node path =
                                     case
                                         pathToChildContentsFromInlineTreePath
                                             spec
-                                            (toInlineArray l)
-                                            (toInlineTree l)
+                                            (RichText.Model.Node.toInlineArray l)
+                                            (RichText.Model.Node.toInlineTree l)
                                             inlineTreePath
                                     of
                                         Nothing ->
@@ -168,7 +155,7 @@ editorToDom spec node path =
                                         Just childInlineTreePath ->
                                             Just (childPath ++ childInlineTreePath)
 
-                        Leaf ->
+                        RichText.Model.Node.Leaf ->
                             Nothing
 
 
@@ -179,11 +166,11 @@ editorToDom spec node path =
 -}
 
 
-removePathUpToChildContents : HtmlNode -> Path -> Maybe Path
+removePathUpToChildContents : RichText.Model.HtmlNode.HtmlNode -> RichText.Model.Node.Path -> Maybe RichText.Model.Node.Path
 removePathUpToChildContents node path =
     case node of
-        ElementNode _ _ children ->
-            if children == childNodesPlaceholder then
+        RichText.Model.HtmlNode.ElementNode _ _ children ->
+            if children == RichText.Internal.HtmlNode.childNodesPlaceholder then
                 Just path
 
             else
@@ -199,7 +186,7 @@ removePathUpToChildContents node path =
                             Just child ->
                                 removePathUpToChildContents child xs
 
-        TextNode _ ->
+        RichText.Model.HtmlNode.TextNode _ ->
             Nothing
 
 
@@ -207,11 +194,11 @@ removePathUpToChildContents node path =
 {- Helper method to return a node path to the which should contain the child contents. -}
 
 
-pathToChildContents : HtmlNode -> Maybe Path
+pathToChildContents : RichText.Model.HtmlNode.HtmlNode -> Maybe RichText.Model.Node.Path
 pathToChildContents node =
     case node of
-        ElementNode _ _ children ->
-            if children == childNodesPlaceholder then
+        RichText.Model.HtmlNode.ElementNode _ _ children ->
+            if children == RichText.Internal.HtmlNode.childNodesPlaceholder then
                 Just []
 
             else
@@ -232,7 +219,7 @@ pathToChildContents node =
                     Nothing
                     (Array.indexedMap Tuple.pair children)
 
-        TextNode _ ->
+        RichText.Model.HtmlNode.TextNode _ ->
             Nothing
 
 
@@ -240,14 +227,14 @@ pathToChildContents node =
 {- Helper method that returns the path to the child contents from a list of marks -}
 
 
-pathToChildContentsFromMark : Spec -> Mark -> Maybe Path
+pathToChildContentsFromMark : RichText.Config.Spec.Spec -> RichText.Model.Mark.Mark -> Maybe RichText.Model.Node.Path
 pathToChildContentsFromMark spec mark =
     let
         markDefinition =
-            markDefinitionWithDefault mark spec
+            RichText.Internal.Spec.markDefinitionWithDefault mark spec
 
         markStructure =
-            MarkDefinition.toHtmlNode markDefinition mark childNodesPlaceholder
+            RichText.Config.MarkDefinition.toHtmlNode markDefinition mark RichText.Internal.HtmlNode.childNodesPlaceholder
     in
     pathToChildContents markStructure
 
@@ -256,19 +243,19 @@ pathToChildContentsFromMark spec mark =
 {- Helper method to determine the path to the child contents from an element editor node -}
 
 
-pathToChildContentsFromElementParameters : Spec -> Element -> Maybe Path
+pathToChildContentsFromElementParameters : RichText.Config.Spec.Spec -> RichText.Model.Element.Element -> Maybe RichText.Model.Node.Path
 pathToChildContentsFromElementParameters spec parameters =
     let
         elementDefinition =
-            elementDefinitionWithDefault parameters spec
+            RichText.Internal.Spec.elementDefinitionWithDefault parameters spec
 
         nodeStructure =
-            ElementDefinition.toHtmlNode elementDefinition parameters childNodesPlaceholder
+            RichText.Config.ElementDefinition.toHtmlNode elementDefinition parameters RichText.Internal.HtmlNode.childNodesPlaceholder
     in
     pathToChildContents nodeStructure
 
 
-pathToChildContentsFromInlineTreePath : Spec -> Array Inline -> Array InlineTree -> Path -> Maybe Path
+pathToChildContentsFromInlineTreePath : RichText.Config.Spec.Spec -> Array RichText.Model.Node.Inline -> Array RichText.Model.Node.InlineTree -> RichText.Model.Node.Path -> Maybe RichText.Model.Node.Path
 pathToChildContentsFromInlineTreePath spec array treeArray path =
     case path of
         [] ->
@@ -281,7 +268,7 @@ pathToChildContentsFromInlineTreePath spec array treeArray path =
 
                 Just tree ->
                     case tree of
-                        LeafNode i ->
+                        RichText.Model.Node.LeafNode i ->
                             case Array.get i array of
                                 Nothing ->
                                     Nothing
@@ -289,7 +276,7 @@ pathToChildContentsFromInlineTreePath spec array treeArray path =
                                 Just _ ->
                                     Just [ x ]
 
-                        MarkNode n ->
+                        RichText.Model.Node.MarkNode n ->
                             case pathToChildContentsFromMark spec n.mark of
                                 Nothing ->
                                     Nothing

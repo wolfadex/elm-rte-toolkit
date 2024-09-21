@@ -7,7 +7,7 @@ module RichText.Internal.DeleteWord exposing
    This is a helper module derived from the DraftJS logic for determining how to delete a word.
 -}
 
-import Regex
+import Regex exposing (Regex)
 
 
 punctuationRegexString : String
@@ -38,11 +38,11 @@ backspaceWordRegexString =
     "(?:(?!" ++ whitespaceAndPunctuationRegexString ++ ").)" ++ "(?:" ++ chameleonCharactersRegexString ++ "|(?!" ++ whitespaceAndPunctuationRegexString ++ ").)*" ++ "(?:" ++ whitespaceAndPunctuationRegexString ++ ")*" ++ "$"
 
 
-deleteWordRegex : Regex.Regex
+deleteWordRegex : Regex
 deleteWordRegex =
     Maybe.withDefault Regex.never (Regex.fromString deleteWordRegexString)
 
 
-backspaceWordRegex : Regex.Regex
+backspaceWordRegex : Regex
 backspaceWordRegex =
     Maybe.withDefault Regex.never (Regex.fromString backspaceWordRegexString)

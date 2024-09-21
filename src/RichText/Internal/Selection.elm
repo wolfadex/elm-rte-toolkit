@@ -3,40 +3,33 @@ module RichText.Internal.Selection exposing
     , editorToDom
     )
 
-import RichText.Config.Spec exposing (Spec)
-import RichText.Internal.Path as Path
-import RichText.Model.Node exposing (Block, Path)
+-- import RichText.Internal.Path
+
+import RichText.Config.Spec
+import RichText.Model.Node
 import RichText.Model.Selection
-    exposing
-        ( Selection
-        , anchorNode
-        , anchorOffset
-        , focusNode
-        , focusOffset
-        , range
-        )
 
 
-domToEditor : Spec -> Block -> Selection -> Maybe Selection
+domToEditor : RichText.Config.Spec.Spec -> RichText.Model.Node.Block -> RichText.Model.Selection.Selection -> Maybe RichText.Model.Selection.Selection
 domToEditor spec =
     transformSelection (Path.domToEditor spec)
 
 
-editorToDom : Spec -> Block -> Selection -> Maybe Selection
+editorToDom : RichText.Config.Spec.Spec -> RichText.Model.Node.Block -> RichText.Model.Selection.Selection -> Maybe RichText.Model.Selection.Selection
 editorToDom spec =
     transformSelection (Path.editorToDom spec)
 
 
-transformSelection : (Block -> Path -> Maybe Path) -> Block -> Selection -> Maybe Selection
+transformSelection : (RichText.Model.Node.Block -> RichText.Model.Node.Path -> Maybe RichText.Model.Node.Path) -> RichText.Model.Node.Block -> RichText.Model.Selection.Selection -> Maybe RichText.Model.Selection.Selection
 transformSelection transformation node selection =
-    case transformation node (anchorNode selection) of
+    case transformation node (RichText.Model.Selection.anchorNode selection) of
         Nothing ->
             Nothing
 
         Just an ->
-            case transformation node (focusNode selection) of
+            case transformation node (RichText.Model.Selection.focusNode selection) of
                 Nothing ->
                     Nothing
 
                 Just fn ->
-                    Just <| range an (anchorOffset selection) fn (focusOffset selection)
+                    Just <| RichText.Model.Selection.range an (RichText.Model.Selection.anchorOffset selection) fn (RichText.Model.Selection.focusOffset selection)

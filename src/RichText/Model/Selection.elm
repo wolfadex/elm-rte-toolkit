@@ -24,7 +24,7 @@ the `anchorNode` and `focusNode` are translations of the node paths relative to 
 
 -}
 
-import RichText.Model.Node exposing (Path)
+import RichText.Model.Node
 
 
 {-| A `Selection` represents the information received and translated from the selection API. Note that
@@ -36,15 +36,15 @@ type Selection
 
 type alias Contents =
     { anchorOffset : Int
-    , anchorNode : Path
+    , anchorNode : RichText.Model.Node.Path
     , focusOffset : Int
-    , focusNode : Path
+    , focusNode : RichText.Model.Node.Path
     }
 
 
 {-| The path to the selection anchor node
 -}
-anchorNode : Selection -> Path
+anchorNode : Selection -> RichText.Model.Node.Path
 anchorNode selection =
     case selection of
         Selection c ->
@@ -62,7 +62,7 @@ anchorOffset selection =
 
 {-| The path to the selection focus node
 -}
-focusNode : Selection -> Path
+focusNode : Selection -> RichText.Model.Node.Path
 focusNode selection =
     case selection of
         Selection c ->
@@ -84,7 +84,7 @@ focusOffset selection =
     --> Creates a selection with { anchorNode=[0,1], anchorOffset=0, focusNode=[0,1], focusOffset=0 }
 
 -}
-caret : Path -> Int -> Selection
+caret : RichText.Model.Node.Path -> Int -> Selection
 caret nodePath offset =
     singleNodeRange nodePath offset offset
 
@@ -95,7 +95,7 @@ caret nodePath offset =
     --> Creates a selection with { anchorNode=[0,1], anchorOffset=0, focusNode=[1,1], focusOffset=1 }
 
 -}
-range : Path -> Int -> Path -> Int -> Selection
+range : RichText.Model.Node.Path -> Int -> RichText.Model.Node.Path -> Int -> Selection
 range aNode aOffset fNode fOffset =
     Selection
         { anchorOffset = aOffset
@@ -111,7 +111,7 @@ range aNode aOffset fNode fOffset =
     --> Creates a selection with { anchorNode=[0,1], anchorOffset=0, focusNode=[0,1], focusOffset=1 }
 
 -}
-singleNodeRange : Path -> Int -> Int -> Selection
+singleNodeRange : RichText.Model.Node.Path -> Int -> Int -> Selection
 singleNodeRange node aOffset fOffset =
     range node aOffset node fOffset
 

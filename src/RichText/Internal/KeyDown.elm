@@ -3,18 +3,18 @@ module RichText.Internal.KeyDown exposing
     , preventDefaultOnKeyDownDecoder
     )
 
-import Json.Decode as D
-import RichText.Config.Command exposing (CommandMap, namedCommandListFromKeyboardEvent)
-import RichText.Config.Spec exposing (Spec)
-import RichText.Internal.Editor exposing (Editor, Message(..), Tagger, applyNamedCommandList, isComposing, shortKey)
-import RichText.Internal.Event exposing (KeyboardEvent)
+import Json.Decode
+import RichText.Config.Command
+import RichText.Config.Spec
+import RichText.Internal.Editor
+import RichText.Internal.Event
 
 
-preventDefaultOn : CommandMap -> Spec -> Editor -> Message -> ( Message, Bool )
+preventDefaultOn : RichText.Config.Command.CommandMap -> RichText.Config.Spec.Spec -> RichText.Internal.Editor.Editor -> RichText.Internal.Editor.Message -> ( RichText.Internal.Editor.Message, Bool )
 preventDefaultOn commandMap spec editor msg =
     case msg of
-        KeyDownEvent key ->
-            if key.isComposing || isComposing editor then
+        RichText.Internal.Editor.KeyDownEvent key ->
+            if key.isComposing || RichText.Internal.Editor.isComposing editor then
                 ( msg, False )
 
             else
@@ -24,7 +24,7 @@ preventDefaultOn commandMap spec editor msg =
             ( msg, False )
 
 
-shouldPreventDefault : CommandMap -> Spec -> Editor -> KeyboardEvent -> Bool
+shouldPreventDefault : RichText.Config.Command.CommandMap -> RichText.Config.Spec.Spec -> RichText.Internal.Editor.Editor -> RichText.Internal.Event.KeyboardEvent -> Bool
 shouldPreventDefault comamndMap spec editor keyboardEvent =
     case handleKeyDownEvent comamndMap spec editor keyboardEvent of
         Err _ ->
@@ -34,36 +34,36 @@ shouldPreventDefault comamndMap spec editor keyboardEvent =
             True
 
 
-preventDefaultOnKeyDownDecoder : Tagger msg -> CommandMap -> Spec -> Editor -> D.Decoder ( msg, Bool )
+preventDefaultOnKeyDownDecoder : RichText.Internal.Editor.Tagger msg -> RichText.Config.Command.CommandMap -> RichText.Config.Spec.Spec -> RichText.Internal.Editor.Editor -> Json.Decode.Decoder ( msg, Bool )
 preventDefaultOnKeyDownDecoder tagger commandMap spec editor =
-    D.map (\( i, b ) -> ( tagger i, b )) (D.map (preventDefaultOn commandMap spec editor) keyDownDecoder)
+    Json.Decode.map (\( i, b ) -> ( tagger i, b )) (Json.Decode.map (preventDefaultOn commandMap spec editor) keyDownDecoder)
 
 
-keyDownDecoder : D.Decoder Message
+keyDownDecoder : Json.Decode.Decoder RichText.Internal.Editor.Message
 keyDownDecoder =
-    D.map KeyDownEvent <|
-        D.map7 KeyboardEvent
-            (D.field "keyCode" D.int)
-            (D.field "key" D.string)
-            (D.field "altKey" D.bool)
-            (D.field "metaKey" D.bool)
-            (D.field "ctrlKey" D.bool)
-            (D.field "shiftKey" D.bool)
-            (D.oneOf [ D.field "isComposing" D.bool, D.succeed False ])
+    Json.Decode.map RichText.Internal.Editor.KeyDownEvent <|
+        Json.Decode.map7 RichText.Internal.Event.KeyboardEvent
+            (Json.Decode.field "keyCode" Json.Decode.int)
+            (Json.Decode.field "key" Json.Decode.string)
+            (Json.Decode.field "altKey" Json.Decode.bool)
+            (Json.Decode.field "metaKey" Json.Decode.bool)
+            (Json.Decode.field "ctrlKey" Json.Decode.bool)
+            (Json.Decode.field "shiftKey" Json.Decode.bool)
+            (Json.Decode.oneOf [ Json.Decode.field "isComposing" Json.Decode.bool, Json.Decode.succeed False ])
 
 
-handleKeyDownEvent : CommandMap -> Spec -> Editor -> KeyboardEvent -> Result String Editor
+handleKeyDownEvent : RichText.Config.Command.CommandMap -> RichText.Config.Spec.Spec -> RichText.Internal.Editor.Editor -> RichText.Internal.Event.KeyboardEvent -> Result String RichText.Internal.Editor.Editor
 handleKeyDownEvent commandMap spec editor event =
     let
         namedCommandList =
-            namedCommandListFromKeyboardEvent (shortKey editor) event commandMap
+            RichText.Config.Command.namedCommandListFromKeyboardEvent (RichText.Internal.Editor.shortKey editor) event commandMap
     in
-    applyNamedCommandList namedCommandList spec editor
+    RichText.Internal.Editor.applyNamedCommandList namedCommandList spec editor
 
 
-handleKeyDown : KeyboardEvent -> CommandMap -> Spec -> Editor -> Editor
+handleKeyDown : RichText.Internal.Event.KeyboardEvent -> RichText.Config.Command.CommandMap -> RichText.Config.Spec.Spec -> RichText.Internal.Editor.Editor -> RichText.Internal.Editor.Editor
 handleKeyDown keyboardEvent commandMap spec editor =
-    if keyboardEvent.isComposing || isComposing editor then
+    if keyboardEvent.isComposing || RichText.Internal.Editor.isComposing editor then
         editor
 
     else

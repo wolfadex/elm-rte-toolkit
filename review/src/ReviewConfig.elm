@@ -16,6 +16,7 @@ import Docs.ReviewAtDocs
 import Docs.ReviewLinksAndSections
 import Docs.UpToDateReadmeLinks
 import NoConfusingPrefixOperator
+import NoEtaReducibleLambdas
 import NoDebug.Log
 import NoDebug.TodoOrToString
 import NoExposingEverything
@@ -27,6 +28,7 @@ import NoPrematureLetComputation
 import NoSimpleLetBody
 import NoUnused.CustomTypeConstructorArgs
 import NoUnused.CustomTypeConstructors
+import NoRedundantlyQualifiedType
 import NoUnused.Dependencies
 import NoUnused.Exports
 import NoUnused.Parameters
@@ -34,6 +36,8 @@ import NoUnused.Patterns
 import NoUnused.Variables
 import Review.Rule as Rule exposing (Rule)
 import Simplify
+import Review.ImportSimple
+
 
 
 config : List Rule
@@ -64,4 +68,10 @@ config =
     , NoUnused.Patterns.rule
     , NoUnused.Variables.rule
     , Simplify.rule Simplify.defaults
+    , NoEtaReducibleLambdas.rule
+        { argumentNamePredicate = \_ -> True
+        , lambdaReduceStrategy = NoEtaReducibleLambdas.OnlyWhenSingleArgument
+        }
+    , NoRedundantlyQualifiedType.rule
+    , Review.ImportSimple.rule
     ]

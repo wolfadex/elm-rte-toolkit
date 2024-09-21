@@ -12,7 +12,7 @@ hierarchical structures like blockquotes, tables and nested lists. Inline nodes 
 represent flat structures, like text, inline images, and hard breaks.
 
 
-# Block
+# Blocks
 
 @docs Block, block, element, childNodes, withElement, withChildNodes
 
@@ -35,10 +35,10 @@ represent flat structures, like text, inline images, and hard breaks.
 
 import Array exposing (Array)
 import List.Extra
-import RichText.Model.Element exposing (Element)
-import RichText.Model.InlineElement as InlineElement exposing (InlineElement)
-import RichText.Model.Mark exposing (Mark, name)
-import RichText.Model.Text as Text exposing (Text)
+import RichText.Model.Element
+import RichText.Model.InlineElement
+import RichText.Model.Mark
+import RichText.Model.Text
 
 
 {-| A node path is a list of indexes that represent the path from a node to a child. It's
@@ -136,7 +136,7 @@ type Block
 
 
 type alias BlockNodeContents =
-    { parameters : Element
+    { parameters : RichText.Model.Element.Element
     , childNodes : Children
     }
 
@@ -153,14 +153,14 @@ block
 ```
 
 -}
-block : Element -> Children -> Block
+block : RichText.Model.Element.Element -> Children -> Block
 block parameters cn =
     Block { parameters = parameters, childNodes = cn }
 
 
 {-| the element from a block node
 -}
-element : Block -> Element
+element : Block -> RichText.Model.Element.Element
 element node =
     case node of
         Block n ->
@@ -178,7 +178,7 @@ childNodes node =
 
 {-| a block node with the given element set
 -}
-withElement : Element -> Block -> Block
+withElement : RichText.Model.Element.Element -> Block -> Block
 withElement parameters node =
     case node of
         Block c ->
@@ -276,7 +276,7 @@ parsing, it can be useful to see this information as a tree instead of an array.
 
 -}
 type InlineTree
-    = MarkNode { mark : Mark, children : Array InlineTree }
+    = MarkNode { mark : RichText.Model.Mark.Mark, children : Array InlineTree }
     | LeafNode Int
 
 
@@ -284,15 +284,15 @@ type InlineTree
 leaf node, like an image or line break, or a text node.
 -}
 type Inline
-    = InlineElement InlineElement
-    | Text Text
+    = InlineElement RichText.Model.InlineElement.InlineElement
+    | Text RichText.Model.Text.Text
 
 
 {-| A Inline that represents plain text
 -}
 plainText : String -> Inline
 plainText s =
-    Text (Text.empty |> Text.withText s)
+    Text (RichText.Model.Text.empty |> RichText.Model.Text.withText s)
 
 
 {-| Creates children derived from an inline array.
@@ -328,7 +328,7 @@ inlineTreeToPaths backwardsPath tree =
 
 {-| Derives the marks from an inline node
 -}
-marks : Inline -> List Mark
+marks : Inline -> List RichText.Model.Mark.Mark
 marks leaf =
     case leaf of
         Text l ->
@@ -340,12 +340,12 @@ marks leaf =
 
 {-| Transforms a list of list of marks to an array of inline tree nodes
 -}
-marksToMarkNodeList : List (List Mark) -> Array InlineTree
+marksToMarkNodeList : List (List RichText.Model.Mark.Mark) -> Array InlineTree
 marksToMarkNodeList markLists =
     marksToMarkNodeListRec (List.indexedMap Tuple.pair markLists)
 
 
-marksToMarkNodeListRec : List ( Int, List Mark ) -> Array InlineTree
+marksToMarkNodeListRec : List ( Int, List RichText.Model.Mark.Mark ) -> Array InlineTree
 marksToMarkNodeListRec indexedMarkLists =
     Array.fromList <|
         List.concatMap
@@ -376,7 +376,7 @@ marksToMarkNodeListRec indexedMarkLists =
                         Just v1 ->
                             case m2 of
                                 Just v2 ->
-                                    name v1 == name v2
+                                    RichText.Model.Mark.name v1 == RichText.Model.Mark.name v2
 
                                 _ ->
                                     False
@@ -387,17 +387,17 @@ marksToMarkNodeListRec indexedMarkLists =
 
 {-| Creates an `Inline` from an `Element` and `Mark`
 -}
-inlineElement : Element -> List Mark -> Inline
+inlineElement : RichText.Model.Element.Element -> List RichText.Model.Mark.Mark -> Inline
 inlineElement parameters mark =
     InlineElement (InlineElement.inlineElement parameters mark)
 
 
 {-| Creates an inline that represents some text with marks
 -}
-markedText : String -> List Mark -> Inline
+markedText : String -> List RichText.Model.Mark.Mark -> Inline
 markedText s marks_ =
     Text
-        (Text.empty
-            |> Text.withText s
-            |> Text.withMarks marks_
+        (RichText.Model.Text.empty
+            |> RichText.Model.Text.withText s
+            |> RichText.Model.Text.withMarks marks_
         )

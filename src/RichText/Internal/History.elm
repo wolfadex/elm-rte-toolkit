@@ -13,7 +13,7 @@ module RichText.Internal.History exposing
 -}
 
 import BoundedDeque exposing (BoundedDeque)
-import RichText.Model.State exposing (State)
+import RichText.Model.State
 
 
 {-| `History` contains the undo deque and redo stack related to undo history.
@@ -31,8 +31,8 @@ type History
 
 -}
 type alias Contents =
-    { undoDeque : BoundedDeque ( String, State )
-    , redoStack : List State
+    { undoDeque : BoundedDeque ( String, RichText.Model.State.State )
+    , redoStack : List RichText.Model.State.State
     , groupDelayMilliseconds : Int
     , lastTextChangeTimestamp : Int
     }
@@ -47,21 +47,21 @@ contents history =
             c
 
 
-peek : History -> Maybe ( String, State )
+peek : History -> Maybe ( String, RichText.Model.State.State )
 peek history =
     case history of
         History c ->
             BoundedDeque.first c.undoDeque
 
 
-undoList : History -> List ( String, State )
+undoList : History -> List ( String, RichText.Model.State.State )
 undoList history =
     case history of
         History c ->
             BoundedDeque.toList c.undoDeque
 
 
-redoList : History -> List State
+redoList : History -> List RichText.Model.State.State
 redoList history =
     case history of
         History c ->
