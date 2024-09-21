@@ -9,15 +9,8 @@ module RichText.Config.Spec exposing (Spec, emptySpec, markDefinitions, markDefi
 import Dict exposing (Dict)
 import RichText.Internal.Definitions
     exposing
-        ( ContentType(..)
-        , Element
-        , ElementDefinition(..)
-        , ElementToHtml
-        , HtmlToElement
-        , HtmlToMark
-        , Mark
+        ( ElementDefinition(..)
         , MarkDefinition(..)
-        , MarkToHtml
         )
 
 

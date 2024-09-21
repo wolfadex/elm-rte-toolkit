@@ -29,7 +29,7 @@ module RichText.List exposing
 
 -}
 
-import Array exposing (Array)
+import Array
 import List.Extra
 import RichText.Annotation as Annotation
     exposing
@@ -63,7 +63,6 @@ import RichText.Model.Element as Element exposing (Element, element)
 import RichText.Model.Node as Node
     exposing
         ( Block
-        , BlockChildren
         , Children(..)
         , Inline(..)
         , Path
@@ -85,7 +84,7 @@ import RichText.Model.Selection
         , isCollapsed
         , normalize
         )
-import RichText.Model.State as State exposing (root, withRoot, withSelection)
+import RichText.Model.State as State exposing (withRoot, withSelection)
 import RichText.Model.Text exposing (text)
 import RichText.Node
     exposing

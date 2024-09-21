@@ -64,8 +64,8 @@ These are convenience types to wrap around inline and block node and arrays
 import Array exposing (Array)
 import Array.Extra
 import List.Extra
-import RichText.Model.InlineElement as InlineElement
-import RichText.Model.Mark exposing (Mark, MarkOrder, ToggleAction, toggle)
+import RichText.Model.InlineElement
+import RichText.Model.Mark
 import RichText.Model.Node
     exposing
         ( Block
@@ -76,12 +76,9 @@ import RichText.Model.Node
         , childNodes
         , inlineChildren
         , parent
-        , toBlockArray
-        , toInlineArray
-        , withChildNodes
         )
-import RichText.Model.Selection exposing (Selection, anchorNode, anchorOffset, isCollapsed)
-import RichText.Model.Text as Text exposing (Text, text, withText)
+import RichText.Model.Selection
+import RichText.Model.Text
 
 
 {-| Node represents either a `Block` or `Inline`. It's a convenience type that wraps an argument
@@ -111,9 +108,11 @@ last node =
     case childNodes node of
         BlockChildren a ->
             let
+                arr : Array Block
                 arr =
-                    toBlockArray a
+                    RichText.Model.Node.toBlockArray a
 
+                lastIndex : Int
                 lastIndex =
                     Array.length arr - 1
             in
@@ -130,9 +129,11 @@ last node =
 
         InlineChildren a ->
             let
+                array : Array Inline
                 array =
-                    toInlineArray a
+                    RichText.Model.Node.toInlineArray a
 
+                lastIndex : Int
                 lastIndex =
                     Array.length array - 1
             in
@@ -160,7 +161,7 @@ type alias Iterator =
     rootNode =
         block
             (Element.element doc [])
-            (blockChildren <| Array.fromList [ pNode ])
+            (RichText.Model.Node.blockChildren <| Array.fromList [ pNode ])
 
     pNode : Block
     pNode =
@@ -189,12 +190,13 @@ previous path node =
 
         [ x ] ->
             let
+                prevIndex : Int
                 prevIndex =
                     x - 1
             in
             case childNodes node of
                 BlockChildren a ->
-                    case Array.get prevIndex (toBlockArray a) of
+                    case Array.get prevIndex (RichText.Model.Node.toBlockArray a) of
                         Nothing ->
                             Just ( [], Block node )
 
@@ -206,7 +208,7 @@ previous path node =
                             Just ( prevIndex :: p, n )
 
                 InlineChildren a ->
-                    case Array.get prevIndex (toInlineArray a) of
+                    case Array.get prevIndex (RichText.Model.Node.toInlineArray a) of
                         Nothing ->
                             Just ( [], Block node )
 
@@ -219,7 +221,7 @@ previous path node =
         x :: xs ->
             case childNodes node of
                 BlockChildren a ->
-                    case Array.get x (toBlockArray a) of
+                    case Array.get x (RichText.Model.Node.toBlockArray a) of
                         Nothing ->
                             Nothing
 
@@ -232,7 +234,7 @@ previous path node =
                                     Just ( x :: p, n )
 
                 InlineChildren a ->
-                    case Array.get (x - 1) (toInlineArray a) of
+                    case Array.get (x - 1) (RichText.Model.Node.toInlineArray a) of
                         Nothing ->
                             Just ( [], Block node )
 
@@ -249,7 +251,7 @@ previous path node =
     rootNode =
         block
             (Element.element doc [])
-            (blockChildren <| Array.fromList [ pNode ])
+            (RichText.Model.Node.blockChildren <| Array.fromList [ pNode ])
 
     pNode : Block
     pNode =
@@ -276,7 +278,7 @@ next path node =
         [] ->
             case childNodes node of
                 BlockChildren a ->
-                    case Array.get 0 (toBlockArray a) of
+                    case Array.get 0 (RichText.Model.Node.toBlockArray a) of
                         Nothing ->
                             Nothing
 
@@ -284,7 +286,7 @@ next path node =
                             Just ( [ 0 ], Block b )
 
                 InlineChildren a ->
-                    case Array.get 0 (toInlineArray a) of
+                    case Array.get 0 (RichText.Model.Node.toInlineArray a) of
                         Nothing ->
                             Nothing
 
@@ -298,8 +300,9 @@ next path node =
             case childNodes node of
                 BlockChildren a ->
                     let
+                        arr : Array Block
                         arr =
-                            toBlockArray a
+                            RichText.Model.Node.toBlockArray a
                     in
                     case Array.get x arr of
                         Nothing ->
@@ -319,7 +322,7 @@ next path node =
                                     Just ( x :: p, n )
 
                 InlineChildren a ->
-                    case Array.get (x + 1) (toInlineArray a) of
+                    case Array.get (x + 1) (RichText.Model.Node.toInlineArray a) of
                         Nothing ->
                             Nothing
 
@@ -392,7 +395,7 @@ findNodeFrom iterator pred path node =
     rootNode =
         block
             (Element.element doc [])
-            (blockChildren <| Array.fromList [ pNode ])
+            (RichText.Model.Node.blockChildren <| Array.fromList [ pNode ])
 
     pNode : Block
     pNode =
@@ -414,7 +417,7 @@ findNodeFrom iterator pred path node =
     doubleRoot =
         block
             (Element.element doc [])
-            (blockChildren <|
+            (RichText.Model.Node.blockChildren <|
                 Array.fromList [ doublePNode, doublePNode ]
             )
 
@@ -433,45 +436,50 @@ findNodeFrom iterator pred path node =
 concatMap : (Node -> List Node) -> Block -> Block
 concatMap func node =
     let
+        newChildren : Children
         newChildren =
             case childNodes node of
                 Leaf ->
                     Leaf
 
                 BlockChildren a ->
-                    let
-                        c =
-                            List.concatMap
-                                (\x ->
-                                    case x of
-                                        Block v ->
-                                            [ v ]
+                    a
+                        |> RichText.Model.Node.toBlockArray
+                        |> Array.toList
+                        |> List.map Block
+                        |> List.concatMap func
+                        |> List.concatMap
+                            (\x ->
+                                case x of
+                                    Block v ->
+                                        [ v ]
 
-                                        Inline _ ->
-                                            []
-                                )
-                            <|
-                                List.concatMap func (List.map Block (Array.toList (toBlockArray a)))
-                    in
-                    blockChildren <| Array.fromList (List.map (concatMap func) c)
+                                    Inline _ ->
+                                        []
+                            )
+                        |> List.map (concatMap func)
+                        |> Array.fromList
+                        |> RichText.Model.Node.blockChildren
 
                 InlineChildren a ->
-                    inlineChildren <|
-                        Array.fromList
-                            (List.concatMap
-                                (\x ->
-                                    case x of
-                                        Block _ ->
-                                            []
+                    a
+                        |> RichText.Model.Node.toInlineArray
+                        |> Array.toList
+                        |> List.map Inline
+                        |> List.concatMap func
+                        |> List.concatMap
+                            (\x ->
+                                case x of
+                                    Block _ ->
+                                        []
 
-                                        Inline v ->
-                                            [ v ]
-                                )
-                             <|
-                                List.concatMap func (List.map Inline (Array.toList (toInlineArray a)))
+                                    Inline v ->
+                                        [ v ]
                             )
+                        |> Array.fromList
+                        |> inlineChildren
     in
-    node |> withChildNodes newChildren
+    node |> RichText.Model.Node.withChildNodes newChildren
 
 
 {-| Apply a function to this node and all child nodes.
@@ -493,14 +501,14 @@ concatMap func node =
             Inline il ->
                 case il of
                     Text tl ->
-                        Inline (Text (tl |> Text.withAnnotations annotations))
+                        Inline (Text (tl |> RichText.Model.Text.withAnnotations annotations))
 
                     InlineElement l ->
                         let
                             params =
-                                InlineElement.element l
+                                RichText.Model.InlineElement.element l
                         in
-                        Inline (InlineElement (l |> InlineElement.withElement (params |> Element.withAnnotations annotations)))
+                        Inline (InlineElement (l |> RichText.Model.InlineElement.withElement (params |> Element.withAnnotations annotations)))
 
     setDummyAnnotation : Node -> Node
     setDummyAnnotation node =
@@ -512,18 +520,14 @@ concatMap func node =
 -}
 map : (Node -> Node) -> Node -> Node
 map func node =
-    let
-        applied =
-            func node
-    in
-    case applied of
+    case func node of
         Block blockNode ->
             Block <|
                 (blockNode
-                    |> withChildNodes
+                    |> RichText.Model.Node.withChildNodes
                         (case childNodes blockNode of
                             BlockChildren a ->
-                                blockChildren <|
+                                RichText.Model.Node.blockChildren <|
                                     Array.map
                                         (\v ->
                                             case map func (Block v) of
@@ -533,7 +537,7 @@ map func node =
                                                 _ ->
                                                     v
                                         )
-                                        (toBlockArray a)
+                                        (RichText.Model.Node.toBlockArray a)
 
                             InlineChildren a ->
                                 inlineChildren <|
@@ -546,7 +550,7 @@ map func node =
                                                 _ ->
                                                     v
                                         )
-                                        (toInlineArray a)
+                                        (RichText.Model.Node.toInlineArray a)
 
                             Leaf ->
                                 Leaf
@@ -578,17 +582,14 @@ indexedMap =
 
 indexedMapRec : Path -> (Path -> Node -> Node) -> Node -> Node
 indexedMapRec path func node =
-    let
-        applied =
-            func path node
-    in
-    case applied of
+    case func path node of
         Block blockNode ->
             let
+                cn : Children
                 cn =
                     case childNodes blockNode of
                         BlockChildren a ->
-                            blockChildren <|
+                            RichText.Model.Node.blockChildren <|
                                 Array.indexedMap
                                     (\i v ->
                                         case indexedMapRec (path ++ [ i ]) func (Block v) of
@@ -598,7 +599,7 @@ indexedMapRec path func node =
                                             _ ->
                                                 v
                                     )
-                                    (toBlockArray a)
+                                    (RichText.Model.Node.toBlockArray a)
 
                         InlineChildren a ->
                             inlineChildren <|
@@ -611,12 +612,12 @@ indexedMapRec path func node =
                                             _ ->
                                                 v
                                     )
-                                    (toInlineArray a)
+                                    (RichText.Model.Node.toInlineArray a)
 
                         Leaf ->
                             Leaf
             in
-            Block (blockNode |> withChildNodes cn)
+            Block (blockNode |> RichText.Model.Node.withChildNodes cn)
 
         Inline inlineLeaf ->
             Inline inlineLeaf
@@ -633,10 +634,10 @@ indexedMapRec path func node =
             Inline il ->
                 case il of
                     Text tl ->
-                        text tl
+                        RichText.Model.Text.text tl
 
                     InlineElement p ->
-                        Element.name (InlineElement.element p)
+                        Element.name (RichText.Model.InlineElement.element p)
         )
             :: list
 
@@ -651,16 +652,17 @@ foldr func acc node =
         (case node of
             Block blockNode ->
                 let
+                    children : Array Node
                     children =
                         case childNodes blockNode of
                             Leaf ->
                                 Array.empty
 
                             InlineChildren a ->
-                                Array.map Inline (toInlineArray a)
+                                Array.map Inline (RichText.Model.Node.toInlineArray a)
 
                             BlockChildren a ->
-                                Array.map Block (toBlockArray a)
+                                Array.map Block (RichText.Model.Node.toBlockArray a)
                 in
                 Array.foldr
                     (\childNode agg ->
@@ -680,7 +682,7 @@ foldr func acc node =
     rootNode =
         block
             (Element.element doc [])
-            (blockChildren <| Array.fromList [ pNode ])
+            (RichText.Model.Node.blockChildren <| Array.fromList [ pNode ])
 
     pNode : Block
     pNode =
@@ -707,10 +709,10 @@ foldr func acc node =
             Inline il ->
                 case il of
                     Text tl ->
-                        text tl
+                        RichText.Model.Text.text tl
 
                     InlineElement p ->
-                        Element.name (InlineElement.element p)
+                        Element.name (RichText.Model.InlineElement.element p)
         )
             :: list
 
@@ -723,16 +725,17 @@ foldl func acc node =
     case node of
         Block blockNode ->
             let
+                children : Array Node
                 children =
                     case childNodes blockNode of
                         Leaf ->
                             Array.empty
 
                         InlineChildren a ->
-                            Array.map Inline (toInlineArray a)
+                            Array.map Inline (RichText.Model.Node.toInlineArray a)
 
                         BlockChildren a ->
-                            Array.map Block (toBlockArray a)
+                            Array.map Block (RichText.Model.Node.toBlockArray a)
             in
             Array.foldl
                 (\childNode agg ->
@@ -767,6 +770,7 @@ indexedFoldrRec path func acc node =
         (case node of
             Block blockNode ->
                 let
+                    children : Array ( Int, Node )
                     children =
                         Array.indexedMap Tuple.pair <|
                             case childNodes blockNode of
@@ -774,10 +778,10 @@ indexedFoldrRec path func acc node =
                                     Array.empty
 
                                 InlineChildren a ->
-                                    Array.map Inline (toInlineArray a)
+                                    Array.map Inline (RichText.Model.Node.toInlineArray a)
 
                                 BlockChildren a ->
-                                    Array.map Block (toBlockArray a)
+                                    Array.map Block (RichText.Model.Node.toBlockArray a)
                 in
                 Array.foldr
                     (\( index, childNode ) agg ->
@@ -810,6 +814,7 @@ indexedFoldlRec path func acc node =
     case node of
         Block blockNode ->
             let
+                children : Array ( Int, Node )
                 children =
                     Array.indexedMap Tuple.pair <|
                         case childNodes blockNode of
@@ -817,10 +822,10 @@ indexedFoldlRec path func acc node =
                                 Array.empty
 
                             InlineChildren a ->
-                                Array.map Inline (toInlineArray a)
+                                Array.map Inline (RichText.Model.Node.toInlineArray a)
 
                             BlockChildren a ->
-                                Array.map Block (toBlockArray a)
+                                Array.map Block (RichText.Model.Node.toBlockArray a)
             in
             Array.foldl
                 (\( index, childNode ) agg ->
@@ -856,6 +861,7 @@ foldlRangeRec start end func acc root node =
 
     else
         let
+            result : b
             result =
                 func node acc
         in
@@ -890,6 +896,7 @@ foldrRangeRec start end func acc root node =
 
     else
         let
+            result : b
             result =
                 func node acc
         in
@@ -921,13 +928,14 @@ replaceWithFragment path fragment root =
                     case fragment of
                         BlockFragment blocks ->
                             let
+                                arr : Array Block
                                 arr =
-                                    toBlockArray a
+                                    RichText.Model.Node.toBlockArray a
                             in
                             Ok <|
                                 (root
-                                    |> withChildNodes
-                                        (blockChildren
+                                    |> RichText.Model.Node.withChildNodes
+                                        (RichText.Model.Node.blockChildren
                                             (Array.append
                                                 (Array.append
                                                     (Array.Extra.sliceUntil x arr)
@@ -945,12 +953,13 @@ replaceWithFragment path fragment root =
                     case fragment of
                         InlineFragment leaves ->
                             let
+                                arr : Array Inline
                                 arr =
-                                    toInlineArray a
+                                    RichText.Model.Node.toInlineArray a
                             in
                             Ok <|
                                 (root
-                                    |> withChildNodes
+                                    |> RichText.Model.Node.withChildNodes
                                         (inlineChildren
                                             (Array.append
                                                 (Array.append
@@ -972,8 +981,9 @@ replaceWithFragment path fragment root =
             case childNodes root of
                 BlockChildren a ->
                     let
+                        arr : Array Block
                         arr =
-                            toBlockArray a
+                            RichText.Model.Node.toBlockArray a
                     in
                     case Array.get x arr of
                         Nothing ->
@@ -982,7 +992,12 @@ replaceWithFragment path fragment root =
                         Just node ->
                             case replaceWithFragment xs fragment node of
                                 Ok n ->
-                                    Ok <| (root |> withChildNodes (blockChildren (Array.set x n arr)))
+                                    root
+                                        |> RichText.Model.Node.withChildNodes
+                                            (RichText.Model.Node.blockChildren
+                                                (Array.set x n arr)
+                                            )
+                                        |> Ok
 
                                 Err v ->
                                     Err v
@@ -1013,6 +1028,7 @@ replace path node root =
 
         _ ->
             let
+                fragment : Fragment
                 fragment =
                     case node of
                         Block n ->
@@ -1031,7 +1047,7 @@ inline content, otherwisereturn Nothing.
     rootNode =
         block
             (Element.element doc [])
-            (blockChildren <| Array.fromList [ pNode ])
+            (RichText.Model.Node.blockChildren <| Array.fromList [ pNode ])
 
     pNode : Block
     pNode =
@@ -1085,7 +1101,7 @@ findAncestor pred path node =
         x :: xs ->
             case childNodes node of
                 BlockChildren a ->
-                    case Array.get x (toBlockArray a) of
+                    case Array.get x (RichText.Model.Node.toBlockArray a) of
                         Nothing ->
                             Nothing
 
@@ -1115,7 +1131,7 @@ findAncestor pred path node =
     rootNode =
         block
             (Element.element doc [])
-            (blockChildren <| Array.fromList [ pNode ])
+            (RichText.Model.Node.blockChildren <| Array.fromList [ pNode ])
 
     pNode : Block
     pNode =
@@ -1137,7 +1153,7 @@ nodeAt path node =
         x :: xs ->
             case childNodes node of
                 BlockChildren arr ->
-                    case Array.get x (toBlockArray arr) of
+                    case Array.get x (RichText.Model.Node.toBlockArray arr) of
                         Nothing ->
                             Nothing
 
@@ -1145,7 +1161,7 @@ nodeAt path node =
                             nodeAt xs childNode
 
                 InlineChildren a ->
-                    case Array.get x (toInlineArray a) of
+                    case Array.get x (RichText.Model.Node.toInlineArray a) of
                         Nothing ->
                             Nothing
 
@@ -1167,14 +1183,14 @@ an ancestor is not removed if the start path or end path is a child node.
     rootNode =
         block
             (Element.element doc [])
-            (blockChildren <| Array.fromList [ pNode ])
+            (RichText.Model.Node.blockChildren <| Array.fromList [ pNode ])
 
 
     emptyRoot : Block
     emptyRoot =
         block
             (Element.element doc [])
-            (blockChildren <| Array.empty)
+            (RichText.Model.Node.blockChildren <| Array.empty)
 
     removeInRange [0] [0] root == emptyRoot
     --> True
@@ -1183,128 +1199,153 @@ an ancestor is not removed if the start path or end path is a child node.
 removeInRange : Path -> Path -> Block -> Block
 removeInRange start end node =
     let
+        startIndex : Int
         startIndex =
             Maybe.withDefault 0 (List.head start)
 
-        startRest =
-            Maybe.withDefault [] (List.tail start)
-
+        endIndex : Int
         endIndex =
-            Maybe.withDefault
-                (case childNodes node of
-                    BlockChildren a ->
-                        Array.length (toBlockArray a)
+            case List.head end of
+                Nothing ->
+                    case childNodes node of
+                        BlockChildren a ->
+                            Array.length (RichText.Model.Node.toBlockArray a)
 
-                    InlineChildren a ->
-                        Array.length (toInlineArray a)
+                        InlineChildren a ->
+                            Array.length (RichText.Model.Node.toInlineArray a)
 
-                    Leaf ->
-                        0
-                )
-                (List.head end)
+                        Leaf ->
+                            0
 
-        endRest =
-            Maybe.withDefault [] (List.tail end)
+                Just e ->
+                    e
     in
     if startIndex > endIndex then
         node
 
-    else if startIndex == endIndex then
-        case childNodes node of
-            BlockChildren a ->
-                let
-                    array =
-                        toBlockArray a
-                in
-                if List.isEmpty startRest && List.isEmpty endRest then
-                    node |> withChildNodes (blockChildren <| Array.Extra.removeAt startIndex array)
+    else
+        let
+            startRest : List Int
+            startRest =
+                Maybe.withDefault [] (List.tail start)
 
-                else
-                    case Array.get startIndex array of
-                        Nothing ->
-                            node
+            endRest : List Int
+            endRest =
+                Maybe.withDefault [] (List.tail end)
+        in
+        if startIndex == endIndex then
+            case childNodes node of
+                BlockChildren a ->
+                    let
+                        array : Array Block
+                        array =
+                            RichText.Model.Node.toBlockArray a
+                    in
+                    if List.isEmpty startRest && List.isEmpty endRest then
+                        node
+                            |> RichText.Model.Node.withChildNodes
+                                (RichText.Model.Node.blockChildren <|
+                                    Array.Extra.removeAt startIndex array
+                                )
 
-                        Just b ->
-                            node |> withChildNodes (blockChildren <| Array.set startIndex (removeInRange startRest endRest b) array)
+                    else
+                        case Array.get startIndex array of
+                            Nothing ->
+                                node
 
-            InlineChildren a ->
-                if List.isEmpty startRest && List.isEmpty endRest then
-                    node |> withChildNodes (inlineChildren <| Array.Extra.removeAt startIndex (toInlineArray a))
+                            Just b ->
+                                node
+                                    |> RichText.Model.Node.withChildNodes
+                                        (RichText.Model.Node.blockChildren <|
+                                            Array.set startIndex (removeInRange startRest endRest b) array
+                                        )
 
-                else
+                InlineChildren a ->
+                    if List.isEmpty startRest && List.isEmpty endRest then
+                        node |> RichText.Model.Node.withChildNodes (inlineChildren <| Array.Extra.removeAt startIndex (RichText.Model.Node.toInlineArray a))
+
+                    else
+                        node
+
+                Leaf ->
                     node
 
-            Leaf ->
-                node
+        else
+            case childNodes node of
+                BlockChildren a ->
+                    let
+                        arr : Array Block
+                        arr =
+                            RichText.Model.Node.toBlockArray a
 
-    else
-        case childNodes node of
-            BlockChildren a ->
-                let
-                    arr =
-                        toBlockArray a
+                        left : Array Block
+                        left =
+                            Array.Extra.sliceUntil startIndex arr
 
-                    left =
-                        Array.Extra.sliceUntil startIndex arr
+                        right : Array Block
+                        right =
+                            Array.Extra.sliceFrom (endIndex + 1) arr
 
-                    right =
-                        Array.Extra.sliceFrom (endIndex + 1) arr
+                        leftRest : Array Block
+                        leftRest =
+                            if List.isEmpty startRest then
+                                Array.empty
 
-                    leftRest =
-                        if List.isEmpty startRest then
-                            Array.empty
+                            else
+                                case Array.get startIndex arr of
+                                    Nothing ->
+                                        Array.empty
 
-                        else
-                            case Array.get startIndex arr of
-                                Nothing ->
-                                    Array.empty
+                                    Just b ->
+                                        Array.fromList [ removeInRange startRest (last b |> Tuple.first) b ]
 
-                                Just b ->
-                                    Array.fromList [ removeInRange startRest (last b |> Tuple.first) b ]
+                        rightRest : Array Block
+                        rightRest =
+                            if List.isEmpty endRest then
+                                Array.empty
 
-                    rightRest =
-                        if List.isEmpty endRest then
-                            Array.empty
+                            else
+                                case Array.get endIndex arr of
+                                    Nothing ->
+                                        Array.empty
 
-                        else
-                            case Array.get endIndex arr of
-                                Nothing ->
-                                    Array.empty
+                                    Just b ->
+                                        Array.fromList [ removeInRange [] endRest b ]
+                    in
+                    node |> RichText.Model.Node.withChildNodes (blockChildren <| List.foldr Array.append Array.empty [ left, leftRest, rightRest, right ])
 
-                                Just b ->
-                                    Array.fromList [ removeInRange [] endRest b ]
-                in
-                node |> withChildNodes (blockChildren <| List.foldr Array.append Array.empty [ left, leftRest, rightRest, right ])
+                InlineChildren a ->
+                    let
+                        arr : Array Inline
+                        arr =
+                            RichText.Model.Node.toInlineArray a
 
-            InlineChildren a ->
-                let
-                    arr =
-                        toInlineArray a
+                        left : Array Inline
+                        left =
+                            Array.Extra.sliceUntil
+                                (if List.isEmpty startRest then
+                                    startIndex
 
-                    left =
-                        Array.Extra.sliceUntil
-                            (if List.isEmpty startRest then
-                                startIndex
+                                 else
+                                    startIndex + 1
+                                )
+                                arr
 
-                             else
-                                startIndex + 1
-                            )
-                            arr
+                        right : Array Inline
+                        right =
+                            Array.Extra.sliceFrom
+                                (if List.isEmpty endRest then
+                                    endIndex + 1
 
-                    right =
-                        Array.Extra.sliceFrom
-                            (if List.isEmpty endRest then
-                                endIndex + 1
+                                 else
+                                    endIndex
+                                )
+                                arr
+                    in
+                    node |> RichText.Model.Node.withChildNodes (inlineChildren <| Array.append left right)
 
-                             else
-                                endIndex
-                            )
-                            arr
-                in
-                node |> withChildNodes (inlineChildren <| Array.append left right)
-
-            Leaf ->
-                node
+                Leaf ->
+                    node
 
 
 {-| Removes the node at the given path, and recursively removes parent blocks that have no remaining
@@ -1314,7 +1355,7 @@ child nodes, excluding the root.
     rootNode =
         block
             (Element.element doc [])
-            (blockChildren <|
+            (RichText.Model.Node.blockChildren <|
                 Array.fromList [ removedPHtmlNode ]
             )
 
@@ -1334,7 +1375,7 @@ child nodes, excluding the root.
     removedRoot =
         block
             (Element.element doc [])
-            (blockChildren Array.empty)
+            (RichText.Model.Node.blockChildren Array.empty)
 
     removeNodeAndEmptyParents [0, 0] root == removedRoot
     --> True
@@ -1349,10 +1390,10 @@ removeNodeAndEmptyParents path node =
         [ x ] ->
             case childNodes node of
                 BlockChildren a ->
-                    node |> withChildNodes (blockChildren <| Array.Extra.removeAt x (toBlockArray a))
+                    node |> RichText.Model.Node.withChildNodes (RichText.Model.Node.blockChildren <| Array.Extra.removeAt x (RichText.Model.Node.toBlockArray a))
 
                 InlineChildren a ->
-                    node |> withChildNodes (inlineChildren <| Array.Extra.removeAt x (toInlineArray a))
+                    node |> RichText.Model.Node.withChildNodes (inlineChildren <| Array.Extra.removeAt x (RichText.Model.Node.toInlineArray a))
 
                 Leaf ->
                     node
@@ -1361,8 +1402,9 @@ removeNodeAndEmptyParents path node =
             case childNodes node of
                 BlockChildren a ->
                     let
+                        arr : Array Block
                         arr =
-                            toBlockArray a
+                            RichText.Model.Node.toBlockArray a
                     in
                     case Array.get x arr of
                         Nothing ->
@@ -1370,34 +1412,37 @@ removeNodeAndEmptyParents path node =
 
                         Just n ->
                             let
+                                newNode : Block
                                 newNode =
                                     removeNodeAndEmptyParents xs n
                             in
                             case childNodes newNode of
                                 BlockChildren newNodeChildren ->
                                     let
+                                        newChildNodes : Array Block
                                         newChildNodes =
-                                            toBlockArray newNodeChildren
+                                            RichText.Model.Node.toBlockArray newNodeChildren
                                     in
                                     if Array.isEmpty newChildNodes then
-                                        node |> withChildNodes (blockChildren <| Array.Extra.removeAt x arr)
+                                        node |> RichText.Model.Node.withChildNodes (RichText.Model.Node.blockChildren <| Array.Extra.removeAt x arr)
 
                                     else
-                                        node |> withChildNodes (blockChildren <| Array.set x newNode arr)
+                                        node |> RichText.Model.Node.withChildNodes (RichText.Model.Node.blockChildren <| Array.set x newNode arr)
 
                                 InlineChildren newNodeChildren ->
                                     let
+                                        newChildNodes : Array Inline
                                         newChildNodes =
-                                            toInlineArray newNodeChildren
+                                            RichText.Model.Node.toInlineArray newNodeChildren
                                     in
                                     if Array.isEmpty newChildNodes then
-                                        node |> withChildNodes (blockChildren <| Array.Extra.removeAt x arr)
+                                        node |> RichText.Model.Node.withChildNodes (RichText.Model.Node.blockChildren <| Array.Extra.removeAt x arr)
 
                                     else
-                                        node |> withChildNodes (blockChildren <| Array.set x newNode arr)
+                                        node |> RichText.Model.Node.withChildNodes (RichText.Model.Node.blockChildren <| Array.set x newNode arr)
 
                                 _ ->
-                                    node |> withChildNodes (blockChildren <| Array.set x newNode arr)
+                                    node |> RichText.Model.Node.withChildNodes (RichText.Model.Node.blockChildren <| Array.set x newNode arr)
 
                 InlineChildren _ ->
                     node
@@ -1408,17 +1453,20 @@ removeNodeAndEmptyParents path node =
 
 {-| Splits a text leaf into two based on the given offset.
 
-    splitTextLeaf 1 (emptyText <| withText "test")
+    splitTextLeaf 1 (emptyText <| RichText.Model.Text.withText "test")
     --> (Text "t", Text "est")
 
 -}
-splitTextLeaf : Int -> Text -> ( Text, Text )
+splitTextLeaf : Int -> RichText.Model.Text.Text -> ( RichText.Model.Text.Text, RichText.Model.Text.Text )
 splitTextLeaf offset leaf =
     let
+        leafText : String
         leafText =
-            text leaf
+            RichText.Model.Text.text leaf
     in
-    ( leaf |> withText (String.left offset leafText), leaf |> withText (String.dropLeft offset leafText) )
+    ( leaf |> RichText.Model.Text.withText (String.left offset leafText)
+    , leaf |> RichText.Model.Text.withText (String.dropLeft offset leafText)
+    )
 
 
 {-| Splits a block at the given path and offset and returns Just the split nodes.
@@ -1463,22 +1511,24 @@ splitBlockAtPathAndOffset path offset node =
             case childNodes node of
                 BlockChildren a ->
                     let
+                        arr : Array Block
                         arr =
-                            toBlockArray a
+                            RichText.Model.Node.toBlockArray a
                     in
                     Just
-                        ( node |> withChildNodes (blockChildren (Array.Extra.sliceUntil offset arr))
-                        , node |> withChildNodes (blockChildren (Array.Extra.sliceFrom offset arr))
+                        ( node |> RichText.Model.Node.withChildNodes (RichText.Model.Node.blockChildren (Array.Extra.sliceUntil offset arr))
+                        , node |> RichText.Model.Node.withChildNodes (RichText.Model.Node.blockChildren (Array.Extra.sliceFrom offset arr))
                         )
 
                 InlineChildren a ->
                     let
+                        arr : Array Inline
                         arr =
-                            toInlineArray a
+                            RichText.Model.Node.toInlineArray a
                     in
                     Just
-                        ( node |> withChildNodes (inlineChildren (Array.Extra.sliceUntil offset arr))
-                        , node |> withChildNodes (inlineChildren (Array.Extra.sliceFrom offset arr))
+                        ( node |> RichText.Model.Node.withChildNodes (inlineChildren (Array.Extra.sliceUntil offset arr))
+                        , node |> RichText.Model.Node.withChildNodes (inlineChildren (Array.Extra.sliceFrom offset arr))
                         )
 
                 Leaf ->
@@ -1488,8 +1538,9 @@ splitBlockAtPathAndOffset path offset node =
             case childNodes node of
                 BlockChildren a ->
                     let
+                        arr : Array Block
                         arr =
-                            toBlockArray a
+                            RichText.Model.Node.toBlockArray a
                     in
                     case Array.get x arr of
                         Nothing ->
@@ -1502,14 +1553,15 @@ splitBlockAtPathAndOffset path offset node =
 
                                 Just ( before, after ) ->
                                     Just
-                                        ( node |> withChildNodes (blockChildren (Array.append (Array.Extra.sliceUntil x arr) (Array.fromList [ before ])))
-                                        , node |> withChildNodes (blockChildren (Array.append (Array.fromList [ after ]) (Array.Extra.sliceFrom (x + 1) arr)))
+                                        ( node |> RichText.Model.Node.withChildNodes (RichText.Model.Node.blockChildren (Array.append (Array.Extra.sliceUntil x arr) (Array.fromList [ before ])))
+                                        , node |> RichText.Model.Node.withChildNodes (RichText.Model.Node.blockChildren (Array.append (Array.fromList [ after ]) (Array.Extra.sliceFrom (x + 1) arr)))
                                         )
 
                 InlineChildren a ->
                     let
+                        arr : Array Inline
                         arr =
-                            toInlineArray a
+                            RichText.Model.Node.toInlineArray a
                     in
                     case Array.get x arr of
                         Nothing ->
@@ -1523,14 +1575,14 @@ splitBlockAtPathAndOffset path offset node =
                                             splitTextLeaf offset tl
                                     in
                                     Just
-                                        ( node |> withChildNodes (inlineChildren (Array.set x (Text before) (Array.Extra.sliceUntil (x + 1) arr)))
-                                        , node |> withChildNodes (inlineChildren (Array.set 0 (Text after) (Array.Extra.sliceFrom x arr)))
+                                        ( node |> RichText.Model.Node.withChildNodes (inlineChildren (Array.set x (Text before) (Array.Extra.sliceUntil (x + 1) arr)))
+                                        , node |> RichText.Model.Node.withChildNodes (inlineChildren (Array.set 0 (Text after) (Array.Extra.sliceFrom x arr)))
                                         )
 
                                 InlineElement _ ->
                                     Just
-                                        ( node |> withChildNodes (inlineChildren (Array.Extra.sliceUntil x arr))
-                                        , node |> withChildNodes (inlineChildren (Array.Extra.sliceFrom x arr))
+                                        ( node |> RichText.Model.Node.withChildNodes (inlineChildren (Array.Extra.sliceUntil x arr))
+                                        , node |> RichText.Model.Node.withChildNodes (inlineChildren (Array.Extra.sliceFrom x arr))
                                         )
 
                 Leaf ->
@@ -1586,7 +1638,7 @@ returns the root path.
     rootNode =
         block
             (Element.element doc [])
-            (blockChildren <| Array.fromList [ pNode ])
+            (RichText.Model.Node.blockChildren <| Array.fromList [ pNode ])
 
     pNode : Block
     pNode =
@@ -1661,7 +1713,15 @@ joinBlocks b1 b2 =
         BlockChildren a1 ->
             case childNodes b2 of
                 BlockChildren a2 ->
-                    Just <| (b1 |> withChildNodes (blockChildren (Array.append (toBlockArray a1) (toBlockArray a2))))
+                    Just <|
+                        (b1
+                            |> RichText.Model.Node.withChildNodes
+                                (RichText.Model.Node.blockChildren
+                                    (Array.append (RichText.Model.Node.toBlockArray a1)
+                                        (RichText.Model.Node.toBlockArray a2)
+                                    )
+                                )
+                        )
 
                 _ ->
                     Nothing
@@ -1669,7 +1729,7 @@ joinBlocks b1 b2 =
         InlineChildren a1 ->
             case childNodes b2 of
                 InlineChildren a2 ->
-                    Just <| (b1 |> withChildNodes (inlineChildren (Array.append (toInlineArray a1) (toInlineArray a2))))
+                    Just <| (b1 |> RichText.Model.Node.withChildNodes (inlineChildren (Array.append (RichText.Model.Node.toInlineArray a1) (RichText.Model.Node.toInlineArray a2))))
 
                 _ ->
                     Nothing
@@ -1697,6 +1757,7 @@ insertAfter path fragment root =
                     case fragment of
                         InlineFragment a ->
                             let
+                                newFragment : Fragment
                                 newFragment =
                                     InlineFragment <| Array.fromList (il :: Array.toList a)
                             in
@@ -1709,6 +1770,7 @@ insertAfter path fragment root =
                     case fragment of
                         BlockFragment a ->
                             let
+                                newFragment : Fragment
                                 newFragment =
                                     BlockFragment <| Array.fromList (bn :: Array.toList a)
                             in
@@ -1737,6 +1799,7 @@ insertBefore path fragment root =
                     case fragment of
                         InlineFragment a ->
                             let
+                                newFragment : Fragment
                                 newFragment =
                                     InlineFragment <| Array.push il a
                             in
@@ -1749,6 +1812,7 @@ insertBefore path fragment root =
                     case fragment of
                         BlockFragment a ->
                             let
+                                newFragment : Fragment
                                 newFragment =
                                     BlockFragment <| Array.push bn a
                             in
@@ -1764,7 +1828,7 @@ insertBefore path fragment root =
     --> Adds bold to the given node
 
 -}
-toggleMark : ToggleAction -> MarkOrder -> Mark -> Node -> Node
+toggleMark : RichText.Model.Mark.ToggleAction -> RichText.Model.Mark.MarkOrder -> RichText.Model.Mark.Mark -> Node -> Node
 toggleMark action markOrder mark node =
     case node of
         Block _ ->
@@ -1776,15 +1840,23 @@ toggleMark action markOrder mark node =
                     Text leaf ->
                         Text <|
                             (leaf
-                                |> Text.withMarks
-                                    (toggle action markOrder mark (Text.marks leaf))
+                                |> RichText.Model.Text.withMarks
+                                    (RichText.Model.Mark.toggle action
+                                        markOrder
+                                        mark
+                                        (RichText.Model.Text.marks leaf)
+                                    )
                             )
 
                     InlineElement leaf ->
                         InlineElement <|
                             (leaf
-                                |> InlineElement.withMarks
-                                    (toggle action markOrder mark (InlineElement.marks leaf))
+                                |> RichText.Model.InlineElement.withMarks
+                                    (RichText.Model.Mark.toggle action
+                                        markOrder
+                                        mark
+                                        (RichText.Model.InlineElement.marks leaf)
+                                    )
                             )
 
 
@@ -1809,19 +1881,19 @@ isEmptyTextBlock node =
             case childNodes bn of
                 InlineChildren a ->
                     let
+                        array : Array Inline
                         array =
-                            toInlineArray a
+                            RichText.Model.Node.toInlineArray a
                     in
                     case Array.get 0 array of
                         Nothing ->
                             Array.isEmpty array
 
                         Just n ->
-                            Array.length array
-                                == 1
+                            (Array.length array == 1)
                                 && (case n of
                                         Text t ->
-                                            String.isEmpty (Text.text t)
+                                            String.isEmpty (RichText.Model.Text.text t)
 
                                         _ ->
                                             False
@@ -1843,29 +1915,29 @@ isEmptyTextBlock node =
         -- Do something else
 
 -}
-selectionIsBeginningOfTextBlock : Selection -> Block -> Bool
+selectionIsBeginningOfTextBlock : RichText.Model.Selection.Selection -> Block -> Bool
 selectionIsBeginningOfTextBlock selection root =
-    if not <| isCollapsed selection then
+    if not <| RichText.Model.Selection.isCollapsed selection then
         False
 
     else
-        case findTextBlockNodeAncestor (anchorNode selection) root of
+        case findTextBlockNodeAncestor (RichText.Model.Selection.anchorNode selection) root of
             Nothing ->
                 False
 
             Just ( _, n ) ->
                 case childNodes n of
                     InlineChildren a ->
-                        case List.Extra.last (anchorNode selection) of
+                        case List.Extra.last (RichText.Model.Selection.anchorNode selection) of
                             Nothing ->
                                 False
 
                             Just i ->
-                                if i /= 0 || Array.isEmpty (toInlineArray a) then
+                                if i /= 0 || Array.isEmpty (RichText.Model.Node.toInlineArray a) then
                                     False
 
                                 else
-                                    anchorOffset selection == 0
+                                    RichText.Model.Selection.anchorOffset selection == 0
 
                     _ ->
                         False
@@ -1880,36 +1952,36 @@ selectionIsBeginningOfTextBlock selection root =
         -- Do something else
 
 -}
-selectionIsEndOfTextBlock : Selection -> Block -> Bool
+selectionIsEndOfTextBlock : RichText.Model.Selection.Selection -> Block -> Bool
 selectionIsEndOfTextBlock selection root =
-    if not <| isCollapsed selection then
+    if not <| RichText.Model.Selection.isCollapsed selection then
         False
 
     else
-        case findTextBlockNodeAncestor (anchorNode selection) root of
+        case findTextBlockNodeAncestor (RichText.Model.Selection.anchorNode selection) root of
             Nothing ->
                 False
 
             Just ( _, n ) ->
                 case childNodes n of
                     InlineChildren a ->
-                        case List.Extra.last (anchorNode selection) of
+                        case List.Extra.last (RichText.Model.Selection.anchorNode selection) of
                             Nothing ->
                                 False
 
                             Just i ->
-                                if i /= Array.length (toInlineArray a) - 1 then
+                                if i /= Array.length (RichText.Model.Node.toInlineArray a) - 1 then
                                     False
 
                                 else
-                                    case Array.get i (toInlineArray a) of
+                                    case Array.get i (RichText.Model.Node.toInlineArray a) of
                                         Nothing ->
                                             False
 
                                         Just leaf ->
                                             case leaf of
                                                 Text tl ->
-                                                    String.length (Text.text tl) == anchorOffset selection
+                                                    String.length (RichText.Model.Text.text tl) == RichText.Model.Selection.anchorOffset selection
 
                                                 InlineElement _ ->
                                                     True

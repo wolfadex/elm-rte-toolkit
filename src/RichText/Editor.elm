@@ -66,7 +66,6 @@ import RichText.Internal.Editor as InternalEditor
         , isComposing
         , renderCount
         , selectionCount
-        , state
         , updateEditorStateWithTimestamp
         , withBufferedEditorState
         , withComposing
@@ -422,9 +421,6 @@ updateChangeEventTextChanges timestamp composing textChanges selection spec_ edi
 
         Just changes ->
             let
-                editorState =
-                    state editor_
-
                 actualChanges =
                     List.filter (differentText (State.root stateToCompare)) changes
             in
@@ -432,6 +428,10 @@ updateChangeEventTextChanges timestamp composing textChanges selection spec_ edi
                 editor_
 
             else
+                let
+                    editorState =
+                        state editor_
+                in
                 case replaceText (State.root editorState) actualChanges of
                     Nothing ->
                         applyForceFunctionOnEditor forceRerender editor_
@@ -543,12 +543,12 @@ initDecoder =
 
 onCompositionStart : (Message -> msg) -> Html.Attribute msg
 onCompositionStart msgFunc =
-    Html.Events.on "compositionstart" (D.map msgFunc (D.succeed CompositionStart))
+    Html.Events.on "compositionstart" (D.succeed (msgFunc CompositionStart))
 
 
 onCompositionEnd : (Message -> msg) -> Html.Attribute msg
 onCompositionEnd msgFunc =
-    Html.Events.on "editorcompositionend" (D.map msgFunc (D.succeed CompositionEnd))
+    Html.Events.on "editorcompositionend" (D.succeed (msgFunc CompositionEnd))
 
 
 onPasteWithData : (Message -> msg) -> Html.Attribute msg
@@ -558,7 +558,7 @@ onPasteWithData msgFunc =
 
 onCut : (Message -> msg) -> Html.Attribute msg
 onCut msgFunc =
-    Html.Events.on "cut" (D.map msgFunc (D.succeed CutEvent))
+    Html.Events.on "cut" (D.succeed (msgFunc CutEvent))
 
 
 onInit : (Message -> msg) -> Html.Attribute msg
@@ -615,14 +615,14 @@ applyTextChange editorNode ( path, text ) =
                                         )
 
                 InlineChildren array ->
-                    let
-                        a =
-                            toInlineArray array
-                    in
                     if not <| List.isEmpty xs then
                         Nothing
 
                     else
+                        let
+                            a =
+                                toInlineArray array
+                        in
                         case Array.get x a of
                             Nothing ->
                                 Nothing
@@ -904,11 +904,8 @@ viewElement spec_ decorations_ elementParameters backwardsNodePath children =
 
         decorators =
             List.map (\d -> d (List.reverse backwardsNodePath) elementParameters) eDecorators
-
-        nodeHtml =
-            viewHtmlNode node decorators children []
     in
-    nodeHtml
+    viewHtmlNode node decorators children []
 
 
 viewInlineLeafTree : Spec -> Decorations msg -> Path -> Array Inline -> InlineTree -> Html msg

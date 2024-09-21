@@ -134,13 +134,6 @@ elementDefinition contents =
         contents
 
 
-selectable : ElementDefinition -> Bool
-selectable definition_ =
-    case definition_ of
-        Internal.ElementDefinition c ->
-            c.selectable
-
-
 {-| The name of the node this element definition defines.
 
     name paragraph

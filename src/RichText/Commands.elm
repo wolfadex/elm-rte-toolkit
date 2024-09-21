@@ -77,15 +77,14 @@ Toggle commands for elements and marks
 
 -}
 
-import Array exposing (Array)
+import Array
 import Array.Extra
 import List.Extra
 import Regex
 import RichText.Annotation as Annotation exposing (annotateSelection, clear, clearSelectionAnnotations, doLift, isSelectable, selectionFromAnnotations)
 import RichText.Config.Command
     exposing
-        ( CommandBinding
-        , CommandMap
+        ( CommandMap
         , InternalAction(..)
         , NamedCommandList
         , Transform
@@ -105,7 +104,7 @@ import RichText.Internal.Event exposing (InputEvent, KeyboardEvent)
 import RichText.Model.Element as Element exposing (Element)
 import RichText.Model.InlineElement as InlineElement
 import RichText.Model.Mark as Mark exposing (Mark, MarkOrder, ToggleAction(..), hasMarkWithName, toggle)
-import RichText.Model.Node as Node exposing (Block, BlockChildren, Children(..), Inline(..), InlineChildren, Path, block, blockChildren, childNodes, commonAncestor, decrement, increment, inlineChildren, marks, parent, plainText, toBlockArray, toInlineArray, toString, withChildNodes, withElement)
+import RichText.Model.Node as Node exposing (Block, Children(..), Inline(..), InlineChildren, Path, block, blockChildren, childNodes, commonAncestor, decrement, increment, inlineChildren, marks, parent, plainText, toBlockArray, toInlineArray, toString, withChildNodes, withElement)
 import RichText.Model.Selection
     exposing
         ( Selection
@@ -736,17 +735,6 @@ removeRange editorState =
                             Err s
 
                 else
-                    let
-                        anchorTextBlock =
-                            findTextBlockNodeAncestor
-                                (anchorNode normalizedSelection)
-                                (State.root editorState)
-
-                        focusTextBlock =
-                            findTextBlockNodeAncestor
-                                (focusNode normalizedSelection)
-                                (State.root editorState)
-                    in
                     case
                         if focusOffset normalizedSelection == 0 then
                             Ok ( State.root editorState, Nothing )
@@ -780,6 +768,11 @@ removeRange editorState =
 
                                 Ok ( removedStart, maybePath ) ->
                                     let
+                                        anchorTextBlock =
+                                            findTextBlockNodeAncestor
+                                                (anchorNode normalizedSelection)
+                                                (State.root editorState)
+
                                         newSelection =
                                             Maybe.map
                                                 (\( p, n ) ->
@@ -823,6 +816,12 @@ removeRange editorState =
                                             Ok newEditorState
 
                                         Just ( ap, _ ) ->
+                                            let
+                                                focusTextBlock =
+                                                    findTextBlockNodeAncestor
+                                                        (focusNode normalizedSelection)
+                                                        (State.root editorState)
+                                            in
                                             case focusTextBlock of
                                                 Nothing ->
                                                     Ok newEditorState
@@ -1553,16 +1552,6 @@ toggleMarkSingleInlineNode markOrder mark action editorState =
                                                                         )
                                                                 )
 
-                                                        left =
-                                                            Text
-                                                                (leaf
-                                                                    |> Text.withText
-                                                                        (String.left
-                                                                            (anchorOffset normalizedSelection)
-                                                                            (Text.text leaf)
-                                                                        )
-                                                                )
-
                                                         right =
                                                             Text
                                                                 (leaf
@@ -1576,24 +1565,23 @@ toggleMarkSingleInlineNode markOrder mark action editorState =
                                                     if anchorOffset normalizedSelection == 0 then
                                                         [ newNode, right ]
 
-                                                    else if String.length (Text.text leaf) == focusOffset normalizedSelection then
-                                                        [ left, newNode ]
-
                                                     else
-                                                        [ left, newNode, right ]
+                                                        let
+                                                            left =
+                                                                Text
+                                                                    (leaf
+                                                                        |> Text.withText
+                                                                            (String.left
+                                                                                (anchorOffset normalizedSelection)
+                                                                                (Text.text leaf)
+                                                                            )
+                                                                    )
+                                                        in
+                                                        if String.length (Text.text leaf) == focusOffset normalizedSelection then
+                                                            [ left, newNode ]
 
-                                    path =
-                                        if anchorOffset normalizedSelection == 0 then
-                                            anchorNode normalizedSelection
-
-                                        else
-                                            increment (anchorNode normalizedSelection)
-
-                                    newSelection =
-                                        singleNodeRange
-                                            path
-                                            0
-                                            (focusOffset normalizedSelection - anchorOffset normalizedSelection)
+                                                        else
+                                                            [ left, newNode, right ]
                                 in
                                 case
                                     replaceWithFragment
@@ -1605,6 +1593,20 @@ toggleMarkSingleInlineNode markOrder mark action editorState =
                                         Err s
 
                                     Ok newRoot ->
+                                        let
+                                            path =
+                                                if anchorOffset normalizedSelection == 0 then
+                                                    anchorNode normalizedSelection
+
+                                                else
+                                                    increment (anchorNode normalizedSelection)
+
+                                            newSelection =
+                                                singleNodeRange
+                                                    path
+                                                    0
+                                                    (focusOffset normalizedSelection - anchorOffset normalizedSelection)
+                                        in
                                         Ok
                                             (editorState
                                                 |> withSelection (Just newSelection)
@@ -2978,9 +2980,6 @@ backspaceBlock editorState =
                 let
                     blockPath =
                         findClosestBlockPath (anchorNode selection) (State.root editorState)
-
-                    markedRoot =
-                        annotateSelection selection (State.root editorState)
                 in
                 case previous blockPath (State.root editorState) of
                     Nothing ->
@@ -2991,6 +2990,10 @@ backspaceBlock editorState =
                             Block bn ->
                                 case childNodes bn of
                                     Leaf ->
+                                        let
+                                            markedRoot =
+                                                annotateSelection selection (State.root editorState)
+                                        in
                                         case replaceWithFragment path (BlockFragment Array.empty) markedRoot of
                                             Err s ->
                                                 Err s
@@ -3036,7 +3039,7 @@ groupSameTypeInlineLeaf a b =
 
 textFromGroup : List Inline -> String
 textFromGroup leaves =
-    String.join "" <|
+    String.concat <|
         List.map
             (\leaf ->
                 case leaf of
@@ -3133,19 +3136,18 @@ backspaceWord editorState =
                     Just ( p, n ) ->
                         case childNodes n of
                             InlineChildren arr ->
-                                let
-                                    groupedLeaves =
-                                        -- group text nodes together
-                                        List.Extra.groupWhile
-                                            groupSameTypeInlineLeaf
-                                            (Array.toList (toInlineArray arr))
-                                in
                                 case List.Extra.last (anchorNode selection) of
                                     Nothing ->
                                         Err "Somehow the anchor node is the root node"
 
                                     Just lastIndex ->
                                         let
+                                            groupedLeaves =
+                                                -- group text nodes together
+                                                List.Extra.groupWhile
+                                                    groupSameTypeInlineLeaf
+                                                    (Array.toList (toInlineArray arr))
+
                                             ( relativeLastIndex, group ) =
                                                 List.foldl
                                                     (\( first, rest ) ( i, g ) ->
@@ -3579,18 +3581,17 @@ deleteWord editorState =
                     Just ( p, n ) ->
                         case childNodes n of
                             InlineChildren arr ->
-                                let
-                                    groupedLeaves =
-                                        List.Extra.groupWhile
-                                            groupSameTypeInlineLeaf
-                                            (Array.toList (toInlineArray arr))
-                                in
                                 case List.Extra.last (anchorNode selection) of
                                     Nothing ->
                                         Err "Somehow the anchor node is the root node"
 
                                     Just lastIndex ->
                                         let
+                                            groupedLeaves =
+                                                List.Extra.groupWhile
+                                                    groupSameTypeInlineLeaf
+                                                    (Array.toList (toInlineArray arr))
+
                                             ( relativeLastIndex, group ) =
                                                 List.foldl
                                                     (\( first, rest ) ( i, g ) ->
@@ -3825,14 +3826,14 @@ selectBackward state =
             Err "There is no selection to move forward"
 
         Just selection ->
-            let
-                root =
-                    State.root state
-            in
             if not <| selectionIsBeginningOfTextBlock selection (State.root state) then
                 Err "I can only select a node backwards if this is the beginning of a text block"
 
             else
+                let
+                    root =
+                        State.root state
+                in
                 case findBackwardFromExclusive (\_ n -> isSelectable n) (anchorNode selection) root of
                     Nothing ->
                         Err "I could not find a selectable node prior to the selected one"
@@ -3866,14 +3867,14 @@ selectForward state =
             Err "There is no selection to move forward"
 
         Just selection ->
-            let
-                root =
-                    State.root state
-            in
             if not <| selectionIsEndOfTextBlock selection (State.root state) then
                 Err "I can only select a node forward if this is the end of a text block"
 
             else
+                let
+                    root =
+                        State.root state
+                in
                 case findForwardFromExclusive (\_ n -> isSelectable n) (anchorNode selection) root of
                     Nothing ->
                         Err "I could not find a selectable node after the selected one"

@@ -1,4 +1,7 @@
-module RichText.Internal.KeyDown exposing (..)
+module RichText.Internal.KeyDown exposing
+    ( handleKeyDown
+    , preventDefaultOnKeyDownDecoder
+    )
 
 import Json.Decode as D
 import RichText.Config.Command exposing (CommandMap, namedCommandListFromKeyboardEvent)

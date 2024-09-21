@@ -300,6 +300,7 @@ plainText s =
 inlineChildren : Array Inline -> Children
 inlineChildren arr =
     let
+        tree : Array InlineTree
         tree =
             marksToMarkNodeList (List.map marks (Array.toList arr))
     in

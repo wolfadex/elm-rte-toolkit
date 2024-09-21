@@ -1,4 +1,4 @@
-module RichText.Internal.Definitions exposing (..)
+module RichText.Internal.Definitions exposing (ContentType(..), Contents, Element(..), ElementDefinition(..), ElementDefinitionContents, ElementParametersContents, ElementToHtml, HtmlToElement, HtmlToMark, Mark(..), MarkDefinition(..), MarkDefinitionContents, MarkToHtml, annotationsFromElement, attributesFromElement, attributesFromMark, element, elementWithAnnotations, elementWithAttributes, mark, markWithAttributes, nameFromElement, nameFromMark, toStringContentType)
 
 {-| Internal module for various entities related to definition, elements and nodes to keep records
 private and avoid dependency loops.

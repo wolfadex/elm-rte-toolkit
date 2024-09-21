@@ -1,4 +1,32 @@
-module RichText.Internal.Editor exposing (..)
+module RichText.Internal.Editor exposing
+    ( Editor(..)
+    , EditorContents
+    , Message(..)
+    , Tagger
+    , applyCommand
+    , applyCommandNoForceSelection
+    , applyNamedCommandList
+    , bufferedEditorState
+    , changeCount
+    , completeRerenderCount
+    , editor
+    , forceCompleteRerender
+    , forceRerender
+    , forceReselection
+    , history
+    , isComposing
+    , renderCount
+    , selectionCount
+    , shortKey
+    , state
+    , updateEditorState
+    , updateEditorStateWithTimestamp
+    , withBufferedEditorState
+    , withComposing
+    , withHistory
+    , withShortKey
+    , withState
+    )
 
 {-| This is the internal module contains the types used to model the editor,
 as well as the messages used to update the editor's internal state.

@@ -17,8 +17,6 @@ module RichText.Model.Attribute exposing
 
 -}
 
-import String
-
 
 {-| An attribute is a key value pair. It's used to store information on an element or mark.
 Information you can store are things like color, font type, or image or link locations.
@@ -154,7 +152,7 @@ replaceOrAddBoolAttribute name value attributes =
             List.map
                 (\x ->
                     case x of
-                        BoolAttribute k v ->
+                        BoolAttribute k _ ->
                             if k == name then
                                 BoolAttribute name value
 
@@ -184,7 +182,7 @@ replaceOrAddStringAttribute name value attributes =
             List.map
                 (\x ->
                     case x of
-                        StringAttribute k v ->
+                        StringAttribute k _ ->
                             if k == name then
                                 StringAttribute name value
 
@@ -214,7 +212,7 @@ replaceOrAddIntegerAttribute name value attributes =
             List.map
                 (\x ->
                     case x of
-                        IntegerAttribute k v ->
+                        IntegerAttribute k _ ->
                             if k == name then
                                 IntegerAttribute name value
 
@@ -244,7 +242,7 @@ replaceOrAddFloatAttribute name value attributes =
             List.map
                 (\x ->
                     case x of
-                        FloatAttribute k v ->
+                        FloatAttribute k _ ->
                             if k == name then
                                 FloatAttribute name value
 

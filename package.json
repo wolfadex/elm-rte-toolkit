@@ -1,24 +1,33 @@
 {
-  "name": "elm-rte-toolkit",
-  "version": "1.0.5",
-  "description": "Elm toolkit for rich text editors",
-  "main": "elmEditor.js",
-  "scripts": {
-    "build": "babel js -d js-dist",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/mweiss/elm-rte-toolkit.git"
-  },
-  "author": "Michael Weiss",
-  "license": "BSD-3-Clause",
-  "bugs": {
-    "url": "https://github.com/mweiss/elm-rte-toolkit/issues"
-  },
-  "homepage": "https://github.com/mweiss/elm-rte-toolkit#readme",
-  "devDependencies": {
-    "babel-cli": "^6.26.0",
-    "babel-preset-env": "^1.7.0"
-  }
+    "name": "@wolfadex/elm-rte-toolkit",
+    "version": "1.0.0",
+    "description": "Elm toolkit for rich text editors",
+    "main": "elmEditor.js",
+    "scripts": {
+        "build": "babel js -d js-dist",
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "review": "elm-review --fix --watch"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/wolfadex/elm-rte-toolkit.git"
+    },
+    "authors": [
+        {
+            "name": "Michael Weiss"
+        },
+        {
+            "name": "Wolfgang Schuster"
+        }
+    ],
+    "license": "BSD-3-Clause",
+    "bugs": {
+        "url": "https://github.com/wolfadex/elm-rte-toolkit/issues"
+    },
+    "homepage": "https://github.com/wolfadex/elm-rte-toolkit#readme",
+    "devDependencies": {
+        "babel-cli": "^6.26.0",
+        "babel-preset-env": "^1.7.0",
+        "elm-review": "^2.12.0"
+    }
 }

@@ -1,5 +1,5 @@
 module RichText.Model.Mark exposing
-    ( Mark, mark, name, attributes, withAttributes
+    ( Mark, MarkDefinition, mark, name, attributes, withAttributes
     , MarkOrder, markOrderFromSpec
     , sort, ToggleAction(..), toggle, hasMarkWithName
     )
@@ -9,7 +9,7 @@ module RichText.Model.Mark exposing
 
 # Mark
 
-@docs Mark, mark, name, attributes, withAttributes
+@docs Mark, MarkDefinition, mark, name, attributes, withAttributes
 
 
 # Mark order
@@ -24,21 +24,26 @@ module RichText.Model.Mark exposing
 -}
 
 import Dict exposing (Dict)
-import RichText.Config.Spec exposing (Spec, markDefinitions)
-import RichText.Internal.Definitions as Internal exposing (MarkDefinition(..), attributesFromMark)
-import RichText.Model.Attribute exposing (Attribute)
+import RichText.Config.Spec
+import RichText.Internal.Definitions
+import RichText.Model.Attribute
 
 
 {-| A mark is a piece of information defined by a `MarkDefinition` that can be attached to an inline node,
 like color font, or link information.
 -}
 type alias Mark =
-    Internal.Mark
+    RichText.Internal.Definitions.Mark
+
+
+{-| -}
+type alias MarkDefinition =
+    RichText.Internal.Definitions.MarkDefinition
 
 
 {-| Creates a mark. The arguments are as follows:
 
-  - `definition` is the `MarkDefinition` that defines this node. Note that even though marks require a mark definition,
+  - `definition` is the `RichText.Internal.Definitions.MarkDefinition` that defines this node. Note that even though marks require a mark definition,
     it's still safe to use `(==)` because the function arguments are not stored on the Mark
 
   - `attributes` are a list of attributes, for example `[StringAttribute 'href' 'www.google.com']`
@@ -49,30 +54,30 @@ type alias Mark =
 ```
 
 -}
-mark : MarkDefinition -> List Attribute -> Mark
+mark : MarkDefinition -> List RichText.Model.Attribute.Attribute -> Mark
 mark =
-    Internal.mark
+    RichText.Internal.Definitions.mark
 
 
 {-| A list of attributes associated with the mark
 -}
-attributes : Mark -> List Attribute
+attributes : Mark -> List RichText.Model.Attribute.Attribute
 attributes =
-    attributesFromMark
+    RichText.Internal.Definitions.attributesFromMark
 
 
 {-| Name of the mark
 -}
 name : Mark -> String
 name =
-    Internal.nameFromMark
+    RichText.Internal.Definitions.nameFromMark
 
 
 {-| Creates a mark with new attributes
 -}
-withAttributes : List Attribute -> Mark -> Mark
+withAttributes : List RichText.Model.Attribute.Attribute -> Mark -> Mark
 withAttributes =
-    Internal.markWithAttributes
+    RichText.Internal.Definitions.markWithAttributes
 
 
 {-| A mark order is a way of sorting marks. In order to have a single way of representing a document,
@@ -87,18 +92,13 @@ type MarkOrder
     = MarkOrder Order
 
 
-markOrder : Dict String Int -> MarkOrder
-markOrder d =
-    MarkOrder d
-
-
 type alias Order =
     Dict String Int
 
 
 {-| Sorts a list of marks from the given `MarkOrder`
 
-    spec : Spec
+    spec : RichText.Config.Spec.Spec
     spec =
         emptySpec
             |> withMarkDefinitions
@@ -148,6 +148,7 @@ type ToggleAction
 toggle : ToggleAction -> MarkOrder -> Mark -> List Mark -> List Mark
 toggle toggleAction order mark_ marks =
     let
+        isMember : Bool
         isMember =
             List.any (\m -> name m == name mark_) marks
     in
@@ -169,9 +170,9 @@ toggle toggleAction order mark_ marks =
             marks
 
 
-{-| Derives the mark order from the order of the spec's mark definitions, e.g. `(markDefinitions spec)`.
+{-| Derives the mark order from the order of the spec's mark definitions, e.g. `(RichText.Config.Spec.markDefinitions spec)`.
 
-    spec : Spec
+    spec : RichText.Config.Spec.Spec
     spec =
         emptySpec
             |> withMarkDefinitions
@@ -185,18 +186,18 @@ toggle toggleAction order mark_ marks =
     --> returns a mark order that will sort marks in the following order:  link, bold, italic, and code.
 
 -}
-markOrderFromSpec : Spec -> MarkOrder
+markOrderFromSpec : RichText.Config.Spec.Spec -> MarkOrder
 markOrderFromSpec spec =
-    MarkOrder <|
-        Dict.fromList
-            (List.indexedMap
-                (\i m ->
-                    case m of
-                        MarkDefinition md ->
-                            ( md.name, i )
-                )
-                (markDefinitions spec)
+    spec
+        |> RichText.Config.Spec.markDefinitions
+        |> List.indexedMap
+            (\i m ->
+                case m of
+                    RichText.Internal.Definitions.MarkDefinition md ->
+                        ( md.name, i )
             )
+        |> Dict.fromList
+        |> MarkOrder
 
 
 {-| Predicate that returns true if the list of marks contains a mark with the given name
