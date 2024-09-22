@@ -7205,7 +7205,7 @@ var $author$project$Page$SpecExtension$initialCaptionedImage = A2(
 		_List_fromArray(
 			[
 				A2($author$project$RichText$Model$Attribute$StringAttribute, 'caption', 'The elm logo!'),
-				A2($author$project$RichText$Model$Attribute$StringAttribute, 'src', 'logo.svg')
+				A2($author$project$RichText$Model$Attribute$StringAttribute, 'src', 'public/logo.svg')
 			])),
 	$author$project$RichText$Model$Node$Leaf);
 var $author$project$Page$SpecExtension$loremParagraph = A2(
@@ -8584,8 +8584,8 @@ var $author$project$RichText$Annotation$toggle = F3(
 				func,
 				annotation,
 				$author$project$RichText$Model$Node$element(bn));
-			return $author$project$RichText$Node$Block(
-				A2($author$project$RichText$Model$Node$withElement, newParameters, bn));
+			var newBlockNode = A2($author$project$RichText$Model$Node$withElement, newParameters, bn);
+			return $author$project$RichText$Node$Block(newBlockNode);
 		} else {
 			var il = node.a;
 			return $author$project$RichText$Node$Inline(
@@ -9242,9 +9242,9 @@ var $author$project$RichText$Annotation$annotateSelection = F2(
 	});
 var $author$project$RichText$Node$map = F2(
 	function (func, node) {
-		var _v0 = func(node);
-		if (!_v0.$) {
-			var blockNode = _v0.a;
+		var applied = func(node);
+		if (!applied.$) {
+			var blockNode = applied.a;
 			return $author$project$RichText$Node$Block(
 				A2(
 					$author$project$RichText$Model$Node$withChildNodes,
@@ -9293,7 +9293,7 @@ var $author$project$RichText$Node$map = F2(
 					}(),
 					blockNode));
 		} else {
-			var inlineLeaf = _v0.a;
+			var inlineLeaf = applied.a;
 			return $author$project$RichText$Node$Inline(inlineLeaf);
 		}
 	});
@@ -9780,17 +9780,17 @@ var $author$project$RichText$Annotation$findPathsWithAnnotation = F2(
 			$author$project$RichText$Node$Block(node));
 	});
 var $author$project$RichText$Annotation$findNodeRangeFromSelectionAnnotations = function (node) {
-	var _v0 = A2($author$project$RichText$Annotation$findPathsWithAnnotation, $author$project$RichText$Annotation$selection, node);
-	if (!_v0.b) {
+	var paths = A2($author$project$RichText$Annotation$findPathsWithAnnotation, $author$project$RichText$Annotation$selection, node);
+	if (!paths.b) {
 		return $elm$core$Maybe$Nothing;
 	} else {
-		if (!_v0.b.b) {
-			var x = _v0.a;
+		if (!paths.b.b) {
+			var x = paths.a;
 			return $elm$core$Maybe$Just(
 				_Utils_Tuple2(x, x));
 		} else {
-			var end = _v0.a;
-			var _v1 = _v0.b;
+			var end = paths.a;
+			var _v1 = paths.b;
 			var start = _v1.a;
 			return $elm$core$Maybe$Just(
 				_Utils_Tuple2(start, end));
@@ -9947,6 +9947,10 @@ var $author$project$RichText$Commands$backspaceBlock = function (editorState) {
 			$author$project$RichText$Model$State$root(editorState))) {
 			return $elm$core$Result$Err('Cannot backspace a block element if we\'re not at the beginning of a text block');
 		} else {
+			var markedRoot = A2(
+				$author$project$RichText$Annotation$annotateSelection,
+				selection,
+				$author$project$RichText$Model$State$root(editorState));
 			var blockPath = A2(
 				$author$project$RichText$Node$findClosestBlockPath,
 				$author$project$RichText$Model$Selection$anchorNode(selection),
@@ -9965,19 +9969,16 @@ var $author$project$RichText$Commands$backspaceBlock = function (editorState) {
 					var bn = node.a;
 					var _v4 = $author$project$RichText$Model$Node$childNodes(bn);
 					if (_v4.$ === 2) {
-						var markedRoot = A3(
+						var _v5 = A3(
 							$author$project$RichText$Node$replaceWithFragment,
 							path,
 							$author$project$RichText$Node$BlockFragment($elm$core$Array$empty),
-							A2(
-								$author$project$RichText$Annotation$annotateSelection,
-								selection,
-								$author$project$RichText$Model$State$root(editorState)));
-						if (markedRoot.$ === 1) {
-							var s = markedRoot.a;
+							markedRoot);
+						if (_v5.$ === 1) {
+							var s = _v5.a;
 							return $elm$core$Result$Err(s);
 						} else {
-							var newRoot = markedRoot.a;
+							var newRoot = _v5.a;
 							return $elm$core$Result$Ok(
 								A2(
 									$author$project$RichText$Model$State$withSelection,
@@ -10488,19 +10489,20 @@ var $author$project$RichText$Commands$joinForward = function (editorState) {
 							'I could not join these two blocks at' + ($author$project$RichText$Model$Node$toString(p1) + (' ,' + $author$project$RichText$Model$Node$toString(p2))));
 					} else {
 						var newBlock = _v5.a;
-						var replaced = A3(
+						var removed = A2(
+							$author$project$RichText$Node$removeNodeAndEmptyParents,
+							p2,
+							$author$project$RichText$Model$State$root(editorState));
+						var _v6 = A3(
 							$author$project$RichText$Node$replace,
 							p1,
 							$author$project$RichText$Node$Block(newBlock),
-							A2(
-								$author$project$RichText$Node$removeNodeAndEmptyParents,
-								p2,
-								$author$project$RichText$Model$State$root(editorState)));
-						if (replaced.$ === 1) {
-							var e = replaced.a;
+							removed);
+						if (_v6.$ === 1) {
+							var e = _v6.a;
 							return $elm$core$Result$Err(e);
 						} else {
-							var b = replaced.a;
+							var b = _v6.a;
 							return $elm$core$Result$Ok(
 								A2($author$project$RichText$Model$State$withRoot, b, editorState));
 						}
@@ -10665,42 +10667,39 @@ var $elm$core$List$tail = function (list) {
 };
 var $author$project$RichText$Node$removeInRange = F3(
 	function (start, end, node) {
+		var startRest = A2(
+			$elm$core$Maybe$withDefault,
+			_List_Nil,
+			$elm$core$List$tail(start));
 		var startIndex = A2(
 			$elm$core$Maybe$withDefault,
 			0,
 			$elm$core$List$head(start));
-		var endIndex = function () {
-			var _v5 = $elm$core$List$head(end);
-			if (_v5.$ === 1) {
-				var _v6 = $author$project$RichText$Model$Node$childNodes(node);
-				switch (_v6.$) {
+		var endRest = A2(
+			$elm$core$Maybe$withDefault,
+			_List_Nil,
+			$elm$core$List$tail(end));
+		var endIndex = A2(
+			$elm$core$Maybe$withDefault,
+			function () {
+				var _v5 = $author$project$RichText$Model$Node$childNodes(node);
+				switch (_v5.$) {
 					case 0:
-						var a = _v6.a;
+						var a = _v5.a;
 						return $elm$core$Array$length(
 							$author$project$RichText$Model$Node$toBlockArray(a));
 					case 1:
-						var a = _v6.a;
+						var a = _v5.a;
 						return $elm$core$Array$length(
 							$author$project$RichText$Model$Node$toInlineArray(a));
 					default:
 						return 0;
 				}
-			} else {
-				var e = _v5.a;
-				return e;
-			}
-		}();
+			}(),
+			$elm$core$List$head(end));
 		if (_Utils_cmp(startIndex, endIndex) > 0) {
 			return node;
 		} else {
-			var startRest = A2(
-				$elm$core$Maybe$withDefault,
-				_List_Nil,
-				$elm$core$List$tail(start));
-			var endRest = A2(
-				$elm$core$Maybe$withDefault,
-				_List_Nil,
-				$elm$core$List$tail(end));
 			if (_Utils_eq(startIndex, endIndex)) {
 				var _v0 = $author$project$RichText$Model$Node$childNodes(node);
 				switch (_v0.$) {
@@ -10940,10 +10939,15 @@ var $author$project$RichText$Commands$removeRange = function (editorState) {
 					return $elm$core$Result$Err(s);
 				}
 			} else {
-				var _v3 = (!$author$project$RichText$Model$Selection$focusOffset(normalizedSelection)) ? $elm$core$Result$Ok(
-					_Utils_Tuple2(
-						$author$project$RichText$Model$State$root(editorState),
-						$elm$core$Maybe$Nothing)) : A4(
+				var focusTextBlock = A2(
+					$author$project$RichText$Node$findTextBlockNodeAncestor,
+					$author$project$RichText$Model$Selection$focusNode(normalizedSelection),
+					$author$project$RichText$Model$State$root(editorState));
+				var anchorTextBlock = A2(
+					$author$project$RichText$Node$findTextBlockNodeAncestor,
+					$author$project$RichText$Model$Selection$anchorNode(normalizedSelection),
+					$author$project$RichText$Model$State$root(editorState));
+				var _v3 = A4(
 					$author$project$RichText$Commands$removeNodeOrTextWithRange,
 					$author$project$RichText$Model$Selection$focusNode(normalizedSelection),
 					0,
@@ -10956,23 +10960,24 @@ var $author$project$RichText$Commands$removeRange = function (editorState) {
 				} else {
 					var _v4 = _v3.a;
 					var removedEnd = _v4.a;
-					var removedNodes = A4(
+					var removedNodes = A3(
+						$author$project$RichText$Node$removeInRange,
+						$author$project$RichText$Model$Node$increment(
+							$author$project$RichText$Model$Selection$anchorNode(normalizedSelection)),
+						$author$project$RichText$Model$Node$decrement(
+							$author$project$RichText$Model$Selection$focusNode(normalizedSelection)),
+						removedEnd);
+					var _v5 = A4(
 						$author$project$RichText$Commands$removeNodeOrTextWithRange,
 						$author$project$RichText$Model$Selection$anchorNode(normalizedSelection),
 						$author$project$RichText$Model$Selection$anchorOffset(normalizedSelection),
 						$elm$core$Maybe$Nothing,
-						A3(
-							$author$project$RichText$Node$removeInRange,
-							$author$project$RichText$Model$Node$increment(
-								$author$project$RichText$Model$Selection$anchorNode(normalizedSelection)),
-							$author$project$RichText$Model$Node$decrement(
-								$author$project$RichText$Model$Selection$focusNode(normalizedSelection)),
-							removedEnd));
-					if (removedNodes.$ === 1) {
-						var s = removedNodes.a;
+						removedNodes);
+					if (_v5.$ === 1) {
+						var s = _v5.a;
 						return $elm$core$Result$Err(s);
 					} else {
-						var _v6 = removedNodes.a;
+						var _v6 = _v5.a;
 						var removedStart = _v6.a;
 						var maybePath = _v6.b;
 						var newSelection = A2(
@@ -11021,19 +11026,11 @@ var $author$project$RichText$Commands$removeRange = function (editorState) {
 							$author$project$RichText$Model$State$withSelection,
 							defaultedSelection,
 							A2($author$project$RichText$Model$State$withRoot, removedStart, editorState));
-						var anchorTextBlock = A2(
-							$author$project$RichText$Node$findTextBlockNodeAncestor,
-							$author$project$RichText$Model$Selection$anchorNode(normalizedSelection),
-							$author$project$RichText$Model$State$root(editorState));
 						if (anchorTextBlock.$ === 1) {
 							return $elm$core$Result$Ok(newEditorState);
 						} else {
 							var _v8 = anchorTextBlock.a;
 							var ap = _v8.a;
-							var focusTextBlock = A2(
-								$author$project$RichText$Node$findTextBlockNodeAncestor,
-								$author$project$RichText$Model$Selection$focusNode(normalizedSelection),
-								$author$project$RichText$Model$State$root(editorState));
 							if (focusTextBlock.$ === 1) {
 								return $elm$core$Result$Ok(newEditorState);
 							} else {
@@ -11146,13 +11143,13 @@ var $author$project$RichText$Commands$selectBackward = function (state) {
 		return $elm$core$Result$Err('There is no selection to move forward');
 	} else {
 		var selection = _v0.a;
+		var root = $author$project$RichText$Model$State$root(state);
 		if (!A2(
 			$author$project$RichText$Node$selectionIsBeginningOfTextBlock,
 			selection,
 			$author$project$RichText$Model$State$root(state))) {
 			return $elm$core$Result$Err('I can only select a node backwards if this is the beginning of a text block');
 		} else {
-			var root = $author$project$RichText$Model$State$root(state);
 			var _v1 = A3(
 				$author$project$RichText$Node$findBackwardFromExclusive,
 				F2(
@@ -11371,11 +11368,10 @@ var $author$project$RichText$Commands$lengthsFromGroup = function (leaves) {
 var $elm$core$List$sum = function (numbers) {
 	return A3($elm$core$List$foldl, $elm$core$Basics$add, 0, numbers);
 };
-var $elm$core$String$concat = function (strings) {
-	return A2($elm$core$String$join, '', strings);
-};
 var $author$project$RichText$Commands$textFromGroup = function (leaves) {
-	return $elm$core$String$concat(
+	return A2(
+		$elm$core$String$join,
+		'',
 		A2(
 			$elm$core$List$map,
 			function (leaf) {
@@ -11410,17 +11406,17 @@ var $author$project$RichText$Commands$backspaceWord = function (editorState) {
 				var _v3 = $author$project$RichText$Model$Node$childNodes(n);
 				if (_v3.$ === 1) {
 					var arr = _v3.a;
+					var groupedLeaves = A2(
+						$elmcraft$core_extra$List$Extra$groupWhile,
+						$author$project$RichText$Commands$groupSameTypeInlineLeaf,
+						$elm$core$Array$toList(
+							$author$project$RichText$Model$Node$toInlineArray(arr)));
 					var _v4 = $elmcraft$core_extra$List$Extra$last(
 						$author$project$RichText$Model$Selection$anchorNode(selection));
 					if (_v4.$ === 1) {
 						return $elm$core$Result$Err('Somehow the anchor node is the root node');
 					} else {
 						var lastIndex = _v4.a;
-						var groupedLeaves = A2(
-							$elmcraft$core_extra$List$Extra$groupWhile,
-							$author$project$RichText$Commands$groupSameTypeInlineLeaf,
-							$elm$core$Array$toList(
-								$author$project$RichText$Model$Node$toInlineArray(arr)));
 						var _v5 = A3(
 							$elm$core$List$foldl,
 							F2(
@@ -11485,11 +11481,11 @@ var $author$project$RichText$Commands$backspaceWord = function (editorState) {
 								newOffset,
 								$author$project$RichText$Model$Selection$anchorNode(selection),
 								$author$project$RichText$Model$Selection$anchorOffset(selection));
-							return $author$project$RichText$Commands$removeRange(
-								A2(
-									$author$project$RichText$Model$State$withSelection,
-									$elm$core$Maybe$Just(newSelection),
-									editorState));
+							var newState = A2(
+								$author$project$RichText$Model$State$withSelection,
+								$elm$core$Maybe$Just(newSelection),
+								editorState);
+							return $author$project$RichText$Commands$removeRange(newState);
 						}
 					}
 				} else {
@@ -11746,13 +11742,13 @@ var $author$project$RichText$Commands$selectForward = function (state) {
 		return $elm$core$Result$Err('There is no selection to move forward');
 	} else {
 		var selection = _v0.a;
+		var root = $author$project$RichText$Model$State$root(state);
 		if (!A2(
 			$author$project$RichText$Node$selectionIsEndOfTextBlock,
 			selection,
 			$author$project$RichText$Model$State$root(state))) {
 			return $elm$core$Result$Err('I can only select a node forward if this is the end of a text block');
 		} else {
-			var root = $author$project$RichText$Model$State$root(state);
 			var _v1 = A3(
 				$author$project$RichText$Node$findForwardFromExclusive,
 				F2(
@@ -11919,17 +11915,17 @@ var $author$project$RichText$Commands$deleteWord = function (editorState) {
 				var _v3 = $author$project$RichText$Model$Node$childNodes(n);
 				if (_v3.$ === 1) {
 					var arr = _v3.a;
+					var groupedLeaves = A2(
+						$elmcraft$core_extra$List$Extra$groupWhile,
+						$author$project$RichText$Commands$groupSameTypeInlineLeaf,
+						$elm$core$Array$toList(
+							$author$project$RichText$Model$Node$toInlineArray(arr)));
 					var _v4 = $elmcraft$core_extra$List$Extra$last(
 						$author$project$RichText$Model$Selection$anchorNode(selection));
 					if (_v4.$ === 1) {
 						return $elm$core$Result$Err('Somehow the anchor node is the root node');
 					} else {
 						var lastIndex = _v4.a;
-						var groupedLeaves = A2(
-							$elmcraft$core_extra$List$Extra$groupWhile,
-							$author$project$RichText$Commands$groupSameTypeInlineLeaf,
-							$elm$core$Array$toList(
-								$author$project$RichText$Model$Node$toInlineArray(arr)));
 						var _v5 = A3(
 							$elm$core$List$foldl,
 							F2(
@@ -11994,11 +11990,11 @@ var $author$project$RichText$Commands$deleteWord = function (editorState) {
 								newOffset,
 								$author$project$RichText$Model$Selection$anchorNode(selection),
 								$author$project$RichText$Model$Selection$anchorOffset(selection));
-							return $author$project$RichText$Commands$removeRange(
-								A2(
-									$author$project$RichText$Model$State$withSelection,
-									$elm$core$Maybe$Just(newSelection),
-									editorState));
+							var newState = A2(
+								$author$project$RichText$Model$State$withSelection,
+								$elm$core$Maybe$Just(newSelection),
+								editorState);
+							return $author$project$RichText$Commands$removeRange(newState);
 						}
 					}
 				} else {
@@ -12008,16 +12004,10 @@ var $author$project$RichText$Commands$deleteWord = function (editorState) {
 		}
 	}
 };
-var $author$project$RichText$Config$Command$emptyCommandMap = {
-	I: function (_v0) {
-		return _List_Nil;
-	},
-	J: function (_v1) {
-		return _List_Nil;
-	},
-	M: $elm$core$Dict$empty,
-	x: $elm$core$Dict$empty
+var $author$project$RichText$Config$Command$emptyFunction = function (_v0) {
+	return _List_Nil;
 };
+var $author$project$RichText$Config$Command$emptyCommandMap = {I: $author$project$RichText$Config$Command$emptyFunction, J: $author$project$RichText$Config$Command$emptyFunction, M: $elm$core$Dict$empty, x: $elm$core$Dict$empty};
 var $author$project$RichText$Config$Keys$enter = 'Enter';
 var $author$project$RichText$Config$Command$InputEventType = function (a) {
 	return {$: 1, a: a};
@@ -12288,9 +12278,9 @@ var $author$project$RichText$Node$isEmptyTextBlock = function (node) {
 };
 var $author$project$RichText$Node$indexedMapRec = F3(
 	function (path, func, node) {
-		var _v0 = A2(func, path, node);
-		if (!_v0.$) {
-			var blockNode = _v0.a;
+		var applied = A2(func, path, node);
+		if (!applied.$) {
+			var blockNode = applied.a;
 			var cn = function () {
 				var _v1 = $author$project$RichText$Model$Node$childNodes(blockNode);
 				switch (_v1.$) {
@@ -12347,7 +12337,7 @@ var $author$project$RichText$Node$indexedMapRec = F3(
 			return $author$project$RichText$Node$Block(
 				A2($author$project$RichText$Model$Node$withChildNodes, cn, blockNode));
 		} else {
-			var inlineLeaf = _v0.a;
+			var inlineLeaf = applied.a;
 			return $author$project$RichText$Node$Inline(inlineLeaf);
 		}
 	});
@@ -12410,30 +12400,31 @@ var $author$project$RichText$Node$concatMap = F2(
 					return $author$project$RichText$Model$Node$Leaf;
 				case 0:
 					var a = _v0.a;
+					var c = A2(
+						$elm$core$List$concatMap,
+						function (x) {
+							if (!x.$) {
+								var v = x.a;
+								return _List_fromArray(
+									[v]);
+							} else {
+								return _List_Nil;
+							}
+						},
+						A2(
+							$elm$core$List$concatMap,
+							func,
+							A2(
+								$elm$core$List$map,
+								$author$project$RichText$Node$Block,
+								$elm$core$Array$toList(
+									$author$project$RichText$Model$Node$toBlockArray(a)))));
 					return $author$project$RichText$Model$Node$blockChildren(
 						$elm$core$Array$fromList(
 							A2(
 								$elm$core$List$map,
 								$author$project$RichText$Node$concatMap(func),
-								A2(
-									$elm$core$List$concatMap,
-									function (x) {
-										if (!x.$) {
-											var v = x.a;
-											return _List_fromArray(
-												[v]);
-										} else {
-											return _List_Nil;
-										}
-									},
-									A2(
-										$elm$core$List$concatMap,
-										func,
-										A2(
-											$elm$core$List$map,
-											$author$project$RichText$Node$Block,
-											$elm$core$Array$toList(
-												$author$project$RichText$Model$Node$toBlockArray(a))))))));
+								c)));
 				default:
 					var a = _v0.a;
 					return $author$project$RichText$Model$Node$inlineChildren(
@@ -12478,6 +12469,22 @@ var $author$project$RichText$Annotation$liftConcatMapFunc = function (node) {
 					[node]);
 			default:
 				var a = _v1.a;
+				var groupedBlockNodes = A2(
+					$elmcraft$core_extra$List$Extra$groupWhile,
+					F2(
+						function (n1, n2) {
+							return _Utils_eq(
+								A2(
+									$elm$core$Set$member,
+									$author$project$RichText$Annotation$lift,
+									$author$project$RichText$Annotation$annotationsFromBlockNode(n1)),
+								A2(
+									$elm$core$Set$member,
+									$author$project$RichText$Annotation$lift,
+									$author$project$RichText$Annotation$annotationsFromBlockNode(n2)));
+						}),
+					$elm$core$Array$toList(
+						$author$project$RichText$Model$Node$toBlockArray(a)));
 				return A2(
 					$elm$core$List$map,
 					$author$project$RichText$Node$Block,
@@ -12499,22 +12506,7 @@ var $author$project$RichText$Annotation$liftConcatMapFunc = function (node) {
 									bn)
 								]);
 						},
-						A2(
-							$elmcraft$core_extra$List$Extra$groupWhile,
-							F2(
-								function (n1, n2) {
-									return _Utils_eq(
-										A2(
-											$elm$core$Set$member,
-											$author$project$RichText$Annotation$lift,
-											$author$project$RichText$Annotation$annotationsFromBlockNode(n1)),
-										A2(
-											$elm$core$Set$member,
-											$author$project$RichText$Annotation$lift,
-											$author$project$RichText$Annotation$annotationsFromBlockNode(n2)));
-								}),
-							$elm$core$Array$toList(
-								$author$project$RichText$Model$Node$toBlockArray(a)))));
+						groupedBlockNodes));
 		}
 	} else {
 		return _List_fromArray(
@@ -12898,15 +12890,15 @@ var $author$project$RichText$Commands$splitBlock = F2(
 	});
 var $author$project$RichText$Commands$splitTextBlock = $author$project$RichText$Commands$splitBlock($author$project$RichText$Node$findTextBlockNodeAncestor);
 var $author$project$RichText$Config$Command$withDefaultInputEventCommand = F2(
-	function (func, _v0) {
-		var m = _v0;
+	function (func, map) {
+		var m = map;
 		return _Utils_update(
 			m,
 			{I: func});
 	});
 var $author$project$RichText$Config$Command$withDefaultKeyCommand = F2(
-	function (func, _v0) {
-		var m = _v0;
+	function (func, map) {
+		var m = map;
 		return _Utils_update(
 			m,
 			{J: func});
@@ -14327,6 +14319,13 @@ var $author$project$RichText$Commands$toggleMarkSingleInlineNode = F4(
 						return $elm$core$Result$Err('Cannot toggle a block node');
 					} else {
 						var il = node.a;
+						var path = (!$author$project$RichText$Model$Selection$anchorOffset(normalizedSelection)) ? $author$project$RichText$Model$Selection$anchorNode(normalizedSelection) : $author$project$RichText$Model$Node$increment(
+							$author$project$RichText$Model$Selection$anchorNode(normalizedSelection));
+						var newSelection = A3(
+							$author$project$RichText$Model$Selection$singleNodeRange,
+							path,
+							0,
+							$author$project$RichText$Model$Selection$focusOffset(normalizedSelection) - $author$project$RichText$Model$Selection$anchorOffset(normalizedSelection));
 						var newMarks = A4(
 							$author$project$RichText$Model$Mark$toggle,
 							action,
@@ -14370,25 +14369,21 @@ var $author$project$RichText$Commands$toggleMarkSingleInlineNode = F4(
 												$author$project$RichText$Model$Selection$focusOffset(normalizedSelection),
 												$author$project$RichText$Model$Text$text(leaf)),
 											A2($author$project$RichText$Model$Text$withMarks, newMarks, leaf)));
-									if (!$author$project$RichText$Model$Selection$anchorOffset(normalizedSelection)) {
-										return _List_fromArray(
-											[newNode, right]);
-									} else {
-										var left = $author$project$RichText$Model$Node$Text(
+									var left = $author$project$RichText$Model$Node$Text(
+										A2(
+											$author$project$RichText$Model$Text$withText,
 											A2(
-												$author$project$RichText$Model$Text$withText,
-												A2(
-													$elm$core$String$left,
-													$author$project$RichText$Model$Selection$anchorOffset(normalizedSelection),
-													$author$project$RichText$Model$Text$text(leaf)),
-												leaf));
-										return _Utils_eq(
-											$elm$core$String$length(
+												$elm$core$String$left,
+												$author$project$RichText$Model$Selection$anchorOffset(normalizedSelection),
 												$author$project$RichText$Model$Text$text(leaf)),
-											$author$project$RichText$Model$Selection$focusOffset(normalizedSelection)) ? _List_fromArray(
-											[left, newNode]) : _List_fromArray(
-											[left, newNode, right]);
-									}
+											leaf));
+									return (!$author$project$RichText$Model$Selection$anchorOffset(normalizedSelection)) ? _List_fromArray(
+										[newNode, right]) : (_Utils_eq(
+										$elm$core$String$length(
+											$author$project$RichText$Model$Text$text(leaf)),
+										$author$project$RichText$Model$Selection$focusOffset(normalizedSelection)) ? _List_fromArray(
+										[left, newNode]) : _List_fromArray(
+										[left, newNode, right]));
 								}
 							}
 						}();
@@ -14403,13 +14398,6 @@ var $author$project$RichText$Commands$toggleMarkSingleInlineNode = F4(
 							return $elm$core$Result$Err(s);
 						} else {
 							var newRoot = _v3.a;
-							var path = (!$author$project$RichText$Model$Selection$anchorOffset(normalizedSelection)) ? $author$project$RichText$Model$Selection$anchorNode(normalizedSelection) : $author$project$RichText$Model$Node$increment(
-								$author$project$RichText$Model$Selection$anchorNode(normalizedSelection));
-							var newSelection = A3(
-								$author$project$RichText$Model$Selection$singleNodeRange,
-								path,
-								0,
-								$author$project$RichText$Model$Selection$focusOffset(normalizedSelection) - $author$project$RichText$Model$Selection$anchorOffset(normalizedSelection));
 							return $elm$core$Result$Ok(
 								A2(
 									$author$project$RichText$Model$State$withRoot,
@@ -14434,7 +14422,7 @@ var $author$project$RichText$Commands$toggleMarkFull = F4(
 			if (_Utils_eq(
 				$author$project$RichText$Model$Selection$focusNode(selection),
 				$author$project$RichText$Model$Selection$anchorNode(selection))) {
-				return A4($author$project$RichText$Commands$toggleMarkSingleInlineNode, markOrder, mark, action, editorState);
+				return A4($author$project$RichText$Commands$toggleMarkSingleInlineNode, markOrder, mark, 2, editorState);
 			} else {
 				var normalizedSelection = $author$project$RichText$Model$Selection$normalize(selection);
 				var toggleAction = (action !== 2) ? action : (A4(
@@ -14665,8 +14653,8 @@ var $author$project$RichText$Editor$Config = $elm$core$Basics$identity;
 var $author$project$RichText$Editor$config = function (cfg) {
 	return cfg;
 };
-var $author$project$RichText$Config$Decorations$elementDecorations = function (_v0) {
-	var c = _v0;
+var $author$project$RichText$Config$Decorations$elementDecorations = function (d) {
+	var c = d;
 	return c.aD;
 };
 var $author$project$RichText$Config$ElementDefinition$name = function (definition_) {
@@ -14675,8 +14663,8 @@ var $author$project$RichText$Config$ElementDefinition$name = function (definitio
 };
 var $author$project$RichText$Config$Decorations$Decorations = $elm$core$Basics$identity;
 var $author$project$RichText$Config$Decorations$withElementDecorations = F2(
-	function (elements, _v0) {
-		var c = _v0;
+	function (elements, d) {
+		var c = d;
 		return _Utils_update(
 			c,
 			{aD: elements});
@@ -14716,7 +14704,9 @@ var $author$project$RichText$Definitions$htmlToHorizontalRule = F2(
 				_Utils_Tuple2(
 					A2(
 						$author$project$RichText$Model$Element$withAnnotations,
-						$elm$core$Set$singleton($author$project$RichText$Annotation$selectable),
+						$elm$core$Set$fromList(
+							_List_fromArray(
+								[$author$project$RichText$Annotation$selectable])),
 						A2($author$project$RichText$Model$Element$element, def, _List_Nil)),
 					$elm$core$Array$empty)) : $elm$core$Maybe$Nothing;
 		} else {
@@ -14815,9 +14805,10 @@ var $author$project$RichText$Definitions$imageToHtmlNode = F2(
 	});
 var $author$project$RichText$Definitions$image = $author$project$RichText$Config$ElementDefinition$elementDefinition(
 	{ct: $author$project$RichText$Config$ElementDefinition$inlineLeaf, by: $author$project$RichText$Definitions$htmlNodeToImage, cE: 'inline', bM: 'image', c0: true, cb: $author$project$RichText$Definitions$imageToHtmlNode});
-var $author$project$RichText$Internal$Editor$SelectElement = function (a) {
-	return {$: 1, a: a};
-};
+var $author$project$RichText$Internal$Editor$SelectionEvent = F2(
+	function (a, b) {
+		return {$: 0, a: a, b: b};
+	});
 var $elm$json$Json$Encode$string = _Json_wrap;
 var $elm$html$Html$Attributes$stringProperty = F2(
 	function (key, string) {
@@ -14858,12 +14849,16 @@ var $author$project$RichText$Config$Decorations$selectableDecoration = F4(
 				[
 					$elm$html$Html$Events$onClick(
 					tagger(
-						$author$project$RichText$Internal$Editor$SelectElement(editorNodePath)))
+						A2(
+							$author$project$RichText$Internal$Editor$SelectionEvent,
+							$elm$core$Maybe$Just(
+								A2($author$project$RichText$Model$Selection$caret, editorNodePath, 0)),
+							false)))
 				]));
 	});
 var $author$project$RichText$Config$Decorations$withTopLevelAttributes = F2(
-	function (topLevelAttributes_, _v0) {
-		var c = _v0;
+	function (topLevelAttributes_, d) {
+		var c = d;
 		return _Utils_update(
 			c,
 			{aQ: topLevelAttributes_});
@@ -15148,12 +15143,12 @@ var $author$project$RichText$Internal$History$contents = function (history) {
 var $author$project$RichText$Internal$History$fromContents = function (c) {
 	return c;
 };
-var $author$project$RichText$Internal$Editor$history = function (_v0) {
-	var c = _v0;
+var $author$project$RichText$Internal$Editor$history = function (e) {
+	var c = e;
 	return c.aH;
 };
-var $author$project$RichText$Internal$Editor$incrementChangeCount = function (_v0) {
-	var c = _v0;
+var $author$project$RichText$Internal$Editor$incrementChangeCount = function (e) {
+	var c = e;
 	return _Utils_update(
 		c,
 		{ai: c.ai + 1});
@@ -15267,20 +15262,20 @@ var $folkertdev$elm_deque$BoundedDeque$pushFront = F2(
 				newMaxSize);
 		}
 	});
-var $author$project$RichText$Internal$Editor$state = function (_v0) {
-	var c = _v0;
+var $author$project$RichText$Internal$Editor$state = function (e) {
+	var c = e;
 	return c.aO;
 };
 var $author$project$RichText$Internal$Editor$withHistory = F2(
-	function (h, _v0) {
-		var c = _v0;
+	function (h, e) {
+		var c = e;
 		return _Utils_update(
 			c,
 			{aH: h});
 	});
 var $author$project$RichText$Internal$Editor$withState = F2(
-	function (s, _v0) {
-		var c = _v0;
+	function (s, e) {
+		var c = e;
 		return _Utils_update(
 			c,
 			{aO: s});
@@ -15411,8 +15406,8 @@ var $author$project$RichText$Internal$Editor$applyInternalCommand = F2(
 			return $author$project$RichText$Internal$Editor$handleRedo(editor_);
 		}
 	});
-var $author$project$RichText$Internal$Editor$forceReselection = function (_v0) {
-	var c = _v0;
+var $author$project$RichText$Internal$Editor$forceReselection = function (e) {
+	var c = e;
 	return _Utils_update(
 		c,
 		{ap: c.ap + 1});
@@ -15887,7 +15882,9 @@ var $author$project$RichText$State$validateAllowedMarks = F2(
 				$elm$core$Set$fromList(
 					A2(
 						$elm$core$List$map,
-						$author$project$RichText$Model$Mark$name,
+						function (m) {
+							return $author$project$RichText$Model$Mark$name(m);
+						},
 						$author$project$RichText$Model$Node$marks(leaf))),
 				allowed);
 			return $elm$core$Set$isEmpty(notAllowed) ? _List_Nil : _List_fromArray(
@@ -16885,19 +16882,19 @@ var $author$project$Editor$handleWrapInList = F3(
 						model.a))
 			});
 	});
-var $author$project$RichText$Editor$spec = function (_v0) {
-	var c = _v0;
+var $author$project$RichText$Editor$spec = function (cfg) {
+	var c = cfg;
 	return c.c4;
 };
-var $author$project$RichText$Internal$Editor$forceRerender = function (_v0) {
-	var c = _v0;
+var $author$project$RichText$Internal$Editor$forceRerender = function (e) {
+	var c = e;
 	return _Utils_update(
 		c,
 		{an: c.an + 1});
 };
 var $author$project$RichText$Config$Command$namedCommandListFromInputEvent = F2(
-	function (event, _v0) {
-		var contents = _v0;
+	function (event, map) {
+		var contents = map;
 		return A2(
 			$elm$core$Maybe$withDefault,
 			contents.I(event),
@@ -16908,8 +16905,8 @@ var $author$project$RichText$Internal$BeforeInput$handleInputEvent = F4(
 		var namedCommandList = A2($author$project$RichText$Config$Command$namedCommandListFromInputEvent, inputEvent, commandMap);
 		return A3($author$project$RichText$Internal$Editor$applyNamedCommandList, namedCommandList, spec, editor);
 	});
-var $author$project$RichText$Internal$Editor$isComposing = function (_v0) {
-	var c = _v0;
+var $author$project$RichText$Internal$Editor$isComposing = function (e) {
+	var c = e;
 	return c.bI;
 };
 var $author$project$RichText$Internal$BeforeInput$handleBeforeInput = F4(
@@ -16926,20 +16923,20 @@ var $author$project$RichText$Internal$BeforeInput$handleBeforeInput = F4(
 			}
 		}
 	});
-var $author$project$RichText$Internal$Editor$bufferedEditorState = function (_v0) {
-	var c = _v0;
+var $author$project$RichText$Internal$Editor$bufferedEditorState = function (e) {
+	var c = e;
 	return c.ay;
 };
 var $author$project$RichText$Internal$Editor$withBufferedEditorState = F2(
-	function (s, _v0) {
-		var c = _v0;
+	function (s, e) {
+		var c = e;
 		return _Utils_update(
 			c,
 			{ay: s});
 	});
 var $author$project$RichText$Internal$Editor$withComposing = F2(
-	function (composing, _v0) {
-		var c = _v0;
+	function (composing, e) {
+		var c = e;
 		return _Utils_update(
 			c,
 			{bI: composing});
@@ -16953,13 +16950,11 @@ var $author$project$RichText$Editor$applyForceFunctionOnEditor = F2(
 					return editor_;
 				} else {
 					var bufferedEditorState = _v0.a;
+					var newEditor = A3($author$project$RichText$Internal$Editor$updateEditorState, 'buffered', bufferedEditorState, editor_);
 					return A2(
 						$author$project$RichText$Internal$Editor$withComposing,
 						false,
-						A2(
-							$author$project$RichText$Internal$Editor$withBufferedEditorState,
-							$elm$core$Maybe$Nothing,
-							A3($author$project$RichText$Internal$Editor$updateEditorState, 'buffered', bufferedEditorState, editor_)));
+						A2($author$project$RichText$Internal$Editor$withBufferedEditorState, $elm$core$Maybe$Nothing, newEditor));
 				}
 			}());
 	});
@@ -16994,8 +16989,8 @@ var $author$project$RichText$Editor$handleCut = F2(
 		}
 	});
 var $author$project$RichText$Internal$Editor$withShortKey = F2(
-	function (key, _v0) {
-		var c = _v0;
+	function (key, e) {
+		var c = e;
 		return _Utils_update(
 			c,
 			{c1: key});
@@ -17021,34 +17016,34 @@ var $author$project$RichText$Config$Command$addShiftKey = F2(
 	function (keyboardEvent, keys) {
 		return keyboardEvent.b4 ? A2($elm$core$List$cons, $author$project$RichText$Config$Keys$shift, keys) : keys;
 	});
-var $author$project$RichText$Config$Command$keyboardEventToDictKey = F2(
-	function (shortKey, keyboardEvent) {
-		return $elm$core$List$sort(
+var $author$project$RichText$Config$Command$keyboardEventToDictKey = function (keyboardEvent) {
+	return $elm$core$List$sort(
+		A2(
+			$author$project$RichText$Config$Command$addAltKey,
+			keyboardEvent,
 			A2(
-				$elm$core$List$map,
-				function (v) {
-					return _Utils_eq(v, shortKey) ? $author$project$RichText$Config$Keys$short : v;
-				},
+				$author$project$RichText$Config$Command$addCtrlKey,
+				keyboardEvent,
 				A2(
-					$author$project$RichText$Config$Command$addAltKey,
+					$author$project$RichText$Config$Command$addMetaKey,
 					keyboardEvent,
 					A2(
-						$author$project$RichText$Config$Command$addCtrlKey,
+						$author$project$RichText$Config$Command$addShiftKey,
 						keyboardEvent,
-						A2(
-							$author$project$RichText$Config$Command$addMetaKey,
-							keyboardEvent,
-							A2(
-								$author$project$RichText$Config$Command$addShiftKey,
-								keyboardEvent,
-								_List_fromArray(
-									[keyboardEvent.bJ])))))));
-	});
+						_List_fromArray(
+							[keyboardEvent.bJ]))))));
+};
 var $author$project$RichText$Config$Command$namedCommandListFromKeyboardEvent = F3(
 	function (shortKey, event, map) {
 		var contents = map;
-		var mapping = A2($author$project$RichText$Config$Command$keyboardEventToDictKey, shortKey, event);
-		var _v1 = A2($elm$core$Dict$get, mapping, contents.x);
+		var mapping = $author$project$RichText$Config$Command$keyboardEventToDictKey(event);
+		var shortKeyReplaced = A2(
+			$elm$core$List$map,
+			function (v) {
+				return _Utils_eq(v, shortKey) ? $author$project$RichText$Config$Keys$short : v;
+			},
+			mapping);
+		var _v1 = A2($elm$core$Dict$get, shortKeyReplaced, contents.x);
 		if (_v1.$ === 1) {
 			var _v2 = A2($elm$core$Dict$get, mapping, contents.x);
 			if (_v2.$ === 1) {
@@ -17068,8 +17063,8 @@ var $author$project$RichText$Config$Command$namedCommandListFromKeyboardEvent = 
 			}
 		}
 	});
-var $author$project$RichText$Internal$Editor$shortKey = function (_v0) {
-	var c = _v0;
+var $author$project$RichText$Internal$Editor$shortKey = function (e) {
+	var c = e;
 	return c.c1;
 };
 var $author$project$RichText$Internal$KeyDown$handleKeyDownEvent = F4(
@@ -17311,17 +17306,15 @@ var $author$project$RichText$Internal$Spec$htmlNodeToEditorFragment = F3(
 									]))));
 				} else {
 					var childArr = A2(
-						$author$project$RichText$Internal$Spec$arrayToChildNodes,
-						contentType,
-						A2(
-							$elm$core$Array$map,
-							A2($author$project$RichText$Internal$Spec$htmlNodeToEditorFragment, spec, _List_Nil),
-							children));
-					if (childArr.$ === 1) {
-						var s = childArr.a;
+						$elm$core$Array$map,
+						A2($author$project$RichText$Internal$Spec$htmlNodeToEditorFragment, spec, _List_Nil),
+						children);
+					var _v4 = A2($author$project$RichText$Internal$Spec$arrayToChildNodes, contentType, childArr);
+					if (_v4.$ === 1) {
+						var s = _v4.a;
 						return $elm$core$Result$Err(s);
 					} else {
-						var childNodes = childArr.a;
+						var childNodes = _v4.a;
 						return $elm$core$Result$Ok(
 							$author$project$RichText$Node$BlockFragment(
 								$elm$core$Array$fromList(
@@ -17345,11 +17338,11 @@ var $author$project$RichText$Internal$Spec$htmlNodeToEditorFragment = F3(
 						$author$project$RichText$Model$Mark$markOrderFromSpec(spec),
 						mark,
 						marks);
-					return $author$project$RichText$Internal$Spec$arrayToFragment(
-						A2(
-							$elm$core$Array$map,
-							A2($author$project$RichText$Internal$Spec$htmlNodeToEditorFragment, spec, newMarks),
-							children));
+					var newChildren = A2(
+						$elm$core$Array$map,
+						A2($author$project$RichText$Internal$Spec$htmlNodeToEditorFragment, spec, newMarks),
+						children);
+					return $author$project$RichText$Internal$Spec$arrayToFragment(newChildren);
 				}
 			}
 		}
@@ -20832,9 +20825,7 @@ var $author$project$RichText$Internal$Spec$htmlToElementArray = F2(
 					'',
 					A2(
 						$elm$core$List$map,
-						function (err) {
-							return '\n' + err;
-						},
+						$elm$core$Basics$append('\n'),
 						errList))) : $elm$core$Result$Ok(
 				$author$project$RichText$Internal$Spec$reduceEditorFragmentArray(newArray));
 		}
@@ -21017,6 +21008,15 @@ var $author$project$RichText$Internal$Paste$pasteInlineArray = F2(
 									var inlineNode = _v5.a;
 									if (inlineNode.$ === 1) {
 										var tl = inlineNode.a;
+										var newSelection = A2(
+											$author$project$RichText$Model$Selection$caret,
+											_Utils_ap(
+												path,
+												_List_fromArray(
+													[
+														(index + $elm$core$Array$length(inlineFragment)) + 1
+													])),
+											0);
 										var _v7 = A2(
 											$author$project$RichText$Node$splitTextLeaf,
 											$author$project$RichText$Model$Selection$anchorOffset(selection),
@@ -21043,15 +21043,6 @@ var $author$project$RichText$Internal$Paste$pasteInlineArray = F2(
 											return $elm$core$Result$Err(s);
 										} else {
 											var newRoot = replaceResult.a;
-											var newSelection = A2(
-												$author$project$RichText$Model$Selection$caret,
-												_Utils_ap(
-													path,
-													_List_fromArray(
-														[
-															(index + $elm$core$Array$length(inlineFragment)) + 1
-														])),
-												0);
 											return $elm$core$Result$Ok(
 												A2(
 													$author$project$RichText$Model$State$withRoot,
@@ -21067,20 +21058,20 @@ var $author$project$RichText$Internal$Paste$pasteInlineArray = F2(
 											$author$project$RichText$Model$Selection$anchorNode(selection),
 											$author$project$RichText$Node$InlineFragment(inlineFragment),
 											$author$project$RichText$Model$State$root(editorState));
+										var newSelection = A2(
+											$author$project$RichText$Model$Selection$caret,
+											_Utils_ap(
+												path,
+												_List_fromArray(
+													[
+														(index + $elm$core$Array$length(inlineFragment)) - 1
+													])),
+											0);
 										if (replaceResult.$ === 1) {
 											var s = replaceResult.a;
 											return $elm$core$Result$Err(s);
 										} else {
 											var newRoot = replaceResult.a;
-											var newSelection = A2(
-												$author$project$RichText$Model$Selection$caret,
-												_Utils_ap(
-													path,
-													_List_fromArray(
-														[
-															(index + $elm$core$Array$length(inlineFragment)) - 1
-														])),
-												0);
 											return $elm$core$Result$Ok(
 												A2(
 													$author$project$RichText$Model$State$withRoot,
@@ -21151,6 +21142,10 @@ var $author$project$RichText$Internal$Paste$pasteText = F2(
 						$author$project$RichText$Internal$Paste$pasteText(text),
 						$author$project$RichText$Commands$removeRange(editorState));
 				} else {
+					var lines = A2(
+						$elm$core$String$split,
+						'\n',
+						A3($elm$core$String$replace, $author$project$RichText$Internal$Constants$zeroWidthSpace, '', text));
 					var _v1 = A2(
 						$author$project$RichText$Node$findTextBlockNodeAncestor,
 						$author$project$RichText$Model$Selection$anchorNode(selection),
@@ -21160,10 +21155,6 @@ var $author$project$RichText$Internal$Paste$pasteText = F2(
 					} else {
 						var _v2 = _v1.a;
 						var tbNode = _v2.b;
-						var lines = A2(
-							$elm$core$String$split,
-							'\n',
-							A3($elm$core$String$replace, $author$project$RichText$Internal$Constants$zeroWidthSpace, '', text));
 						var newLines = A2(
 							$elm$core$List$map,
 							function (line) {
@@ -21203,31 +21194,6 @@ var $author$project$RichText$Internal$Paste$handlePaste = F3(
 			$elm$core$Result$withDefault,
 			editor,
 			A3($author$project$RichText$Internal$Editor$applyNamedCommandList, commandArray, spec, editor));
-	});
-var $author$project$RichText$Editor$selectElement = F3(
-	function (path, _v0, editor_) {
-		var editorState = $author$project$RichText$Editor$state(editor_);
-		var selection = function () {
-			var _v1 = A2(
-				$author$project$RichText$Node$next,
-				path,
-				$author$project$RichText$Model$State$root(editorState));
-			if (!_v1.$) {
-				var _v2 = _v1.a;
-				var b = _v2.a;
-				return A4($author$project$RichText$Model$Selection$range, b, 0, path, 0);
-			} else {
-				return A2($author$project$RichText$Model$Selection$caret, path, 0);
-			}
-		}();
-		return $author$project$RichText$Internal$Editor$forceReselection(
-			A2(
-				$author$project$RichText$Internal$Editor$withState,
-				A2(
-					$author$project$RichText$Model$State$withSelection,
-					$elm$core$Maybe$Just(selection),
-					editorState),
-				editor_));
 	});
 var $author$project$RichText$Internal$DomNode$DomNode = $elm$core$Basics$identity;
 var $author$project$RichText$Internal$DomNode$DomNodeContents = F4(
@@ -21474,6 +21440,7 @@ var $author$project$RichText$Internal$DomNode$findTextChangesRec = F3(
 		if (!htmlNode.$) {
 			var tag = htmlNode.a;
 			var children = htmlNode.c;
+			var domChildNodes = A2($elm$core$Maybe$withDefault, $elm$core$Array$empty, domNodeContents.cp);
 			if (!_Utils_eq(domNodeContents.a1, $author$project$RichText$Internal$DomNode$domElementNodeType)) {
 				return $elm$core$Result$Err('Dom node is a text node, but I was expecting an element node');
 			} else {
@@ -21484,7 +21451,6 @@ var $author$project$RichText$Internal$DomNode$findTextChangesRec = F3(
 					return $elm$core$Result$Err(
 						'Dom node\'s tag was ' + (A2($elm$core$Maybe$withDefault, '', domNodeContents.bd) + (', but I was expecting ' + tag)));
 				} else {
-					var domChildNodes = A2($elm$core$Maybe$withDefault, $elm$core$Array$empty, domNodeContents.cp);
 					if (!_Utils_eq(
 						$elm$core$Array$length(domChildNodes),
 						$elm$core$Array$length(children))) {
@@ -21571,17 +21537,16 @@ var $author$project$RichText$Internal$DomNode$extractRootEditorBlockNode = funct
 		return A2($elm$core$Array$get, 0, childNodes);
 	}
 };
-var $author$project$RichText$Internal$Editor$forceCompleteRerender = function (_v0) {
-	var c = _v0;
+var $author$project$RichText$Internal$Editor$forceCompleteRerender = function (e) {
+	var c = e;
 	return _Utils_update(
 		c,
 		{aj: c.aj + 1});
 };
 var $author$project$RichText$Editor$needCompleteRerender = function (root) {
 	var v = root;
-	var cnodesLength = $elm$core$Array$length(
-		A2($elm$core$Maybe$withDefault, $elm$core$Array$empty, v.cp));
-	return cnodesLength !== 1;
+	var cnodes = A2($elm$core$Maybe$withDefault, $elm$core$Array$empty, v.cp);
+	return $elm$core$Array$length(cnodes) !== 1;
 };
 var $elm$core$Maybe$andThen = F2(
 	function (callback, maybeValue) {
@@ -21829,10 +21794,10 @@ var $author$project$RichText$Editor$applyTextChange = F2(
 					}
 				case 1:
 					var array = _v2.a;
+					var a = $author$project$RichText$Model$Node$toInlineArray(array);
 					if (!$elm$core$List$isEmpty(xs)) {
 						return $elm$core$Maybe$Nothing;
 					} else {
-						var a = $author$project$RichText$Model$Node$toInlineArray(array);
 						var _v5 = A2($elm$core$Array$get, x, a);
 						if (_v5.$ === 1) {
 							return $elm$core$Maybe$Nothing;
@@ -21924,6 +21889,7 @@ var $author$project$RichText$Editor$updateChangeEventTextChanges = F6(
 			return A2($author$project$RichText$Editor$applyForceFunctionOnEditor, $author$project$RichText$Internal$Editor$forceRerender, editor_);
 		} else {
 			var changes = _v0.a;
+			var editorState = $author$project$RichText$Editor$state(editor_);
 			var actualChanges = A2(
 				$elm$core$List$filter,
 				$author$project$RichText$Editor$differentText(
@@ -21932,7 +21898,6 @@ var $author$project$RichText$Editor$updateChangeEventTextChanges = F6(
 			if ($elm$core$List$isEmpty(actualChanges)) {
 				return editor_;
 			} else {
-				var editorState = $author$project$RichText$Editor$state(editor_);
 				var _v1 = A2(
 					$author$project$RichText$Editor$replaceText,
 					$author$project$RichText$Model$State$root(editorState),
@@ -21954,18 +21919,20 @@ var $author$project$RichText$Editor$updateChangeEventTextChanges = F6(
 									$author$project$RichText$Model$State$root(editorState)),
 								selection),
 							editorState));
-					return editorComposing ? A2(
-						$author$project$RichText$Internal$Editor$withBufferedEditorState,
-						$elm$core$Maybe$Just(newEditorState),
-						editor_) : A2(
-						$author$project$RichText$Editor$applyForceFunctionOnEditor,
-						$author$project$RichText$Internal$Editor$forceReselection,
-						A4(
+					if (editorComposing) {
+						return A2(
+							$author$project$RichText$Internal$Editor$withBufferedEditorState,
+							$elm$core$Maybe$Just(newEditorState),
+							editor_);
+					} else {
+						var newEditor = A4(
 							$author$project$RichText$Internal$Editor$updateEditorStateWithTimestamp,
 							$elm$core$Maybe$Just(timestamp),
 							'textChange',
 							newEditorState,
-							editor_));
+							editor_);
+						return A2($author$project$RichText$Editor$applyForceFunctionOnEditor, $author$project$RichText$Internal$Editor$forceReselection, newEditor);
+					}
 				}
 			}
 		}
@@ -22018,8 +21985,8 @@ var $author$project$RichText$Editor$updateChangeEvent = F3(
 				editor_);
 		}
 	});
-var $author$project$RichText$Editor$updateSelection = F3(
-	function (maybeSelection, spec_, editor_) {
+var $author$project$RichText$Editor$updateSelection = F4(
+	function (maybeSelection, isDomPath, spec_, editor_) {
 		var editorState = $author$project$RichText$Editor$state(editor_);
 		if (maybeSelection.$ === 1) {
 			return A2(
@@ -22028,11 +21995,11 @@ var $author$project$RichText$Editor$updateSelection = F3(
 				editor_);
 		} else {
 			var selection = maybeSelection.a;
-			var translatedSelection = A3(
+			var translatedSelection = isDomPath ? A3(
 				$author$project$RichText$Internal$Selection$domToEditor,
 				spec_,
 				$author$project$RichText$Model$State$root(editorState),
-				selection);
+				selection) : $elm$core$Maybe$Just(selection);
 			if ($author$project$RichText$Internal$Editor$isComposing(editor_)) {
 				var bufferedState = A2(
 					$elm$core$Maybe$withDefault,
@@ -22057,29 +22024,27 @@ var $author$project$RichText$Editor$update = F3(
 		var spec_ = c.c4;
 		var commandMap_ = c.cr;
 		switch (msg.$) {
-			case 2:
+			case 1:
 				var change = msg.a;
 				return A3($author$project$RichText$Editor$updateChangeEvent, change, spec_, editor_);
 			case 0:
 				var selection = msg.a;
-				return A3($author$project$RichText$Editor$updateSelection, selection, spec_, editor_);
-			case 1:
-				var path = msg.a;
-				return A3($author$project$RichText$Editor$selectElement, path, spec_, editor_);
-			case 3:
+				var isDomPath = msg.b;
+				return A4($author$project$RichText$Editor$updateSelection, selection, isDomPath, spec_, editor_);
+			case 2:
 				var inputEvent = msg.a;
 				return A4($author$project$RichText$Internal$BeforeInput$handleBeforeInput, inputEvent, commandMap_, spec_, editor_);
-			case 5:
-				return $author$project$RichText$Editor$handleCompositionStart(editor_);
-			case 6:
-				return $author$project$RichText$Editor$handleCompositionEnd(editor_);
 			case 4:
+				return $author$project$RichText$Editor$handleCompositionStart(editor_);
+			case 5:
+				return $author$project$RichText$Editor$handleCompositionEnd(editor_);
+			case 3:
 				var e = msg.a;
 				return A4($author$project$RichText$Internal$KeyDown$handleKeyDown, e, commandMap_, spec_, editor_);
-			case 7:
+			case 6:
 				var e = msg.a;
 				return A3($author$project$RichText$Internal$Paste$handlePaste, e, spec_, editor_);
-			case 8:
+			case 7:
 				return A2($author$project$RichText$Editor$handleCut, spec_, editor_);
 			default:
 				var e = msg.a;
@@ -22870,6 +22835,9 @@ var $pablohirafuji$elm_markdown$Markdown$Block$maybeContinueParagraph = F2(
 		}
 		return $elm$core$Maybe$Nothing;
 	});
+var $elm$core$String$concat = function (strings) {
+	return A2($elm$core$String$join, '', strings);
+};
 var $elm$regex$Regex$replace = _Regex_replaceAtMost(_Regex_infinity);
 var $elm$regex$Regex$replaceAtMost = _Regex_replaceAtMost;
 var $pablohirafuji$elm_markdown$Markdown$Helpers$tabRegex = A2(
@@ -26273,6 +26241,7 @@ var $author$project$RichText$Model$Attribute$replaceOrAddStringAttribute = F3(
 				function (x) {
 					if (!x.$) {
 						var k = x.a;
+						var v = x.b;
 						return _Utils_eq(k, name) ? A2($author$project$RichText$Model$Attribute$StringAttribute, name, value) : x;
 					} else {
 						return x;
@@ -26544,6 +26513,7 @@ var $author$project$RichText$Model$Attribute$replaceOrAddBoolAttribute = F3(
 				function (x) {
 					if (x.$ === 2) {
 						var k = x.a;
+						var v = x.b;
 						return _Utils_eq(k, name) ? A2($author$project$RichText$Model$Attribute$BoolAttribute, name, value) : x;
 					} else {
 						return x;
@@ -28131,8 +28101,8 @@ var $author$project$Controls$renderInsertLinkModal = function (insertLinkModal) 
 					]))
 			]));
 };
-var $author$project$RichText$Internal$Editor$completeRerenderCount = function (_v0) {
-	var c = _v0;
+var $author$project$RichText$Internal$Editor$completeRerenderCount = function (e) {
+	var c = e;
 	return c.aj;
 };
 var $elm$json$Json$Encode$bool = _Json_wrap;
@@ -28175,14 +28145,14 @@ var $author$project$RichText$Internal$Path$pathToChildContents = function (node)
 var $author$project$RichText$Internal$Path$pathToChildContentsFromElementParameters = F2(
 	function (spec, parameters) {
 		var elementDefinition = A2($author$project$RichText$Internal$Spec$elementDefinitionWithDefault, parameters, spec);
-		return $author$project$RichText$Internal$Path$pathToChildContents(
-			A3($author$project$RichText$Config$ElementDefinition$toHtmlNode, elementDefinition, parameters, $author$project$RichText$Internal$HtmlNode$childNodesPlaceholder));
+		var nodeStructure = A3($author$project$RichText$Config$ElementDefinition$toHtmlNode, elementDefinition, parameters, $author$project$RichText$Internal$HtmlNode$childNodesPlaceholder);
+		return $author$project$RichText$Internal$Path$pathToChildContents(nodeStructure);
 	});
 var $author$project$RichText$Internal$Path$pathToChildContentsFromMark = F2(
 	function (spec, mark) {
 		var markDefinition = A2($author$project$RichText$Internal$Spec$markDefinitionWithDefault, mark, spec);
-		return $author$project$RichText$Internal$Path$pathToChildContents(
-			A3($author$project$RichText$Config$MarkDefinition$toHtmlNode, markDefinition, mark, $author$project$RichText$Internal$HtmlNode$childNodesPlaceholder));
+		var markStructure = A3($author$project$RichText$Config$MarkDefinition$toHtmlNode, markDefinition, mark, $author$project$RichText$Internal$HtmlNode$childNodesPlaceholder);
+		return $author$project$RichText$Internal$Path$pathToChildContents(markStructure);
 	});
 var $author$project$RichText$Internal$Path$pathToChildContentsFromInlineTreePath = F4(
 	function (spec, array, treeArray, path) {
@@ -28339,7 +28309,7 @@ var $elm$virtual_dom$VirtualDom$keyedNode = function (tag) {
 };
 var $elm$html$Html$Keyed$node = $elm$virtual_dom$VirtualDom$keyedNode;
 var $author$project$RichText$Internal$Editor$BeforeInputEvent = function (a) {
-	return {$: 3, a: a};
+	return {$: 2, a: a};
 };
 var $author$project$RichText$Internal$Event$InputEvent = F3(
 	function (data, isComposing, inputType) {
@@ -28373,7 +28343,7 @@ var $author$project$RichText$Internal$BeforeInput$shouldPreventDefault = F4(
 	});
 var $author$project$RichText$Internal$BeforeInput$preventDefaultOn = F4(
 	function (commandMap, spec, editor, msg) {
-		if (msg.$ === 3) {
+		if (msg.$ === 2) {
 			var inputEvent = msg.a;
 			return (inputEvent.bI || $author$project$RichText$Internal$Editor$isComposing(editor)) ? _Utils_Tuple2(msg, false) : _Utils_Tuple2(
 				msg,
@@ -28405,32 +28375,38 @@ var $author$project$RichText$Editor$onBeforeInput = F4(
 			'beforeinput',
 			A4($author$project$RichText$Internal$BeforeInput$preventDefaultOnBeforeInputDecoder, tagger, commandMap_, spec_, editor_));
 	});
-var $author$project$RichText$Internal$Editor$CompositionEnd = {$: 6};
+var $author$project$RichText$Internal$Editor$CompositionEnd = {$: 5};
 var $author$project$RichText$Editor$onCompositionEnd = function (msgFunc) {
 	return A2(
 		$elm$html$Html$Events$on,
 		'editorcompositionend',
-		$elm$json$Json$Decode$succeed(
-			msgFunc($author$project$RichText$Internal$Editor$CompositionEnd)));
+		A2(
+			$elm$json$Json$Decode$map,
+			msgFunc,
+			$elm$json$Json$Decode$succeed($author$project$RichText$Internal$Editor$CompositionEnd)));
 };
-var $author$project$RichText$Internal$Editor$CompositionStart = {$: 5};
+var $author$project$RichText$Internal$Editor$CompositionStart = {$: 4};
 var $author$project$RichText$Editor$onCompositionStart = function (msgFunc) {
 	return A2(
 		$elm$html$Html$Events$on,
 		'compositionstart',
-		$elm$json$Json$Decode$succeed(
-			msgFunc($author$project$RichText$Internal$Editor$CompositionStart)));
+		A2(
+			$elm$json$Json$Decode$map,
+			msgFunc,
+			$elm$json$Json$Decode$succeed($author$project$RichText$Internal$Editor$CompositionStart)));
 };
-var $author$project$RichText$Internal$Editor$CutEvent = {$: 8};
+var $author$project$RichText$Internal$Editor$CutEvent = {$: 7};
 var $author$project$RichText$Editor$onCut = function (msgFunc) {
 	return A2(
 		$elm$html$Html$Events$on,
 		'cut',
-		$elm$json$Json$Decode$succeed(
-			msgFunc($author$project$RichText$Internal$Editor$CutEvent)));
+		A2(
+			$elm$json$Json$Decode$map,
+			msgFunc,
+			$elm$json$Json$Decode$succeed($author$project$RichText$Internal$Editor$CutEvent)));
 };
 var $author$project$RichText$Internal$Editor$ChangeEvent = function (a) {
-	return {$: 2, a: a};
+	return {$: 1, a: a};
 };
 var $author$project$RichText$Internal$Event$EditorChange = F5(
 	function (root, selection, characterDataMutations, timestamp, isComposing) {
@@ -28514,17 +28490,15 @@ var $author$project$RichText$Editor$onEditorChange = function (msgFunc) {
 		'editorchange',
 		A2($elm$json$Json$Decode$map, msgFunc, $author$project$RichText$Editor$editorChangeDecoder));
 };
-var $author$project$RichText$Internal$Editor$SelectionEvent = function (a) {
-	return {$: 0, a: a};
-};
-var $author$project$RichText$Editor$editorSelectionChangeDecoder = A2(
-	$elm$json$Json$Decode$map,
+var $author$project$RichText$Editor$editorSelectionChangeDecoder = A3(
+	$elm$json$Json$Decode$map2,
 	$author$project$RichText$Internal$Editor$SelectionEvent,
 	A2(
 		$elm$json$Json$Decode$at,
 		_List_fromArray(
 			['detail']),
-		$author$project$RichText$Editor$selectionDecoder));
+		$author$project$RichText$Editor$selectionDecoder),
+	$elm$json$Json$Decode$succeed(true));
 var $author$project$RichText$Editor$onEditorSelectionChange = function (msgFunc) {
 	return A2(
 		$elm$html$Html$Events$on,
@@ -28532,7 +28506,7 @@ var $author$project$RichText$Editor$onEditorSelectionChange = function (msgFunc)
 		A2($elm$json$Json$Decode$map, msgFunc, $author$project$RichText$Editor$editorSelectionChangeDecoder));
 };
 var $author$project$RichText$Internal$Editor$Init = function (a) {
-	return {$: 9, a: a};
+	return {$: 8, a: a};
 };
 var $author$project$RichText$Internal$Event$InitEvent = function (shortKey) {
 	return {c1: shortKey};
@@ -28555,7 +28529,7 @@ var $author$project$RichText$Editor$onInit = function (msgFunc) {
 		A2($elm$json$Json$Decode$map, msgFunc, $author$project$RichText$Editor$initDecoder));
 };
 var $author$project$RichText$Internal$Editor$KeyDownEvent = function (a) {
-	return {$: 4, a: a};
+	return {$: 3, a: a};
 };
 var $author$project$RichText$Internal$Event$KeyboardEvent = F7(
 	function (keyCode, key, altKey, metaKey, ctrlKey, shiftKey, isComposing) {
@@ -28591,7 +28565,7 @@ var $author$project$RichText$Internal$KeyDown$shouldPreventDefault = F4(
 	});
 var $author$project$RichText$Internal$KeyDown$preventDefaultOn = F4(
 	function (commandMap, spec, editor, msg) {
-		if (msg.$ === 4) {
+		if (msg.$ === 3) {
 			var key = msg.a;
 			return (key.bI || $author$project$RichText$Internal$Editor$isComposing(editor)) ? _Utils_Tuple2(msg, false) : _Utils_Tuple2(
 				msg,
@@ -28628,7 +28602,7 @@ var $author$project$RichText$Internal$Event$PasteEvent = F2(
 		return {cG: html, as: text};
 	});
 var $author$project$RichText$Internal$Editor$PasteWithDataEvent = function (a) {
-	return {$: 7, a: a};
+	return {$: 6, a: a};
 };
 var $author$project$RichText$Editor$pasteWithDataDecoder = A2(
 	$elm$json$Json$Decode$map,
@@ -28652,8 +28626,8 @@ var $author$project$RichText$Editor$onPasteWithData = function (msgFunc) {
 		'pastewithdata',
 		A2($elm$json$Json$Decode$map, msgFunc, $author$project$RichText$Editor$pasteWithDataDecoder));
 };
-var $author$project$RichText$Internal$Editor$renderCount = function (_v0) {
-	var c = _v0;
+var $author$project$RichText$Internal$Editor$renderCount = function (e) {
+	var c = e;
 	return c.an;
 };
 var $author$project$RichText$Editor$selectionAttribute = F3(
@@ -28680,8 +28654,8 @@ var $author$project$RichText$Editor$selectionAttribute = F3(
 					]));
 		}
 	});
-var $author$project$RichText$Internal$Editor$selectionCount = function (_v0) {
-	var c = _v0;
+var $author$project$RichText$Internal$Editor$selectionCount = function (e) {
+	var c = e;
 	return c.ap;
 };
 var $author$project$RichText$Editor$shouldHideCaret = function (editorState) {
@@ -28715,8 +28689,8 @@ var $author$project$RichText$Editor$shouldHideCaret = function (editorState) {
 		}
 	}
 };
-var $author$project$RichText$Config$Decorations$topLevelAttributes = function (_v0) {
-	var c = _v0;
+var $author$project$RichText$Config$Decorations$topLevelAttributes = function (d) {
+	var c = d;
 	return c.aQ;
 };
 var $author$project$RichText$Editor$viewHtmlNode = F4(
@@ -28782,7 +28756,8 @@ var $author$project$RichText$Editor$viewElement = F5(
 					elementParameters);
 			},
 			eDecorators);
-		return A4($author$project$RichText$Editor$viewHtmlNode, node, decorators, children, _List_Nil);
+		var nodeHtml = A4($author$project$RichText$Editor$viewHtmlNode, node, decorators, children, _List_Nil);
+		return nodeHtml;
 	});
 var $author$project$RichText$Editor$viewText = function (text) {
 	return $elm$html$Html$text(
@@ -28805,8 +28780,8 @@ var $author$project$RichText$Editor$viewInlineLeaf = F4(
 				$author$project$RichText$Model$Text$text(v));
 		}
 	});
-var $author$project$RichText$Config$Decorations$markDecorations = function (_v0) {
-	var c = _v0;
+var $author$project$RichText$Config$Decorations$markDecorations = function (d) {
+	var c = d;
 	return c.W;
 };
 var $author$project$RichText$Editor$viewMark = F5(

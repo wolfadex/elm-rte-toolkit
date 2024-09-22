@@ -304,7 +304,7 @@ initialCaptionedImage : Block
 initialCaptionedImage =
     block
         (element captionedImage
-            [ StringAttribute "caption" "The elm logo!", StringAttribute "src" "logo.svg" ]
+            [ StringAttribute "caption" "The elm logo!", StringAttribute "src" "public/logo.svg" ]
         )
         Leaf
 

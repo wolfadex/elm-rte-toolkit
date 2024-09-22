@@ -2,7 +2,8 @@
     "name": "demo",
     "version": "1.0.0",
     "scripts": {
-        "dev": "elm-watch hot"
+        "dev": "elm-watch hot",
+        "build": "elm-watch make --optimize"
     },
     "author": "Wolfgang Schuster",
     "description": "",
