@@ -29040,7 +29040,7 @@ var $author$project$Page$Basic$view = function (model) {
 						_List_fromArray(
 							[
 								$elm$html$Html$Attributes$title('git repo'),
-								$elm$html$Html$Attributes$href($author$project$Links$rteToolkit + '/tree/master/demo/src/Page/Basic.elm')
+								$elm$html$Html$Attributes$href($author$project$Links$rteToolkit + '/tree/master/docs/src/Page/Basic.elm')
 							]),
 						_List_fromArray(
 							[
@@ -29410,7 +29410,7 @@ var $author$project$Page$Markdown$view = function (model) {
 						_List_fromArray(
 							[
 								$elm$html$Html$Attributes$title('git repo'),
-								$elm$html$Html$Attributes$href($author$project$Links$rteToolkit + '/tree/master/demo/src/Page/Markdown.elm')
+								$elm$html$Html$Attributes$href($author$project$Links$rteToolkit + '/tree/master/docs/src/Page/Markdown.elm')
 							]),
 						_List_fromArray(
 							[
@@ -29566,7 +29566,7 @@ var $author$project$Page$SpecExtension$view = function (model) {
 						_List_fromArray(
 							[
 								$elm$html$Html$Attributes$title('git repo'),
-								$elm$html$Html$Attributes$href($author$project$Links$rteToolkit + '/tree/master/demo/src/Page/SpecExtension.elm')
+								$elm$html$Html$Attributes$href($author$project$Links$rteToolkit + '/tree/master/docs/src/Page/SpecExtension.elm')
 							]),
 						_List_fromArray(
 							[
@@ -29611,7 +29611,7 @@ var $author$project$Page$SpecFromScratch$view = function (model) {
 						_List_fromArray(
 							[
 								$elm$html$Html$Attributes$title('git repo'),
-								$elm$html$Html$Attributes$href($author$project$Links$rteToolkit + '/tree/master/demo/src/Page/SpecFromScratch.elm')
+								$elm$html$Html$Attributes$href($author$project$Links$rteToolkit + '/tree/master/docs/src/Page/SpecFromScratch.elm')
 							]),
 						_List_fromArray(
 							[

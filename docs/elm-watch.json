@@ -5,5 +5,5 @@
             "output": "public/elm.js"
         }
     },
-    "serve": "public"
+    "serve": "."
 }
