@@ -165,15 +165,23 @@ namedCommandListFromInputEvent event map =
                 (Dict.get event.inputType contents.inputEventTypeMap)
 
 
-keyboardEventToDictKey : KeyboardEvent -> List String
-keyboardEventToDictKey keyboardEvent =
-    List.sort
-        ([ keyboardEvent.key ]
-            |> addShiftKey keyboardEvent
-            |> addMetaKey keyboardEvent
-            |> addCtrlKey keyboardEvent
-            |> addAltKey keyboardEvent
-        )
+keyboardEventToDictKey : String -> KeyboardEvent -> List String
+keyboardEventToDictKey shortKey keyboardEvent =
+    ([ keyboardEvent.key ]
+        |> addShiftKey keyboardEvent
+        |> addMetaKey keyboardEvent
+        |> addCtrlKey keyboardEvent
+        |> addAltKey keyboardEvent
+    )
+        |> List.map
+            (\v ->
+                if v == shortKey then
+                    short
+
+                else
+                    v
+            )
+        |> List.sort
 
 
 addShiftKey : KeyboardEvent -> List String -> List String
@@ -221,20 +229,9 @@ namedCommandListFromKeyboardEvent shortKey event map =
         CommandMap contents ->
             let
                 mapping =
-                    keyboardEventToDictKey event
-
-                shortKeyReplaced =
-                    List.map
-                        (\v ->
-                            if v == shortKey then
-                                short
-
-                            else
-                                v
-                        )
-                        mapping
+                    keyboardEventToDictKey shortKey event
             in
-            case Dict.get shortKeyReplaced contents.keyMap of
+            case Dict.get mapping contents.keyMap of
                 Nothing ->
                     case Dict.get mapping contents.keyMap of
                         Nothing ->
