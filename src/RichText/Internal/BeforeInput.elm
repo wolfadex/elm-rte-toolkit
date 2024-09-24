@@ -1,17 +1,17 @@
 module RichText.Internal.BeforeInput exposing (handleBeforeInput, preventDefaultOnBeforeInputDecoder)
 
-import Json.Decode as D
-import RichText.Config.Command exposing (CommandMap, namedCommandListFromInputEvent)
-import RichText.Config.Spec exposing (Spec)
-import RichText.Internal.Editor exposing (Editor, Message(..), Tagger, applyNamedCommandList, forceRerender, isComposing)
-import RichText.Internal.Event exposing (InputEvent)
+import Json.Decode
+import RichText.Config.Command
+import RichText.Config.Spec
+import RichText.Internal.Editor
+import RichText.Internal.Event
 
 
-preventDefaultOn : CommandMap -> Spec -> Editor -> Message -> ( Message, Bool )
+preventDefaultOn : RichText.Config.Command.CommandMap -> RichText.Config.Spec.Spec -> RichText.Internal.Editor.Editor -> RichText.Internal.Editor.Message -> ( RichText.Internal.Editor.Message, Bool )
 preventDefaultOn commandMap spec editor msg =
     case msg of
-        BeforeInputEvent inputEvent ->
-            if inputEvent.isComposing || isComposing editor then
+        RichText.Internal.Editor.BeforeInputEvent inputEvent ->
+            if inputEvent.isComposing || RichText.Internal.Editor.isComposing editor then
                 ( msg, False )
 
             else
@@ -21,7 +21,7 @@ preventDefaultOn commandMap spec editor msg =
             ( msg, False )
 
 
-shouldPreventDefault : CommandMap -> Spec -> Editor -> InputEvent -> Bool
+shouldPreventDefault : RichText.Config.Command.CommandMap -> RichText.Config.Spec.Spec -> RichText.Internal.Editor.Editor -> RichText.Internal.Event.InputEvent -> Bool
 shouldPreventDefault commandMap spec editor inputEvent =
     case handleInputEvent commandMap spec editor inputEvent of
         Err _ ->
@@ -31,33 +31,33 @@ shouldPreventDefault commandMap spec editor inputEvent =
             True
 
 
-preventDefaultOnBeforeInputDecoder : Tagger msg -> CommandMap -> Spec -> Editor -> D.Decoder ( msg, Bool )
+preventDefaultOnBeforeInputDecoder : RichText.Internal.Editor.Tagger msg -> RichText.Config.Command.CommandMap -> RichText.Config.Spec.Spec -> RichText.Internal.Editor.Editor -> Json.Decode.Decoder ( msg, Bool )
 preventDefaultOnBeforeInputDecoder tagger commandMap spec editor =
-    D.map (\( i, b ) -> ( tagger i, b )) (D.map (preventDefaultOn commandMap spec editor) beforeInputDecoder)
+    Json.Decode.map (\( i, b ) -> ( tagger i, b )) (Json.Decode.map (preventDefaultOn commandMap spec editor) beforeInputDecoder)
 
 
-beforeInputDecoder : D.Decoder Message
+beforeInputDecoder : Json.Decode.Decoder RichText.Internal.Editor.Message
 beforeInputDecoder =
-    D.map BeforeInputEvent
-        (D.map3 InputEvent
-            (D.maybe (D.field "data" D.string))
-            (D.oneOf [ D.field "isComposing" D.bool, D.succeed False ])
-            (D.field "inputType" D.string)
+    Json.Decode.map RichText.Internal.Editor.BeforeInputEvent
+        (Json.Decode.map3 RichText.Internal.Event.InputEvent
+            (Json.Decode.maybe (Json.Decode.field "data" Json.Decode.string))
+            (Json.Decode.oneOf [ Json.Decode.field "isComposing" Json.Decode.bool, Json.Decode.succeed False ])
+            (Json.Decode.field "inputType" Json.Decode.string)
         )
 
 
-handleInputEvent : CommandMap -> Spec -> Editor -> InputEvent -> Result String Editor
+handleInputEvent : RichText.Config.Command.CommandMap -> RichText.Config.Spec.Spec -> RichText.Internal.Editor.Editor -> RichText.Internal.Event.InputEvent -> Result String RichText.Internal.Editor.Editor
 handleInputEvent commandMap spec editor inputEvent =
     let
         namedCommandList =
-            namedCommandListFromInputEvent inputEvent commandMap
+            RichText.Config.Command.namedCommandListFromInputEvent inputEvent commandMap
     in
-    applyNamedCommandList namedCommandList spec editor
+    RichText.Internal.Editor.applyNamedCommandList namedCommandList spec editor
 
 
-handleBeforeInput : InputEvent -> CommandMap -> Spec -> Editor -> Editor
+handleBeforeInput : RichText.Internal.Event.InputEvent -> RichText.Config.Command.CommandMap -> RichText.Config.Spec.Spec -> RichText.Internal.Editor.Editor -> RichText.Internal.Editor.Editor
 handleBeforeInput inputEvent commandMap spec editor =
-    if inputEvent.isComposing || isComposing editor then
+    if inputEvent.isComposing || RichText.Internal.Editor.isComposing editor then
         editor
 
     else
@@ -69,4 +69,4 @@ handleBeforeInput inputEvent commandMap spec editor =
                 -- HACK: Android has very strange behavior with regards to before input events, e.g.
                 -- prevent default doesn't actually stop the DOM from being modified, so
                 -- we're forcing a rerender if we update the editor state on a command
-                forceRerender newEditor
+                RichText.Internal.Editor.forceRerender newEditor

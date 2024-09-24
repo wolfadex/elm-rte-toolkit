@@ -5,9 +5,9 @@ private and avoid dependency loops.
 -}
 
 import Array exposing (Array)
-import RichText.Internal.Constants exposing (selectable)
-import RichText.Model.Attribute exposing (Attribute)
-import RichText.Model.HtmlNode exposing (HtmlNode)
+import RichText.Internal.Constants
+import RichText.Model.Attribute
+import RichText.Model.HtmlNode
 import Set exposing (Set)
 
 
@@ -32,7 +32,7 @@ type ContentType
 
 type alias ElementParametersContents =
     { name : String
-    , attributes : List Attribute
+    , attributes : List RichText.Model.Attribute.Attribute
     , annotations : Set String
     }
 
@@ -41,7 +41,7 @@ type Element
     = ElementParameters ElementParametersContents
 
 
-element : ElementDefinition -> List Attribute -> Element
+element : ElementDefinition -> List RichText.Model.Attribute.Attribute -> Element
 element def attrs =
     case def of
         ElementDefinition d ->
@@ -50,7 +50,7 @@ element def attrs =
                 , attributes = attrs
                 , annotations =
                     if d.selectable then
-                        Set.singleton selectable
+                        Set.singleton RichText.Internal.Constants.selectable
 
                     else
                         Set.empty
@@ -64,7 +64,7 @@ nameFromElement parameters =
             c.name
 
 
-attributesFromElement : Element -> List Attribute
+attributesFromElement : Element -> List RichText.Model.Attribute.Attribute
 attributesFromElement parameters =
     case parameters of
         ElementParameters c ->
@@ -85,7 +85,7 @@ elementWithAnnotations annotations parameters =
             ElementParameters <| { c | annotations = annotations }
 
 
-elementWithAttributes : List Attribute -> Element -> Element
+elementWithAttributes : List RichText.Model.Attribute.Attribute -> Element -> Element
 elementWithAttributes attrs parameters =
     case parameters of
         ElementParameters c ->
@@ -97,10 +97,10 @@ type Mark
 
 
 type alias Contents =
-    { name : String, attributes : List Attribute }
+    { name : String, attributes : List RichText.Model.Attribute.Attribute }
 
 
-mark : MarkDefinition -> List Attribute -> Mark
+mark : MarkDefinition -> List RichText.Model.Attribute.Attribute -> Mark
 mark n a =
     case n of
         MarkDefinition nn ->
@@ -114,14 +114,14 @@ nameFromMark m =
             c.name
 
 
-attributesFromMark : Mark -> List Attribute
+attributesFromMark : Mark -> List RichText.Model.Attribute.Attribute
 attributesFromMark m =
     case m of
         Mark c ->
             c.attributes
 
 
-markWithAttributes : List Attribute -> Mark -> Mark
+markWithAttributes : List RichText.Model.Attribute.Attribute -> Mark -> Mark
 markWithAttributes attributes_ m =
     case m of
         Mark c ->
@@ -140,19 +140,19 @@ type alias MarkDefinitionContents =
 
 
 type alias MarkToHtml =
-    Mark -> Array HtmlNode -> HtmlNode
+    Mark -> Array RichText.Model.HtmlNode.HtmlNode -> RichText.Model.HtmlNode.HtmlNode
 
 
 type alias HtmlToMark =
-    MarkDefinition -> HtmlNode -> Maybe ( Mark, Array HtmlNode )
+    MarkDefinition -> RichText.Model.HtmlNode.HtmlNode -> Maybe ( Mark, Array RichText.Model.HtmlNode.HtmlNode )
 
 
 type alias ElementToHtml =
-    Element -> Array HtmlNode -> HtmlNode
+    Element -> Array RichText.Model.HtmlNode.HtmlNode -> RichText.Model.HtmlNode.HtmlNode
 
 
 type alias HtmlToElement =
-    ElementDefinition -> HtmlNode -> Maybe ( Element, Array HtmlNode )
+    ElementDefinition -> RichText.Model.HtmlNode.HtmlNode -> Maybe ( Element, Array RichText.Model.HtmlNode.HtmlNode )
 
 
 type ElementDefinition

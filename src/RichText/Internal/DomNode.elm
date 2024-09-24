@@ -7,12 +7,12 @@ module RichText.Internal.DomNode exposing
 
 import Array exposing (Array)
 import Array.Extra
-import Json.Decode as D
-import Json.Decode.Extra as DE
-import RichText.Internal.Constants exposing (zeroWidthSpace)
-import RichText.Internal.Event exposing (TextChange)
-import RichText.Model.HtmlNode exposing (HtmlNode(..))
-import RichText.Model.Node exposing (Path)
+import Json.Decode
+import Json.Decode.Extra
+import RichText.Internal.Constants
+import RichText.Internal.Event
+import RichText.Model.HtmlNode
+import RichText.Model.Node
 
 
 {-| A minimal representation of DomNode. It's purpose is to validate the contents of the DOM for any
@@ -50,14 +50,14 @@ domElementNodeType =
     1
 
 
-decodeDomNode : D.Decoder DomNode
+decodeDomNode : Json.Decode.Decoder DomNode
 decodeDomNode =
-    D.map DomNode
-        (D.map4 DomNodeContents
-            (D.field "nodeType" D.int)
-            (D.maybe (D.field "tagName" D.string))
-            (D.maybe (D.field "nodeValue" D.string))
-            (D.maybe (D.field "childNodes" (D.map Array.fromList (DE.collection (D.lazy (\_ -> decodeDomNode))))))
+    Json.Decode.map DomNode
+        (Json.Decode.map4 DomNodeContents
+            (Json.Decode.field "nodeType" Json.Decode.int)
+            (Json.Decode.maybe (Json.Decode.field "tagName" Json.Decode.string))
+            (Json.Decode.maybe (Json.Decode.field "nodeValue" Json.Decode.string))
+            (Json.Decode.maybe (Json.Decode.field "childNodes" (Json.Decode.map Array.fromList (Json.Decode.Extra.collection (Json.Decode.lazy (\_ -> decodeDomNode))))))
         )
 
 
@@ -82,17 +82,17 @@ extractRootEditorBlockNode domNode =
                     Array.get 0 childNodes
 
 
-findTextChanges : HtmlNode -> DomNode -> Result String (List TextChange)
+findTextChanges : RichText.Model.HtmlNode.HtmlNode -> DomNode -> Result String (List RichText.Internal.Event.TextChange)
 findTextChanges htmlNode domNode =
     findTextChangesRec htmlNode domNode []
 
 
-findTextChangesRec : HtmlNode -> DomNode -> Path -> Result String (List TextChange)
+findTextChangesRec : RichText.Model.HtmlNode.HtmlNode -> DomNode -> RichText.Model.Node.Path -> Result String (List RichText.Internal.Event.TextChange)
 findTextChangesRec htmlNode domNode backwardsNodePath =
     case domNode of
         DomNode domNodeContents ->
             case htmlNode of
-                ElementNode tag _ children ->
+                RichText.Model.HtmlNode.ElementNode tag _ children ->
                     if domNodeContents.nodeType /= domElementNodeType then
                         Err "Dom node is a text node, but I was expecting an element node"
 
@@ -137,7 +137,7 @@ findTextChangesRec htmlNode domNode backwardsNodePath =
                                 (Ok [])
                                 indexedNodePairs
 
-                TextNode textNodeText ->
+                RichText.Model.HtmlNode.TextNode textNodeText ->
                     if domNodeContents.nodeType /= domTextNodeType then
                         Err "Dom node was an element node, but I was expecting a text node"
 
@@ -149,7 +149,7 @@ findTextChangesRec htmlNode domNode backwardsNodePath =
                             Just domNodeText ->
                                 let
                                     domNodeSanitizedText =
-                                        if domNodeText == zeroWidthSpace then
+                                        if domNodeText == RichText.Internal.Constants.zeroWidthSpace then
                                             ""
 
                                         else

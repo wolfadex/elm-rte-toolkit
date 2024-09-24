@@ -31,8 +31,8 @@ module RichText.Config.Command exposing
 
 import Dict exposing (Dict)
 import List.Extra
-import RichText.Config.Keys exposing (alt, ctrl, meta, shift, short)
-import RichText.Model.State exposing (State)
+import RichText.Config.Keys
+import RichText.Model.State
 
 
 {-| A `Transform` is a function that receives a state and returns a result either with a new modified state,
@@ -45,7 +45,7 @@ are defined by one or more transforms.
 
 -}
 type alias Transform =
-    State -> Result String State
+    RichText.Model.State.State -> Result String RichText.Model.State.State
 
 
 {-| `InternalAction` is a fixed set of actions that require internal editor state
@@ -176,7 +176,7 @@ keyboardEventToDictKey shortKey keyboardEvent =
         |> List.map
             (\v ->
                 if v == shortKey then
-                    short
+                    RichText.Config.Keys.short
 
                 else
                     v
@@ -187,7 +187,7 @@ keyboardEventToDictKey shortKey keyboardEvent =
 addShiftKey : KeyboardEvent -> List String -> List String
 addShiftKey keyboardEvent keys =
     if keyboardEvent.shiftKey then
-        shift :: keys
+        RichText.Config.Keys.shift :: keys
 
     else
         keys
@@ -196,7 +196,7 @@ addShiftKey keyboardEvent keys =
 addMetaKey : KeyboardEvent -> List String -> List String
 addMetaKey keyboardEvent keys =
     if keyboardEvent.metaKey then
-        meta :: keys
+        RichText.Config.Keys.meta :: keys
 
     else
         keys
@@ -205,7 +205,7 @@ addMetaKey keyboardEvent keys =
 addCtrlKey : KeyboardEvent -> List String -> List String
 addCtrlKey keyboardEvent keys =
     if keyboardEvent.ctrlKey then
-        ctrl :: keys
+        RichText.Config.Keys.ctrl :: keys
 
     else
         keys
@@ -214,7 +214,7 @@ addCtrlKey keyboardEvent keys =
 addAltKey : KeyboardEvent -> List String -> List String
 addAltKey keyboardEvent keys =
     if keyboardEvent.altKey then
-        alt :: keys
+        RichText.Config.Keys.alt :: keys
 
     else
         keys

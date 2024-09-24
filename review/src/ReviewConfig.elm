@@ -74,5 +74,5 @@ config =
         , lambdaReduceStrategy = NoEtaReducibleLambdas.OnlyWhenSingleArgument
         }
     , NoRedundantlyQualifiedType.rule
-    -- , Review.ImportSimple.rule
+    , Review.ImportSimple.rule
     ]

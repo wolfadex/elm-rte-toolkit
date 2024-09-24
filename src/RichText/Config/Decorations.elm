@@ -25,14 +25,14 @@ import Dict exposing (Dict)
 import Html
 import Html.Attributes
 import Html.Events
-import RichText.Config.ElementDefinition as ElementDefinition exposing (ElementDefinition)
-import RichText.Config.MarkDefinition as MarkDefinition exposing (MarkDefinition)
-import RichText.Internal.Constants exposing (selection)
-import RichText.Internal.Editor exposing (Message(..), Tagger)
-import RichText.Model.Element exposing (Element, annotations)
-import RichText.Model.Mark exposing (Mark)
-import RichText.Model.Node exposing (Path)
-import RichText.Model.Selection exposing (caret)
+import RichText.Config.ElementDefinition
+import RichText.Config.MarkDefinition
+import RichText.Internal.Constants
+import RichText.Internal.Editor
+import RichText.Model.Element
+import RichText.Model.Mark
+import RichText.Model.Node
+import RichText.Model.Selection
 import Set
 
 
@@ -94,7 +94,7 @@ toggleCheckboxDecoration editorNodePath element relativeHtmlNodePath =
 
 -}
 type alias ElementDecoration msg =
-    Path -> Element -> Path -> List (Html.Attribute msg)
+    RichText.Model.Node.Path -> RichText.Model.Element.Element -> RichText.Model.Node.Path -> List (Html.Attribute msg)
 
 
 {-| `MarkDecoration` is a type alias for an mark decoration function. The arguments
@@ -114,7 +114,7 @@ highlight _ _ _ =
 
 -}
 type alias MarkDecoration msg =
-    Path -> Mark -> Path -> List (Html.Attribute msg)
+    RichText.Model.Node.Path -> RichText.Model.Mark.Mark -> RichText.Model.Node.Path -> List (Html.Attribute msg)
 
 
 {-| Empty decorations
@@ -189,14 +189,14 @@ withTopLevelAttributes topLevelAttributes_ d =
     --> a collection of decorations that contains a single element decoration for image
 
 -}
-addElementDecoration : ElementDefinition -> ElementDecoration msg -> Decorations msg -> Decorations msg
+addElementDecoration : RichText.Config.ElementDefinition.ElementDefinition -> ElementDecoration msg -> Decorations msg -> Decorations msg
 addElementDecoration definition decorator decorations =
     let
         eleDecorators =
             elementDecorations decorations
 
         name =
-            ElementDefinition.name definition
+            RichText.Config.ElementDefinition.name definition
 
         previousDecorations =
             Maybe.withDefault [] (Dict.get name eleDecorators)
@@ -215,14 +215,14 @@ addElementDecoration definition decorator decorations =
     --> a collection of decorations that contains a single mark decoration for a link
 
 -}
-addMarkDecoration : MarkDefinition -> MarkDecoration msg -> Decorations msg -> Decorations msg
+addMarkDecoration : RichText.Config.MarkDefinition.MarkDefinition -> MarkDecoration msg -> Decorations msg -> Decorations msg
 addMarkDecoration definition decorator decorations =
     let
         mDecorators =
             markDecorations decorations
 
         name =
-            MarkDefinition.name definition
+            RichText.Config.MarkDefinition.name definition
 
         previousDecorations =
             Maybe.withDefault [] (Dict.get name mDecorators)
@@ -234,9 +234,9 @@ addMarkDecoration definition decorator decorations =
 {-| Useful decoration for selectable elements. Adds an onclick listener that will select the element,
 as well as adds an rte-selected class if this item is selected.
 -}
-selectableDecoration : Tagger msg -> Path -> Element -> Path -> List (Html.Attribute msg)
+selectableDecoration : Tagger msg -> RichText.Model.Node.Path -> RichText.Model.Element.Element -> RichText.Model.Node.Path -> List (Html.Attribute msg)
 selectableDecoration tagger editorNodePath elementParameters _ =
-    (if Set.member selection (annotations elementParameters) then
+    (if Set.member RichText.Internal.Constants.selection (RichText.Model.Element.annotations elementParameters) then
         [ Html.Attributes.class "rte-selected" ]
 
      else
@@ -244,6 +244,6 @@ selectableDecoration tagger editorNodePath elementParameters _ =
     )
         ++ [ Html.Events.onClick
                 (tagger <|
-                    SelectionEvent (Just (caret editorNodePath 0)) False
+                    RichText.Internal.Editor.SelectionEvent (Just (RichText.Model.Selection.caret editorNodePath 0)) False
                 )
            ]

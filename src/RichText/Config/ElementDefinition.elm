@@ -25,10 +25,10 @@ it can have.
 -}
 
 import Array exposing (Array)
-import RichText.Internal.Definitions as Internal exposing (ContentType(..))
-import RichText.Model.Attribute exposing (Attribute(..))
-import RichText.Model.Element exposing (Element)
-import RichText.Model.HtmlNode exposing (HtmlNode(..))
+import RichText.Internal.Definitions
+import RichText.Model.Attribute
+import RichText.Model.Element
+import RichText.Model.HtmlNode
 import Set
 
 
@@ -42,14 +42,14 @@ It can be one of four values:
 
 -}
 type alias ContentType =
-    Internal.ContentType
+    RichText.Internal.Definitions.ContentType
 
 
 {-| A `ElementDefinition` contains information on how to serialize/deserialize an editor node,
 as well as describes what type of node and what children the node can have.
 -}
 type alias ElementDefinition =
-    Internal.ElementDefinition
+    RichText.Internal.Definitions.ElementDefinition
 
 
 {-| Type alias for defining an element serialization function.
@@ -64,7 +64,7 @@ to partially serialize a document in some parts of the package.
 
 -}
 type alias ElementToHtml =
-    Element -> Array HtmlNode -> HtmlNode
+    RichText.Model.Element.Element -> Array RichText.Model.HtmlNode.HtmlNode -> RichText.Model.HtmlNode.HtmlNode
 
 
 {-| Type alias for defining an element deserialization function.
@@ -84,7 +84,7 @@ type alias ElementToHtml =
 
 -}
 type alias HtmlToElement =
-    ElementDefinition -> HtmlNode -> Maybe ( Element, Array HtmlNode )
+    ElementDefinition -> RichText.Model.HtmlNode.HtmlNode -> Maybe ( RichText.Model.Element.Element, Array RichText.Model.HtmlNode.HtmlNode )
 
 
 {-| Defines an element. The arguments are as follows:
@@ -130,7 +130,7 @@ elementDefinition :
     }
     -> ElementDefinition
 elementDefinition contents =
-    Internal.ElementDefinition
+    RichText.Internal.Definitions.ElementDefinition
         contents
 
 
@@ -143,7 +143,7 @@ elementDefinition contents =
 name : ElementDefinition -> String
 name definition_ =
     case definition_ of
-        Internal.ElementDefinition c ->
+        RichText.Internal.Definitions.ElementDefinition c ->
             c.name
 
 
@@ -156,7 +156,7 @@ name definition_ =
 group : ElementDefinition -> String
 group definition_ =
     case definition_ of
-        Internal.ElementDefinition c ->
+        RichText.Internal.Definitions.ElementDefinition c ->
             c.group
 
 
@@ -166,7 +166,7 @@ to determine selection, render the editor, and validate the DOM.
 toHtmlNode : ElementDefinition -> ElementToHtml
 toHtmlNode definition_ =
     case definition_ of
-        Internal.ElementDefinition c ->
+        RichText.Internal.Definitions.ElementDefinition c ->
             c.toHtmlNode
 
 
@@ -176,7 +176,7 @@ derive editor nodes from HTML content.
 fromHtmlNode : ElementDefinition -> HtmlToElement
 fromHtmlNode definition_ =
     case definition_ of
-        Internal.ElementDefinition c ->
+        RichText.Internal.Definitions.ElementDefinition c ->
             c.fromHtmlNode
 
 
@@ -185,7 +185,7 @@ fromHtmlNode definition_ =
 contentType : ElementDefinition -> ContentType
 contentType definition_ =
     case definition_ of
-        Internal.ElementDefinition c ->
+        RichText.Internal.Definitions.ElementDefinition c ->
             c.contentType
 
 
@@ -193,14 +193,14 @@ contentType definition_ =
 -}
 inlineLeaf : ContentType
 inlineLeaf =
-    InlineLeafNodeType
+    RichText.Internal.Definitions.InlineLeafNodeType
 
 
 {-| A block leaf is a Block that does not allow child nodes, like a horizontal rule.
 -}
 blockLeaf : ContentType
 blockLeaf =
-    BlockLeafNodeType
+    RichText.Internal.Definitions.BlockLeafNodeType
 
 
 {-| A block node is a Block that has other block children, like a blockquote or list. The
@@ -212,7 +212,7 @@ argument is the group or name of the nodes that it allows as children.
 -}
 blockNode : List String -> ContentType
 blockNode allowedGroups =
-    BlockNodeType <|
+    RichText.Internal.Definitions.BlockNodeType <|
         if List.isEmpty allowedGroups then
             Nothing
 
@@ -234,7 +234,7 @@ blockNode allowedGroups =
 -}
 textBlock : { allowedGroups : List String, allowedMarks : List String } -> ContentType
 textBlock config =
-    TextBlockNodeType
+    RichText.Internal.Definitions.TextBlockNodeType
         { allowedGroups =
             if List.isEmpty config.allowedGroups then
                 Nothing
@@ -278,17 +278,17 @@ string attributes are converted to attributes on the node
 -}
 defaultElementToHtml : String -> ElementToHtml
 defaultElementToHtml tagName elementParameters children =
-    ElementNode tagName
+    RichText.Model.HtmlNode.ElementNode tagName
         (List.filterMap
             (\attr ->
                 case attr of
-                    StringAttribute k v ->
+                    RichText.Model.Attribute.StringAttribute k v ->
                         Just ( k, v )
 
                     _ ->
                         Nothing
             )
-            (Internal.attributesFromElement elementParameters)
+            (RichText.Internal.Definitions.attributesFromElement elementParameters)
         )
         children
 
@@ -302,9 +302,9 @@ defaultElementToHtml tagName elementParameters children =
 defaultHtmlToElement : String -> HtmlToElement
 defaultHtmlToElement htmlTag def node =
     case node of
-        ElementNode name_ _ children ->
+        RichText.Model.HtmlNode.ElementNode name_ _ children ->
             if name_ == htmlTag then
-                Just ( Internal.element def [], children )
+                Just ( RichText.Internal.Definitions.element def [], children )
 
             else
                 Nothing

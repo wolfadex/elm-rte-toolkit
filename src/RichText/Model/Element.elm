@@ -6,8 +6,8 @@ module RichText.Model.Element exposing (ElementDefinition, Element, element, ann
 
 -}
 
-import RichText.Internal.Definitions as Internal exposing (ElementDefinition)
-import RichText.Model.Attribute exposing (Attribute)
+import RichText.Internal.Definitions
+import RichText.Model.Attribute
 import Set exposing (Set)
 
 
@@ -15,14 +15,14 @@ import Set exposing (Set)
 a list of attributes, and a set of annotations.
 -}
 type alias Element =
-    Internal.Element
+    RichText.Internal.Definitions.Element
 
 
 {-| A `ElementDefinition` contains information on how to serialize/deserialize an editor node,
 as well as describes what type of node and what children the node can have.
 -}
 type alias ElementDefinition =
-    Internal.ElementDefinition
+    RichText.Internal.Definitions.ElementDefinition
 
 
 {-| Creates an element. The arguments are as follows:
@@ -39,9 +39,9 @@ type alias ElementDefinition =
 ```
 
 -}
-element : ElementDefinition -> List Attribute -> Element
+element : ElementDefinition -> List RichText.Model.Attribute.Attribute -> Element
 element =
-    Internal.element
+    RichText.Internal.Definitions.element
 
 
 {-| Annotations from an element
@@ -52,7 +52,7 @@ element =
 -}
 annotations : Element -> Set String
 annotations =
-    Internal.annotationsFromElement
+    RichText.Internal.Definitions.annotationsFromElement
 
 
 {-| Attributes from an element
@@ -61,9 +61,9 @@ annotations =
     --> [StringAttribute "src" "logo.svg"]
 
 -}
-attributes : Element -> List Attribute
+attributes : Element -> List RichText.Model.Attribute.Attribute
 attributes =
-    Internal.attributesFromElement
+    RichText.Internal.Definitions.attributesFromElement
 
 
 {-| Name from an element
@@ -74,7 +74,7 @@ attributes =
 -}
 name : Element -> String
 name =
-    Internal.nameFromElement
+    RichText.Internal.Definitions.nameFromElement
 
 
 {-| An element with the annotations changed to the given set
@@ -85,7 +85,7 @@ name =
 -}
 withAnnotations : Set String -> Element -> Element
 withAnnotations =
-    Internal.elementWithAnnotations
+    RichText.Internal.Definitions.elementWithAnnotations
 
 
 {-| An element with the attributes changed to the given list
@@ -94,6 +94,6 @@ withAnnotations =
     --> an element with the attributes changed to the list provided
 
 -}
-withAttributes : List Attribute -> Element -> Element
+withAttributes : List RichText.Model.Attribute.Attribute -> Element -> Element
 withAttributes =
-    Internal.elementWithAttributes
+    RichText.Internal.Definitions.elementWithAttributes

@@ -40,25 +40,13 @@ when defining your own transforms.
 
 import Array
 import List.Extra
-import RichText.Internal.Constants as Constants
-import RichText.Model.Element as Element exposing (Element)
-import RichText.Model.InlineElement as InlineElement
-import RichText.Model.Node as Node
-    exposing
-        ( Block
-        , Children(..)
-        , Inline(..)
-        , Path
-        , blockChildren
-        , childNodes
-        , element
-        , toBlockArray
-        , withChildNodes
-        , withElement
-        )
-import RichText.Model.Selection exposing (Selection, anchorNode, focusNode, range)
-import RichText.Model.Text as Text
-import RichText.Node exposing (Node(..), concatMap, indexedFoldl, map, nodeAt, replace)
+import RichText.Internal.Constants
+import RichText.Model.Element
+import RichText.Model.InlineElement
+import RichText.Model.Node
+import RichText.Model.Selection
+import RichText.Model.Text
+import RichText.Node
 import Set exposing (Set)
 
 
@@ -68,14 +56,14 @@ rendering to annotate a selected node for decorators.
 -}
 selection : String
 selection =
-    Constants.selection
+    RichText.Internal.Constants.selection
 
 
 {-| Represents that a node can be selected. This annotation is not transient.
 -}
 selectable : String
 selectable =
-    Constants.selectable
+    RichText.Internal.Constants.selectable
 
 
 {-| Represents that a node should be lifted. This annotation is transient, e.g. it should be
@@ -83,7 +71,7 @@ cleared before a transform or command is complete.
 -}
 lift : String
 lift =
-    Constants.lift
+    RichText.Internal.Constants.lift
 
 
 {-| Adds an annotation to the node at the given path. Returns an error if no node
@@ -92,14 +80,14 @@ exists at that path.
     Annotation.addAtPath "myAnnotation" path root
 
 -}
-addAtPath : String -> Path -> Block -> Result String Block
+addAtPath : String -> RichText.Model.Node.Path -> RichText.Model.Node.Block -> Result String RichText.Model.Node.Block
 addAtPath annotation path node =
-    case nodeAt path node of
+    case RichText.Node.nodeAt path node of
         Nothing ->
             Err "No block found at path"
 
         Just n ->
-            replace path (add annotation n) node
+            RichText.Node.replace path (add annotation n) node
 
 
 {-| Removes the given annotation from the node at the given path. Returns an error if no node
@@ -108,14 +96,14 @@ exists at that path.
     Annotation.removeAtPath "myAnnotation" path root
 
 -}
-removeAtPath : String -> Path -> Block -> Result String Block
+removeAtPath : String -> RichText.Model.Node.Path -> RichText.Model.Node.Block -> Result String RichText.Model.Node.Block
 removeAtPath annotation path node =
-    case nodeAt path node of
+    case RichText.Node.nodeAt path node of
         Nothing ->
             Err "No block found at path"
 
         Just n ->
-            replace path (remove annotation n) node
+            RichText.Node.replace path (remove annotation n) node
 
 
 {-| Removes the given annotation from the node if it exists.
@@ -124,7 +112,7 @@ removeAtPath annotation path node =
     --> Returns (Block horizontal_rule) with the selectable annotation removed
 
 -}
-remove : String -> Node -> Node
+remove : String -> RichText.Node.Node -> RichText.Node.Node
 remove =
     toggle Set.remove
 
@@ -135,17 +123,17 @@ remove =
     --> Returns (Block horizontal_rule) with the selectable annotation added
 
 -}
-add : String -> Node -> Node
+add : String -> RichText.Node.Node -> RichText.Node.Node
 add =
     toggle Set.insert
 
 
 {-| Helper which adds the given annotation to a block node.
 -}
-addToBlock : String -> Block -> Block
+addToBlock : String -> RichText.Model.Node.Block -> RichText.Model.Node.Block
 addToBlock a n =
-    case add a (Block n) of
-        Block b ->
+    case add a (RichText.Node.Block n) of
+        RichText.Node.Block b ->
             b
 
         _ ->
@@ -154,10 +142,10 @@ addToBlock a n =
 
 {-| Helper which adds the given annotation to an inline node.
 -}
-addToInline : String -> Inline -> Inline
+addToInline : String -> RichText.Model.Node.Inline -> RichText.Model.Node.Inline
 addToInline a n =
-    case add a (Inline n) of
-        Inline i ->
+    case add a (RichText.Node.Inline n) of
+        RichText.Node.Inline i ->
             i
 
         _ ->
@@ -166,10 +154,10 @@ addToInline a n =
 
 {-| Helper which removes the given annotation from a block node.
 -}
-removeFromBlock : String -> Block -> Block
+removeFromBlock : String -> RichText.Model.Node.Block -> RichText.Model.Node.Block
 removeFromBlock a n =
-    case remove a (Block n) of
-        Block b ->
+    case remove a (RichText.Node.Block n) of
+        RichText.Node.Block b ->
             b
 
         _ ->
@@ -178,50 +166,50 @@ removeFromBlock a n =
 
 {-| Helper which removes the given annotation from an inline node.
 -}
-removeFromInline : String -> Inline -> Inline
+removeFromInline : String -> RichText.Model.Node.Inline -> RichText.Model.Node.Inline
 removeFromInline a n =
-    case remove a (Inline n) of
-        Inline i ->
+    case remove a (RichText.Node.Inline n) of
+        RichText.Node.Inline i ->
             i
 
         _ ->
             n
 
 
-toggleElementParameters : (String -> Set String -> Set String) -> String -> Element -> Element
+toggleElementParameters : (String -> Set String -> Set String) -> String -> RichText.Model.Element.Element -> RichText.Model.Element.Element
 toggleElementParameters func annotation parameters =
     let
         annotations =
-            Element.annotations parameters
+            RichText.Model.Element.annotations parameters
     in
-    Element.withAnnotations (func annotation annotations) parameters
+    RichText.Model.Element.withAnnotations (func annotation annotations) parameters
 
 
-toggle : (String -> Set String -> Set String) -> String -> Node -> Node
+toggle : (String -> Set String -> Set String) -> String -> RichText.Node.Node -> RichText.Node.Node
 toggle func annotation node =
     case node of
-        Block bn ->
+        RichText.Node.Block bn ->
             let
                 newParameters =
-                    toggleElementParameters func annotation (element bn)
+                    toggleElementParameters func annotation (RichText.Model.Node.element bn)
 
                 newBlockNode =
-                    bn |> withElement newParameters
+                    bn |> RichText.Model.Node.withElement newParameters
             in
-            Block newBlockNode
+            RichText.Node.Block newBlockNode
 
-        Inline il ->
-            Inline <|
+        RichText.Node.Inline il ->
+            RichText.Node.Inline <|
                 case il of
-                    InlineElement l ->
+                    RichText.Model.Node.InlineElement l ->
                         let
                             newParameters =
-                                toggleElementParameters func annotation (InlineElement.element l)
+                                toggleElementParameters func annotation (RichText.Model.InlineElement.element l)
                         in
-                        InlineElement <| InlineElement.withElement newParameters l
+                        RichText.Model.Node.InlineElement <| RichText.Model.InlineElement.withElement newParameters l
 
-                    Text tl ->
-                        Text <| (tl |> Text.withAnnotations (func annotation <| Text.annotations tl))
+                    RichText.Model.Node.Text tl ->
+                        RichText.Model.Node.Text <| (tl |> RichText.Model.Text.withAnnotations (func annotation <| RichText.Model.Text.annotations tl))
 
 
 {-| Removes the given annotation from this node and its children.
@@ -230,10 +218,10 @@ toggle func annotation node =
     --> Returns `root` but with all the lift annotations removed.
 
 -}
-clear : String -> Block -> Block
+clear : String -> RichText.Model.Node.Block -> RichText.Model.Node.Block
 clear annotation root =
-    case map (remove annotation) (Block root) of
-        Block bn ->
+    case RichText.Node.map (remove annotation) (RichText.Node.Block root) of
+        RichText.Node.Block bn ->
             bn
 
         _ ->
@@ -246,24 +234,24 @@ clear annotation root =
     --> Set ["__selectable__"]
 
 -}
-fromNode : Node -> Set String
+fromNode : RichText.Node.Node -> Set String
 fromNode node =
     case node of
-        Block blockNode ->
-            Element.annotations <| element blockNode
+        RichText.Node.Block blockNode ->
+            RichText.Model.Element.annotations <| RichText.Model.Node.element blockNode
 
-        Inline inlineLeaf ->
+        RichText.Node.Inline inlineLeaf ->
             case inlineLeaf of
-                InlineElement p ->
-                    Element.annotations <| InlineElement.element p
+                RichText.Model.Node.InlineElement p ->
+                    RichText.Model.Element.annotations <| RichText.Model.InlineElement.element p
 
-                Text p ->
-                    Text.annotations p
+                RichText.Model.Node.Text p ->
+                    RichText.Model.Text.annotations p
 
 
-findPathsWithAnnotation : String -> Block -> List Path
+findPathsWithAnnotation : String -> RichText.Model.Node.Block -> List RichText.Model.Node.Path
 findPathsWithAnnotation annotation node =
-    indexedFoldl
+    RichText.Node.indexedFoldl
         (\path n agg ->
             if Set.member annotation <| fromNode n then
                 path :: agg
@@ -272,7 +260,7 @@ findPathsWithAnnotation annotation node =
                 agg
         )
         []
-        (Block node)
+        (RichText.Node.Block node)
 
 
 {-| Adds the selection annotation to the paths in the selection if they exist. This is useful
@@ -282,12 +270,12 @@ when defining your own transforms to keep track of which nodes are selected.
         annotateSelection normalizedSelection (State.root editorState)
 
 -}
-annotateSelection : Selection -> Block -> Block
+annotateSelection : RichText.Model.Selection.Selection -> RichText.Model.Node.Block -> RichText.Model.Node.Block
 annotateSelection selection_ node =
-    addSelectionAnnotationAtPath (focusNode selection_) <| addSelectionAnnotationAtPath (anchorNode selection_) node
+    addSelectionAnnotationAtPath (RichText.Model.Selection.focusNode selection_) <| addSelectionAnnotationAtPath (RichText.Model.Selection.anchorNode selection_) node
 
 
-addSelectionAnnotationAtPath : Path -> Block -> Block
+addSelectionAnnotationAtPath : RichText.Model.Node.Path -> RichText.Model.Node.Block -> RichText.Model.Node.Block
 addSelectionAnnotationAtPath nodePath node =
     Result.withDefault node (addAtPath selection nodePath node)
 
@@ -299,7 +287,7 @@ transient, so it's important to clear the annotation once you're finished with i
     --> Returns root but with the selection annotation removed
 
 -}
-clearSelectionAnnotations : Block -> Block
+clearSelectionAnnotations : RichText.Model.Node.Block -> RichText.Model.Node.Block
 clearSelectionAnnotations =
     clear selection
 
@@ -310,17 +298,17 @@ clearSelectionAnnotations =
     --> Just { anchorNode=[0], anchorOffset=0, focusNode=[1,2], focusOffset=0 }
 
 -}
-selectionFromAnnotations : Block -> Int -> Int -> Maybe Selection
+selectionFromAnnotations : RichText.Model.Node.Block -> Int -> Int -> Maybe RichText.Model.Selection.Selection
 selectionFromAnnotations node anchorOffset focusOffset =
     case findNodeRangeFromSelectionAnnotations node of
         Nothing ->
             Nothing
 
         Just ( start, end ) ->
-            Just (range start anchorOffset end focusOffset)
+            Just (RichText.Model.Selection.range start anchorOffset end focusOffset)
 
 
-findNodeRangeFromSelectionAnnotations : Block -> Maybe ( Path, Path )
+findNodeRangeFromSelectionAnnotations : RichText.Model.Node.Block -> Maybe ( RichText.Model.Node.Path, RichText.Model.Node.Path )
 findNodeRangeFromSelectionAnnotations node =
     let
         paths =
@@ -343,38 +331,38 @@ findNodeRangeFromSelectionAnnotations node =
     --> True
 
 -}
-isSelectable : Node -> Bool
+isSelectable : RichText.Node.Node -> Bool
 isSelectable node =
     case node of
-        Block bn ->
-            Set.member selectable (Element.annotations (element bn))
+        RichText.Node.Block bn ->
+            Set.member selectable (RichText.Model.Element.annotations (RichText.Model.Node.element bn))
 
-        Inline ln ->
+        RichText.Node.Inline ln ->
             case ln of
-                Text _ ->
+                RichText.Model.Node.Text _ ->
                     True
 
-                InlineElement l ->
-                    Set.member selectable (Element.annotations (InlineElement.element l))
+                RichText.Model.Node.InlineElement l ->
+                    Set.member selectable (RichText.Model.Element.annotations (RichText.Model.InlineElement.element l))
 
 
-annotationsFromBlockNode : Block -> Set String
+annotationsFromBlockNode : RichText.Model.Node.Block -> Set String
 annotationsFromBlockNode node =
-    Element.annotations <| Node.element node
+    RichText.Model.Element.annotations <| RichText.Model.Node.element node
 
 
-liftConcatMapFunc : Node -> List Node
+liftConcatMapFunc : RichText.Node.Node -> List RichText.Node.Node
 liftConcatMapFunc node =
     case node of
-        Block bn ->
-            case childNodes bn of
-                Leaf ->
+        RichText.Node.Block bn ->
+            case RichText.Model.Node.childNodes bn of
+                RichText.Model.Node.Leaf ->
                     [ node ]
 
-                InlineChildren _ ->
+                RichText.Model.Node.InlineChildren _ ->
                     [ node ]
 
-                BlockChildren a ->
+                RichText.Model.Node.BlockChildren a ->
                     let
                         groupedBlockNodes =
                             List.Extra.groupWhile
@@ -386,20 +374,20 @@ liftConcatMapFunc node =
                                             lift
                                             (annotationsFromBlockNode n2)
                                 )
-                                (Array.toList (toBlockArray a))
+                                (Array.toList (RichText.Model.Node.toBlockArray a))
                     in
-                    List.map Block <|
+                    List.map RichText.Node.Block <|
                         List.concatMap
                             (\( n, l ) ->
                                 if Set.member lift (annotationsFromBlockNode n) then
                                     n :: l
 
                                 else
-                                    [ bn |> withChildNodes (blockChildren (Array.fromList <| n :: l)) ]
+                                    [ bn |> RichText.Model.Node.withChildNodes (RichText.Model.Node.blockChildren (Array.fromList <| n :: l)) ]
                             )
                             groupedBlockNodes
 
-        Inline _ ->
+        RichText.Node.Inline _ ->
             [ node ]
 
 
@@ -415,6 +403,6 @@ levels of lift annotations, you may have to call this function multiple times.
         doLift markedRoot
 
 -}
-doLift : Block -> Block
+doLift : RichText.Model.Node.Block -> RichText.Model.Node.Block
 doLift root =
-    concatMap liftConcatMapFunc root
+    RichText.Node.concatMap liftConcatMapFunc root

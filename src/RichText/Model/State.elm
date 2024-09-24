@@ -7,8 +7,8 @@ track of and manipulate the contents of the editor.
 
 -}
 
-import RichText.Model.Node exposing (Block)
-import RichText.Model.Selection exposing (Selection)
+import RichText.Model.Node
+import RichText.Model.Selection
 
 
 {-| A `State` consists of a root block and a selection. `State` allows you to keep
@@ -19,8 +19,8 @@ type State
 
 
 type alias Contents =
-    { root : Block
-    , selection : Maybe Selection
+    { root : RichText.Model.Node.Block
+    , selection : Maybe RichText.Model.Selection.Selection
     }
 
 
@@ -48,14 +48,14 @@ state root Nothing
 ```
 
 -}
-state : Block -> Maybe Selection -> State
+state : RichText.Model.Node.Block -> Maybe RichText.Model.Selection.Selection -> State
 state root_ sel_ =
     State { root = root_, selection = sel_ }
 
 
 {-| the selection from the state
 -}
-selection : State -> Maybe Selection
+selection : State -> Maybe RichText.Model.Selection.Selection
 selection st =
     case st of
         State s ->
@@ -64,7 +64,7 @@ selection st =
 
 {-| the root node from the state
 -}
-root : State -> Block
+root : State -> RichText.Model.Node.Block
 root st =
     case st of
         State s ->
@@ -73,7 +73,7 @@ root st =
 
 {-| a state with the given selection
 -}
-withSelection : Maybe Selection -> State -> State
+withSelection : Maybe RichText.Model.Selection.Selection -> State -> State
 withSelection sel st =
     case st of
         State s ->
@@ -82,7 +82,7 @@ withSelection sel st =
 
 {-| a state with the given root
 -}
-withRoot : Block -> State -> State
+withRoot : RichText.Model.Node.Block -> State -> State
 withRoot node st =
     case st of
         State s ->

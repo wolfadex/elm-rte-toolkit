@@ -6,7 +6,7 @@ module RichText.Model.Text exposing (Text, empty, text, marks, annotations, with
 
 -}
 
-import RichText.Model.Mark exposing (Mark)
+import RichText.Model.Mark
 import Set exposing (Set)
 
 
@@ -17,7 +17,7 @@ type Text
 
 
 type alias TextContents =
-    { marks : List Mark
+    { marks : List RichText.Model.Mark.Mark
     , annotations : Set String
     , text : String
     }
@@ -32,7 +32,7 @@ empty =
 
 {-| marks from `Text`
 -}
-marks : Text -> List Mark
+marks : Text -> List RichText.Model.Mark.Mark
 marks parameters =
     case parameters of
         Text c ->
@@ -77,7 +77,7 @@ withAnnotations ann parameters =
 
 {-| `Text` with the given marks
 -}
-withMarks : List Mark -> Text -> Text
+withMarks : List RichText.Model.Mark.Mark -> Text -> Text
 withMarks m parameters =
     case parameters of
         Text c ->

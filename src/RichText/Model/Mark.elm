@@ -24,22 +24,22 @@ module RichText.Model.Mark exposing
 -}
 
 import Dict exposing (Dict)
-import RichText.Config.Spec exposing (Spec, markDefinitions)
-import RichText.Internal.Definitions as Internal exposing (MarkDefinition(..), attributesFromMark)
-import RichText.Model.Attribute exposing (Attribute)
+import RichText.Config.Spec
+import RichText.Internal.Definitions
+import RichText.Model.Attribute
 
 
 {-| A mark is a piece of information defined by a `MarkDefinition` that can be attached to an inline node,
 like color font, or link information.
 -}
 type alias Mark =
-    Internal.Mark
+    RichText.Internal.Definitions.Mark
 
 
 {-| A mark definition defines how a mark is encoded an decoded.
 -}
 type alias MarkDefinition =
-    Internal.MarkDefinition
+    RichText.Internal.Definitions.MarkDefinition
 
 
 {-| Creates a mark. The arguments are as follows:
@@ -55,30 +55,30 @@ type alias MarkDefinition =
 ```
 
 -}
-mark : MarkDefinition -> List Attribute -> Mark
+mark : MarkDefinition -> List RichText.Model.Attribute.Attribute -> Mark
 mark =
-    Internal.mark
+    RichText.Internal.Definitions.mark
 
 
 {-| A list of attributes associated with the mark
 -}
-attributes : Mark -> List Attribute
+attributes : Mark -> List RichText.Model.Attribute.Attribute
 attributes =
-    attributesFromMark
+    RichText.Internal.Definitions.attributesFromMark
 
 
 {-| Name of the mark
 -}
 name : Mark -> String
 name =
-    Internal.nameFromMark
+    RichText.Internal.Definitions.nameFromMark
 
 
 {-| Creates a mark with new attributes
 -}
-withAttributes : List Attribute -> Mark -> Mark
+withAttributes : List RichText.Model.Attribute.Attribute -> Mark -> Mark
 withAttributes =
-    Internal.markWithAttributes
+    RichText.Internal.Definitions.markWithAttributes
 
 
 {-| A mark order is a way of sorting marks. In order to have a single way of representing a document,
@@ -186,17 +186,17 @@ toggle toggleAction order mark_ marks =
     --> returns a mark order that will sort marks in the following order:  link, bold, italic, and code.
 
 -}
-markOrderFromSpec : Spec -> MarkOrder
+markOrderFromSpec : RichText.Config.Spec.Spec -> MarkOrder
 markOrderFromSpec spec =
     MarkOrder <|
         Dict.fromList
             (List.indexedMap
                 (\i m ->
                     case m of
-                        MarkDefinition md ->
+                        RichText.Internal.Definitions.MarkDefinition md ->
                             ( md.name, i )
                 )
-                (markDefinitions spec)
+                (RichText.Config.Spec.markDefinitions spec)
             )
 
 

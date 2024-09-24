@@ -7,8 +7,8 @@ not a text node.
 
 -}
 
-import RichText.Model.Element exposing (Element)
-import RichText.Model.Mark exposing (Mark)
+import RichText.Model.Element
+import RichText.Model.Mark
 
 
 {-| `InlineElement` is an element with marks. It represents the contents of an inline node that is
@@ -19,14 +19,14 @@ type InlineElement
 
 
 type alias InlineElementContents =
-    { marks : List Mark
-    , element : Element
+    { marks : List RichText.Model.Mark.Mark
+    , element : RichText.Model.Element.Element
     }
 
 
 {-| Marks from an inline element
 -}
-marks : InlineElement -> List Mark
+marks : InlineElement -> List RichText.Model.Mark.Mark
 marks parameters =
     case parameters of
         InlineElement c ->
@@ -35,7 +35,7 @@ marks parameters =
 
 {-| `Element` from an inline element
 -}
-element : InlineElement -> Element
+element : InlineElement -> RichText.Model.Element.Element
 element parameters =
     case parameters of
         InlineElement c ->
@@ -44,14 +44,14 @@ element parameters =
 
 {-| Creates an inline element from an element and a list of marks
 -}
-inlineElement : Element -> List Mark -> InlineElement
+inlineElement : RichText.Model.Element.Element -> List RichText.Model.Mark.Mark -> InlineElement
 inlineElement parameters m =
     InlineElement { element = parameters, marks = m }
 
 
 {-| Creates an inline element with the new `Element`
 -}
-withElement : Element -> InlineElement -> InlineElement
+withElement : RichText.Model.Element.Element -> InlineElement -> InlineElement
 withElement eparams iparams =
     case iparams of
         InlineElement c ->
@@ -60,7 +60,7 @@ withElement eparams iparams =
 
 {-| Creates an inline element with the new marks
 -}
-withMarks : List Mark -> InlineElement -> InlineElement
+withMarks : List RichText.Model.Mark.Mark -> InlineElement -> InlineElement
 withMarks m iparams =
     case iparams of
         InlineElement c ->

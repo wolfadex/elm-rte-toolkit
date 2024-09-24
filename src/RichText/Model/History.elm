@@ -6,14 +6,14 @@ module RichText.Model.History exposing (History, empty, peek, undoList, redoList
 
 -}
 
-import RichText.Internal.History as Internal
-import RichText.Model.State exposing (State)
+import RichText.Internal.History
+import RichText.Model.State
 
 
 {-| `History` contains the undo deque and redo stack related to undo history.
 -}
 type alias History =
-    Internal.History
+    RichText.Internal.History.History
 
 
 {-| Provides an empty `History` with the given config. The config values are as follows:
@@ -25,25 +25,25 @@ type alias History =
 -}
 empty : { groupDelayMilliseconds : Int, size : Int } -> History
 empty =
-    Internal.empty
+    RichText.Internal.History.empty
 
 
 {-| Returns the last executed action and previous state on the undo stack.
 -}
-peek : History -> Maybe ( String, State )
+peek : History -> Maybe ( String, RichText.Model.State.State )
 peek =
-    Internal.peek
+    RichText.Internal.History.peek
 
 
 {-| Returns the entire undo stack.
 -}
-undoList : History -> List ( String, State )
+undoList : History -> List ( String, RichText.Model.State.State )
 undoList =
-    Internal.undoList
+    RichText.Internal.History.undoList
 
 
 {-| Returns the entire redo stack.
 -}
-redoList : History -> List State
+redoList : History -> List RichText.Model.State.State
 redoList =
-    Internal.redoList
+    RichText.Internal.History.redoList

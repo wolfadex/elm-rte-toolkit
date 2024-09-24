@@ -18,16 +18,16 @@ module RichText.Config.MarkDefinition exposing
 -}
 
 import Array exposing (Array)
-import RichText.Internal.Definitions as Internal
-import RichText.Model.Attribute exposing (Attribute(..))
-import RichText.Model.HtmlNode exposing (HtmlNode(..))
-import RichText.Model.Mark exposing (Mark)
+import RichText.Internal.Definitions
+import RichText.Model.Attribute
+import RichText.Model.HtmlNode
+import RichText.Model.Mark
 
 
 {-| A mark definition defines how a mark is encoded an decoded.
 -}
 type alias MarkDefinition =
-    Internal.MarkDefinition
+    RichText.Internal.Definitions.MarkDefinition
 
 
 {-| Type alias for a mark encoding function
@@ -38,7 +38,7 @@ type alias MarkDefinition =
 
 -}
 type alias MarkToHtml =
-    Mark -> Array HtmlNode -> HtmlNode
+    RichText.Model.Mark.Mark -> Array RichText.Model.HtmlNode.HtmlNode -> RichText.Model.HtmlNode.HtmlNode
 
 
 {-| Type alias for a mark decoding function
@@ -58,7 +58,7 @@ type alias MarkToHtml =
 
 -}
 type alias HtmlToMark =
-    MarkDefinition -> HtmlNode -> Maybe ( Mark, Array HtmlNode )
+    MarkDefinition -> RichText.Model.HtmlNode.HtmlNode -> Maybe ( RichText.Model.Mark.Mark, Array RichText.Model.HtmlNode.HtmlNode )
 
 
 {-| Defines a mark. The arguments are as follows:
@@ -85,7 +85,7 @@ markDefinition :
     }
     -> MarkDefinition
 markDefinition contents =
-    Internal.MarkDefinition
+    RichText.Internal.Definitions.MarkDefinition
         contents
 
 
@@ -98,7 +98,7 @@ markDefinition contents =
 name : MarkDefinition -> String
 name definition_ =
     case definition_ of
-        Internal.MarkDefinition c ->
+        RichText.Internal.Definitions.MarkDefinition c ->
             c.name
 
 
@@ -107,7 +107,7 @@ name definition_ =
 toHtmlNode : MarkDefinition -> MarkToHtml
 toHtmlNode definition_ =
     case definition_ of
-        Internal.MarkDefinition c ->
+        RichText.Internal.Definitions.MarkDefinition c ->
             c.toHtmlNode
 
 
@@ -116,7 +116,7 @@ toHtmlNode definition_ =
 fromHtmlNode : MarkDefinition -> HtmlToMark
 fromHtmlNode definition_ =
     case definition_ of
-        Internal.MarkDefinition c ->
+        RichText.Internal.Definitions.MarkDefinition c ->
             c.fromHtmlNode
 
 
@@ -144,17 +144,17 @@ defaultMarkDefinition name_ =
 -}
 defaultMarkToHtml : String -> MarkToHtml
 defaultMarkToHtml tag mark_ children =
-    ElementNode tag
+    RichText.Model.HtmlNode.ElementNode tag
         (List.filterMap
             (\attr ->
                 case attr of
-                    StringAttribute k v ->
+                    RichText.Model.Attribute.StringAttribute k v ->
                         Just ( k, v )
 
                     _ ->
                         Nothing
             )
-            (Internal.attributesFromMark mark_)
+            (RichText.Internal.Definitions.attributesFromMark mark_)
         )
         children
 
@@ -168,9 +168,9 @@ defaultMarkToHtml tag mark_ children =
 defaultHtmlToMark : String -> HtmlToMark
 defaultHtmlToMark htmlTag def node =
     case node of
-        ElementNode name_ _ children ->
+        RichText.Model.HtmlNode.ElementNode name_ _ children ->
             if name_ == htmlTag then
-                Just ( Internal.mark def [], children )
+                Just ( RichText.Internal.Definitions.mark def [], children )
 
             else
                 Nothing

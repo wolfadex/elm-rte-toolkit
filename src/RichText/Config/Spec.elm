@@ -14,10 +14,6 @@ module RichText.Config.Spec exposing
 import Dict exposing (Dict)
 import RichText.Config.ElementDefinition
 import RichText.Internal.Definitions
-    exposing
-        ( ElementDefinition(..)
-        , MarkDefinition(..)
-        )
 
 
 {-| A spec describes what nodes and marks can be in an editor. It's used internally to encode an
@@ -89,7 +85,7 @@ withMarkDefinitions marks spec =
                             List.map
                                 (\x ->
                                     case x of
-                                        MarkDefinition m ->
+                                        RichText.Internal.Definitions.MarkDefinition m ->
                                             ( m.name, x )
                                 )
                                 marks
@@ -110,7 +106,7 @@ withElementDefinitions nodes spec =
                             List.map
                                 (\x ->
                                     case x of
-                                        ElementDefinition m ->
+                                        RichText.Internal.Definitions.ElementDefinition m ->
                                             ( m.name, x )
                                 )
                                 nodes

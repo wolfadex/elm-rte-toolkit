@@ -31,73 +31,17 @@ module RichText.List exposing
 
 import Array
 import List.Extra
-import RichText.Annotation as Annotation
-    exposing
-        ( annotateSelection
-        , clear
-        , clearSelectionAnnotations
-        , doLift
-        , selectionFromAnnotations
-        )
+import RichText.Annotation
 import RichText.Commands
 import RichText.Config.Command
-    exposing
-        ( CommandMap
-        , Transform
-        , emptyCommandMap
-        , inputEvent
-        , key
-        , set
-        , transform
-        )
 import RichText.Config.Keys
-    exposing
-        ( alt
-        , backspace
-        , delete
-        , enter
-        , return
-        )
-import RichText.Definitions exposing (listItem, orderedList, unorderedList)
-import RichText.Model.Element as Element exposing (Element, element)
-import RichText.Model.Node as Node
-    exposing
-        ( Block
-        , Children(..)
-        , Inline(..)
-        , Path
-        , block
-        , blockChildren
-        , childNodes
-        , commonAncestor
-        , decrement
-        , increment
-        , toBlockArray
-        )
+import RichText.Definitions
+import RichText.Model.Element
+import RichText.Model.Node
 import RichText.Model.Selection
-    exposing
-        ( Selection
-        , anchorNode
-        , anchorOffset
-        , focusNode
-        , focusOffset
-        , isCollapsed
-        , normalize
-        )
-import RichText.Model.State as State exposing (withRoot, withSelection)
-import RichText.Model.Text exposing (text)
+import RichText.Model.State
+import RichText.Model.Text
 import RichText.Node
-    exposing
-        ( Fragment(..)
-        , Node(..)
-        , findAncestor
-        , isEmptyTextBlock
-        , joinBlocks
-        , last
-        , nodeAt
-        , replace
-        , replaceWithFragment
-        )
 
 
 {-| Represents if a list is ordered or unordered.
@@ -115,13 +59,13 @@ type ListDefinition
 
 {-| Creates a list definition
 -}
-listDefinition : { ordered : Element, unordered : Element, item : Element } -> ListDefinition
+listDefinition : { ordered : RichText.Model.Element.Element, unordered : RichText.Model.Element.Element, item : RichText.Model.Element.Element } -> ListDefinition
 listDefinition contents =
     ListDefinition contents
 
 
 type alias ListDefinitionContents =
-    { ordered : Element, unordered : Element, item : Element }
+    { ordered : RichText.Model.Element.Element, unordered : RichText.Model.Element.Element, item : RichText.Model.Element.Element }
 
 
 {-| Creates a predefined command map related to lists. You can combine this command map with others
@@ -133,7 +77,7 @@ using `RichText.Model.Command.combine`:
     combine listCommandMap RichText.Commands.defaultCommandMap
 
 -}
-defaultCommandMap : ListDefinition -> CommandMap
+defaultCommandMap : ListDefinition -> RichText.Config.Command.CommandMap
 defaultCommandMap definition =
     let
         backspaceCommand =
@@ -142,19 +86,19 @@ defaultCommandMap definition =
         deleteCommand =
             joinForward definition
     in
-    emptyCommandMap
-        |> set [ inputEvent "insertParagraph", key [ enter ], key [ return ] ]
-            [ ( "liftEmptyListItem", transform <| liftEmpty definition )
-            , ( "splitListItem", transform <| split definition )
+    RichText.Config.Command.emptyCommandMap
+        |> RichText.Config.Command.set [ RichText.Config.Command.inputEvent "insertParagraph", RichText.Config.Command.key [ RichText.Config.Keys.enter ], RichText.Config.Command.key [ RichText.Config.Keys.return ] ]
+            [ ( "liftEmptyListItem", RichText.Config.Command.transform <| liftEmpty definition )
+            , ( "splitListItem", RichText.Config.Command.transform <| split definition )
             ]
-        |> set [ inputEvent "deleteContentBackward", key [ backspace ] ]
-            [ ( "joinListBackward", transform <| backspaceCommand ) ]
-        |> set [ inputEvent "deleteContentForward", key [ delete ] ]
-            [ ( "joinListForward", transform <| deleteCommand ) ]
-        |> set [ inputEvent "deleteWordBackward", key [ alt, backspace ] ]
-            [ ( "joinListBackward", transform <| backspaceCommand ) ]
-        |> set [ inputEvent "deleteWordForward", key [ alt, delete ] ]
-            [ ( "joinListForward", transform <| deleteCommand ) ]
+        |> RichText.Config.Command.set [ RichText.Config.Command.inputEvent "deleteContentBackward", RichText.Config.Command.key [ RichText.Config.Keys.backspace ] ]
+            [ ( "joinListBackward", RichText.Config.Command.transform <| backspaceCommand ) ]
+        |> RichText.Config.Command.set [ RichText.Config.Command.inputEvent "deleteContentForward", RichText.Config.Command.key [ RichText.Config.Keys.delete ] ]
+            [ ( "joinListForward", RichText.Config.Command.transform <| deleteCommand ) ]
+        |> RichText.Config.Command.set [ RichText.Config.Command.inputEvent "deleteWordBackward", RichText.Config.Command.key [ RichText.Config.Keys.alt, RichText.Config.Keys.backspace ] ]
+            [ ( "joinListBackward", RichText.Config.Command.transform <| backspaceCommand ) ]
+        |> RichText.Config.Command.set [ RichText.Config.Command.inputEvent "deleteWordForward", RichText.Config.Command.key [ RichText.Config.Keys.alt, RichText.Config.Keys.delete ] ]
+            [ ( "joinListForward", RichText.Config.Command.transform <| deleteCommand ) ]
 
 
 {-| The default list definition, which uses `RichText.Definitions` `orderedList`, `unorderedList` and `listItem`
@@ -163,15 +107,15 @@ element definitions.
 defaultListDefinition : ListDefinition
 defaultListDefinition =
     listDefinition
-        { ordered = element orderedList []
-        , unordered = element unorderedList []
-        , item = element listItem []
+        { ordered = RichText.Model.Element.element RichText.Definitions.orderedList []
+        , unordered = RichText.Model.Element.element RichText.Definitions.unorderedList []
+        , item = RichText.Model.Element.element RichText.Definitions.listItem []
         }
 
 
 {-| Retrieves the element template for list items
 -}
-item : ListDefinition -> Element
+item : ListDefinition -> RichText.Model.Element.Element
 item definition =
     case definition of
         ListDefinition c ->
@@ -180,7 +124,7 @@ item definition =
 
 {-| Retrieves the element template for ordered lists
 -}
-ordered : ListDefinition -> Element
+ordered : ListDefinition -> RichText.Model.Element.Element
 ordered definition =
     case definition of
         ListDefinition c ->
@@ -189,18 +133,18 @@ ordered definition =
 
 {-| Retrieves the element template for unordered lists
 -}
-unordered : ListDefinition -> Element
+unordered : ListDefinition -> RichText.Model.Element.Element
 unordered definition =
     case definition of
         ListDefinition c ->
             c.unordered
 
 
-addListItem : ListDefinition -> Block -> Block
+addListItem : ListDefinition -> RichText.Model.Node.Block -> RichText.Model.Node.Block
 addListItem definition node =
-    block
+    RichText.Model.Node.block
         (item definition)
-        (blockChildren <|
+        (RichText.Model.Node.blockChildren <|
             Array.fromList [ node ]
         )
 
@@ -281,7 +225,7 @@ addListItem definition node =
     --> True
 
 -}
-wrap : ListDefinition -> ListType -> Transform
+wrap : ListDefinition -> ListType -> RichText.Config.Command.Transform
 wrap definition type_ editorState =
     RichText.Commands.wrap (addListItem definition)
         (if type_ == Ordered then
@@ -295,9 +239,9 @@ wrap definition type_ editorState =
 
 {-| Finds the closest list item ancestor and path if one exists, otherwise returns `Nothing`.
 -}
-findListItemAncestor : Element -> Path -> Block -> Maybe ( Path, Block )
+findListItemAncestor : RichText.Model.Element.Element -> RichText.Model.Node.Path -> RichText.Model.Node.Block -> Maybe ( RichText.Model.Node.Path, RichText.Model.Node.Block )
 findListItemAncestor parameters =
-    findAncestor (\n -> Element.name (Node.element n) == Element.name parameters)
+    RichText.Node.findAncestor (\n -> RichText.Model.Element.name (RichText.Model.Node.element n) == RichText.Model.Element.name parameters)
 
 
 {-| Same as `RichText.Commands.splitTextBlock`, but searches for a list item ancestor instead of a text block
@@ -380,46 +324,46 @@ findListItemAncestor parameters =
     --> True
 
 -}
-split : ListDefinition -> Transform
+split : ListDefinition -> RichText.Config.Command.Transform
 split definition =
     RichText.Commands.splitBlock (findListItemAncestor (item definition))
 
 
 {-| Returns true if the current node is a ordered or unordered list, false otherwise.
 -}
-isListNode : ListDefinition -> Node -> Bool
+isListNode : ListDefinition -> RichText.Node.Node -> Bool
 isListNode definition node =
     case node of
-        Inline _ ->
+        RichText.Node.Inline _ ->
             False
 
-        Block bn ->
+        RichText.Node.Block bn ->
             let
                 bnName =
-                    Element.name (Node.element bn)
+                    RichText.Model.Element.name (RichText.Model.Node.element bn)
             in
             bnName
-                == Element.name (ordered definition)
+                == RichText.Model.Element.name (ordered definition)
                 || bnName
-                == Element.name (unordered definition)
+                == RichText.Model.Element.name (unordered definition)
 
 
-addLiftAnnotationAtPathAndChildren : Path -> Block -> Result String Block
+addLiftAnnotationAtPathAndChildren : RichText.Model.Node.Path -> RichText.Model.Node.Block -> Result String RichText.Model.Node.Block
 addLiftAnnotationAtPathAndChildren path root =
-    case Annotation.addAtPath Annotation.lift path root of
+    case RichText.Annotation.addAtPath RichText.Annotation.lift path root of
         Err s ->
             Err s
 
         Ok newRoot ->
-            case nodeAt path newRoot of
+            case RichText.Node.nodeAt path newRoot of
                 Nothing ->
                     Err "Invalid path"
 
                 Just node ->
                     case node of
-                        Block bn ->
-                            case childNodes bn of
-                                BlockChildren ba ->
+                        RichText.Node.Block bn ->
+                            case RichText.Model.Node.childNodes bn of
+                                RichText.Model.Node.BlockChildren ba ->
                                     List.foldl
                                         (\i result ->
                                             case result of
@@ -427,10 +371,10 @@ addLiftAnnotationAtPathAndChildren path root =
                                                     result
 
                                                 Ok n ->
-                                                    Annotation.addAtPath Annotation.lift (path ++ [ i ]) n
+                                                    RichText.Annotation.addAtPath RichText.Annotation.lift (path ++ [ i ]) n
                                         )
                                         (Ok newRoot)
-                                        (List.range 0 (Array.length (toBlockArray ba) - 1))
+                                        (List.range 0 (Array.length (RichText.Model.Node.toBlockArray ba) - 1))
 
                                 _ ->
                                     Err "I was expecting a block array to add a lift mark to"
@@ -439,14 +383,14 @@ addLiftAnnotationAtPathAndChildren path root =
                             Err "I was expecting a block node to add a lift mark to"
 
 
-addLiftMarkToListItems : ListDefinition -> Selection -> Block -> Result String Block
+addLiftMarkToListItems : ListDefinition -> RichText.Model.Selection.Selection -> RichText.Model.Node.Block -> Result String RichText.Model.Node.Block
 addLiftMarkToListItems definition selection root =
-    case findListItemAncestor (item definition) (anchorNode selection) root of
+    case findListItemAncestor (item definition) (RichText.Model.Selection.anchorNode selection) root of
         Nothing ->
             Err "There is no list item ancestor at anchor path"
 
         Just ( start, _ ) ->
-            case findListItemAncestor (item definition) (focusNode selection) root of
+            case findListItemAncestor (item definition) (RichText.Model.Selection.focusNode selection) root of
                 Nothing ->
                     Err "There is no list item ancestor at focus path"
 
@@ -457,9 +401,9 @@ addLiftMarkToListItems definition selection root =
                     else
                         let
                             ancestor =
-                                commonAncestor start end
+                                RichText.Model.Node.commonAncestor start end
                         in
-                        case nodeAt ancestor root of
+                        case RichText.Node.nodeAt ancestor root of
                             Nothing ->
                                 Err "Invalid ancestor path"
 
@@ -578,18 +522,18 @@ addLiftMarkToListItems definition selection root =
     --> True
 
 -}
-lift : ListDefinition -> Transform
+lift : ListDefinition -> RichText.Config.Command.Transform
 lift definition editorState =
-    case State.selection editorState of
+    case RichText.Model.State.selection editorState of
         Nothing ->
             Err "Nothing is selected"
 
         Just selection ->
             let
                 normalizedSelection =
-                    normalize selection
+                    RichText.Model.Selection.normalize selection
             in
-            case addLiftMarkToListItems definition normalizedSelection <| annotateSelection normalizedSelection (State.root editorState) of
+            case addLiftMarkToListItems definition normalizedSelection <| RichText.Annotation.annotateSelection normalizedSelection (RichText.Model.State.root editorState) of
                 Err s ->
                     Err s
 
@@ -597,15 +541,15 @@ lift definition editorState =
                     let
                         -- this logic looks suspicious... but it seems to work
                         liftedRoot =
-                            doLift <| doLift markedRoot
+                            RichText.Annotation.doLift <| RichText.Annotation.doLift markedRoot
 
                         newSelection =
-                            selectionFromAnnotations liftedRoot (anchorOffset normalizedSelection) (focusOffset normalizedSelection)
+                            RichText.Annotation.selectionFromAnnotations liftedRoot (RichText.Model.Selection.anchorOffset normalizedSelection) (RichText.Model.Selection.focusOffset normalizedSelection)
                     in
                     Ok
                         (editorState
-                            |> withSelection newSelection
-                            |> withRoot (clear Annotation.lift <| clearSelectionAnnotations liftedRoot)
+                            |> RichText.Model.State.withSelection newSelection
+                            |> RichText.Model.State.withRoot (RichText.Annotation.clear RichText.Annotation.lift <| RichText.Annotation.clearSelectionAnnotations liftedRoot)
                         )
 
 
@@ -696,30 +640,30 @@ lift definition editorState =
     --> True
 
 -}
-liftEmpty : ListDefinition -> Transform
+liftEmpty : ListDefinition -> RichText.Config.Command.Transform
 liftEmpty definition editorState =
-    case State.selection editorState of
+    case RichText.Model.State.selection editorState of
         Nothing ->
             Err "Nothing is selected"
 
         Just selection ->
-            if (not <| isCollapsed selection) || anchorOffset selection /= 0 then
+            if (not <| RichText.Model.Selection.isCollapsed selection) || RichText.Model.Selection.anchorOffset selection /= 0 then
                 Err "I can only lift collapsed selections at the beginning of a text node"
 
             else
-                case findListItemAncestor (item definition) (anchorNode selection) (State.root editorState) of
+                case findListItemAncestor (item definition) (RichText.Model.Selection.anchorNode selection) (RichText.Model.State.root editorState) of
                     Nothing ->
                         Err "No list item ancestor to lift"
 
                     Just ( _, node ) ->
-                        case childNodes node of
-                            BlockChildren a ->
-                                case Array.get 0 (toBlockArray a) of
+                        case RichText.Model.Node.childNodes node of
+                            RichText.Model.Node.BlockChildren a ->
+                                case Array.get 0 (RichText.Model.Node.toBlockArray a) of
                                     Nothing ->
                                         Err "Cannot lift a list item with no children"
 
                                     Just firstNode ->
-                                        if not <| isEmptyTextBlock (Block firstNode) then
+                                        if not <| RichText.Node.isEmptyTextBlock (RichText.Node.Block firstNode) then
                                             Err "I cannot lift a node that is not an empty text block"
 
                                         else
@@ -731,23 +675,23 @@ liftEmpty definition editorState =
 
 {-| True if the selection is collapsed at the beginning of a list item, false otherwise.
 -}
-isBeginningOfListItem : ListDefinition -> Selection -> Block -> Bool
+isBeginningOfListItem : ListDefinition -> RichText.Model.Selection.Selection -> RichText.Model.Node.Block -> Bool
 isBeginningOfListItem definition selection root =
-    if not <| isCollapsed selection then
+    if not <| RichText.Model.Selection.isCollapsed selection then
         False
 
-    else if anchorOffset selection /= 0 then
+    else if RichText.Model.Selection.anchorOffset selection /= 0 then
         False
 
     else
-        case findListItemAncestor (item definition) (anchorNode selection) root of
+        case findListItemAncestor (item definition) (RichText.Model.Selection.anchorNode selection) root of
             Nothing ->
                 False
 
             Just ( p, _ ) ->
                 let
                     relativePath =
-                        List.drop (List.length p) (anchorNode selection)
+                        List.drop (List.length p) (RichText.Model.Selection.anchorNode selection)
                 in
                 List.all (\i -> i == 0) relativePath
 
@@ -840,25 +784,25 @@ fails with an error.
     --> True
 
 -}
-joinBackward : ListDefinition -> Transform
+joinBackward : ListDefinition -> RichText.Config.Command.Transform
 joinBackward definition editorState =
-    case State.selection editorState of
+    case RichText.Model.State.selection editorState of
         Nothing ->
             Err "Nothing is selected"
 
         Just selection ->
-            if not <| isBeginningOfListItem definition selection (State.root editorState) then
+            if not <| isBeginningOfListItem definition selection (RichText.Model.State.root editorState) then
                 Err "I can only join a list item backward if the selection is the beginning of a list item"
 
             else
                 let
                     normalizedSelection =
-                        normalize selection
+                        RichText.Model.Selection.normalize selection
 
                     markedRoot =
-                        annotateSelection normalizedSelection (State.root editorState)
+                        RichText.Annotation.annotateSelection normalizedSelection (RichText.Model.State.root editorState)
                 in
-                case findListItemAncestor (item definition) (anchorNode selection) markedRoot of
+                case findListItemAncestor (item definition) (RichText.Model.Selection.anchorNode selection) markedRoot of
                     Nothing ->
                         Err "There is no list item selected"
 
@@ -870,28 +814,28 @@ joinBackward definition editorState =
                         else
                             let
                                 prevLiPath =
-                                    decrement liPath
+                                    RichText.Model.Node.decrement liPath
                             in
-                            case nodeAt prevLiPath markedRoot of
+                            case RichText.Node.nodeAt prevLiPath markedRoot of
                                 Nothing ->
                                     Err "Invalid list item path"
 
                                 Just prevLiNode ->
                                     case prevLiNode of
-                                        Inline _ ->
+                                        RichText.Node.Inline _ ->
                                             Err "There is no list item at path"
 
-                                        Block prevBn ->
-                                            case joinBlocks prevBn liNode of
+                                        RichText.Node.Block prevBn ->
+                                            case RichText.Node.joinBlocks prevBn liNode of
                                                 Nothing ->
                                                     Err "Could not join list items"
 
                                                 Just joinedLi ->
                                                     let
                                                         joinedNodes =
-                                                            replace prevLiPath (Block joinedLi) markedRoot
+                                                            RichText.Node.replace prevLiPath (RichText.Node.Block joinedLi) markedRoot
                                                                 |> Result.andThen
-                                                                    (replaceWithFragment liPath (BlockFragment Array.empty))
+                                                                    (RichText.Node.replaceWithFragment liPath (RichText.Node.BlockFragment Array.empty))
                                                     in
                                                     case joinedNodes of
                                                         Err s ->
@@ -900,42 +844,42 @@ joinBackward definition editorState =
                                                         Ok newRoot ->
                                                             Ok
                                                                 (editorState
-                                                                    |> withSelection
-                                                                        (selectionFromAnnotations
+                                                                    |> RichText.Model.State.withSelection
+                                                                        (RichText.Annotation.selectionFromAnnotations
                                                                             newRoot
-                                                                            (anchorOffset selection)
-                                                                            (focusOffset selection)
+                                                                            (RichText.Model.Selection.anchorOffset selection)
+                                                                            (RichText.Model.Selection.focusOffset selection)
                                                                         )
-                                                                    |> withRoot (clearSelectionAnnotations newRoot)
+                                                                    |> RichText.Model.State.withRoot (RichText.Annotation.clearSelectionAnnotations newRoot)
                                                                 )
 
 
 {-| True if the selection is collapsed at the end of a list item, false otherwise.
 -}
-isEndOfListItem : ListDefinition -> Selection -> Block -> Bool
+isEndOfListItem : ListDefinition -> RichText.Model.Selection.Selection -> RichText.Model.Node.Block -> Bool
 isEndOfListItem definition selection root =
-    if not <| isCollapsed selection then
+    if not <| RichText.Model.Selection.isCollapsed selection then
         False
 
     else
-        case findListItemAncestor (item definition) (anchorNode selection) root of
+        case findListItemAncestor (item definition) (RichText.Model.Selection.anchorNode selection) root of
             Nothing ->
                 False
 
             Just ( path, node ) ->
                 let
                     ( lastPath, lastNode ) =
-                        last node
+                        RichText.Node.last node
                 in
-                if anchorNode selection /= path ++ lastPath then
+                if RichText.Model.Selection.anchorNode selection /= path ++ lastPath then
                     False
 
                 else
                     case lastNode of
-                        Inline il ->
+                        RichText.Node.Inline il ->
                             case il of
-                                Text tl ->
-                                    String.length (text tl) == anchorOffset selection
+                                RichText.Model.Node.Text tl ->
+                                    String.length (RichText.Model.Text.text tl) == RichText.Model.Selection.anchorOffset selection
 
                                 _ ->
                                     True
@@ -1031,53 +975,53 @@ isEndOfListItem definition selection root =
     --> True
 
 -}
-joinForward : ListDefinition -> Transform
+joinForward : ListDefinition -> RichText.Config.Command.Transform
 joinForward definition editorState =
-    case State.selection editorState of
+    case RichText.Model.State.selection editorState of
         Nothing ->
             Err "Nothing is selected"
 
         Just selection ->
-            if not <| isEndOfListItem definition selection (State.root editorState) then
+            if not <| isEndOfListItem definition selection (RichText.Model.State.root editorState) then
                 Err "I can only join a list item forward if the selection is at the end of a list item"
 
             else
                 let
                     normalizedSelection =
-                        normalize selection
+                        RichText.Model.Selection.normalize selection
 
                     markedRoot =
-                        annotateSelection normalizedSelection (State.root editorState)
+                        RichText.Annotation.annotateSelection normalizedSelection (RichText.Model.State.root editorState)
                 in
-                case findListItemAncestor (item definition) (anchorNode selection) markedRoot of
+                case findListItemAncestor (item definition) (RichText.Model.Selection.anchorNode selection) markedRoot of
                     Nothing ->
                         Err "There is no list item selected"
 
                     Just ( liPath, liNode ) ->
                         let
                             nextLiPath =
-                                increment liPath
+                                RichText.Model.Node.increment liPath
                         in
-                        case nodeAt nextLiPath markedRoot of
+                        case RichText.Node.nodeAt nextLiPath markedRoot of
                             Nothing ->
                                 Err "I cannot join forward a list item if there is no subsequent list item"
 
                             Just nextLi ->
                                 case nextLi of
-                                    Inline _ ->
+                                    RichText.Node.Inline _ ->
                                         Err "There is no list item at path"
 
-                                    Block nextBn ->
-                                        case joinBlocks liNode nextBn of
+                                    RichText.Node.Block nextBn ->
+                                        case RichText.Node.joinBlocks liNode nextBn of
                                             Nothing ->
                                                 Err "I could not join these list items"
 
                                             Just joinedLi ->
                                                 let
                                                     joinedNodes =
-                                                        replace liPath (Block joinedLi) markedRoot
+                                                        RichText.Node.replace liPath (RichText.Node.Block joinedLi) markedRoot
                                                             |> Result.andThen
-                                                                (replaceWithFragment nextLiPath (BlockFragment Array.empty))
+                                                                (RichText.Node.replaceWithFragment nextLiPath (RichText.Node.BlockFragment Array.empty))
                                                 in
                                                 case joinedNodes of
                                                     Err s ->
@@ -1086,6 +1030,6 @@ joinForward definition editorState =
                                                     Ok newRoot ->
                                                         Ok
                                                             (editorState
-                                                                |> withSelection (selectionFromAnnotations newRoot (anchorOffset selection) (focusOffset selection))
-                                                                |> withRoot (clearSelectionAnnotations newRoot)
+                                                                |> RichText.Model.State.withSelection (RichText.Annotation.selectionFromAnnotations newRoot (RichText.Model.Selection.anchorOffset selection) (RichText.Model.Selection.focusOffset selection))
+                                                                |> RichText.Model.State.withRoot (RichText.Annotation.clearSelectionAnnotations newRoot)
                                                             )
