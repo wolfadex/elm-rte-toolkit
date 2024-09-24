@@ -889,11 +889,8 @@ viewElement spec_ decorations_ elementParameters backwardsNodePath children =
 
         decorators =
             List.map (\d -> d (List.reverse backwardsNodePath) elementParameters) eDecorators
-
-        nodeHtml =
-            viewHtmlNode node decorators children []
     in
-    nodeHtml
+    viewHtmlNode node decorators children []
 
 
 viewInlineLeafTree : Spec -> Decorations msg -> Path -> Array Inline -> InlineTree -> Html msg

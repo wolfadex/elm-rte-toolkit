@@ -59,7 +59,7 @@ config =
     , NoMissingTypeAnnotation.rule
     -- , NoMissingTypeAnnotationInLetIn.rule
     , NoMissingTypeExpose.rule
-    -- , NoSimpleLetBody.rule
+    , NoSimpleLetBody.rule
     -- , NoPrematureLetComputation.rule
     -- , NoUnused.CustomTypeConstructors.rule []
     -- , NoUnused.CustomTypeConstructorArgs.rule
