@@ -154,7 +154,7 @@ replaceOrAddBoolAttribute name value attributes =
             List.map
                 (\x ->
                     case x of
-                        BoolAttribute k v ->
+                        BoolAttribute k _ ->
                             if k == name then
                                 BoolAttribute name value
 
@@ -184,7 +184,7 @@ replaceOrAddStringAttribute name value attributes =
             List.map
                 (\x ->
                     case x of
-                        StringAttribute k v ->
+                        StringAttribute k _ ->
                             if k == name then
                                 StringAttribute name value
 
@@ -214,7 +214,7 @@ replaceOrAddIntegerAttribute name value attributes =
             List.map
                 (\x ->
                     case x of
-                        IntegerAttribute k v ->
+                        IntegerAttribute k _ ->
                             if k == name then
                                 IntegerAttribute name value
 
@@ -244,7 +244,7 @@ replaceOrAddFloatAttribute name value attributes =
             List.map
                 (\x ->
                     case x of
-                        FloatAttribute k v ->
+                        FloatAttribute k _ ->
                             if k == name then
                                 FloatAttribute name value
 

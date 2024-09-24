@@ -66,7 +66,7 @@ config =
     , NoUnused.Dependencies.rule
     , NoUnused.Exports.rule
     , NoUnused.Parameters.rule
-    -- , NoUnused.Patterns.rule
+    , NoUnused.Patterns.rule
     -- , NoUnused.Variables.rule
     -- , Simplify.rule Simplify.defaults    , NoEtaReducibleLambdas.rule
     --     { argumentNamePredicate = \_ -> True
