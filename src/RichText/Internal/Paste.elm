@@ -82,16 +82,15 @@ pasteText text editorState =
                     removeRange editorState |> Result.andThen (pasteText text)
 
                 else
-                    let
-                        lines =
-                            String.split "\n" (String.replace zeroWidthSpace "" text)
-                    in
                     case findTextBlockNodeAncestor (anchorNode selection) (State.root editorState) of
                         Nothing ->
                             Err "I can only paste test if there is a text block ancestor"
 
                         Just ( _, tbNode ) ->
                             let
+                                lines =
+                                    String.split "\n" (String.replace zeroWidthSpace "" text)
+
                                 newLines =
                                     List.map
                                         (\line ->
@@ -191,15 +190,16 @@ pasteInlineArray inlineFragment editorState =
                                                                 replaceWithFragment (anchorNode selection)
                                                                     (InlineFragment newFragment)
                                                                     (State.root editorState)
-
-                                                            newSelection =
-                                                                caret (path ++ [ index + Array.length inlineFragment + 1 ]) 0
                                                         in
                                                         case replaceResult of
                                                             Err s ->
                                                                 Err s
 
                                                             Ok newRoot ->
+                                                                let
+                                                                    newSelection =
+                                                                        caret (path ++ [ index + Array.length inlineFragment + 1 ]) 0
+                                                                in
                                                                 Ok
                                                                     (editorState
                                                                         |> withSelection (Just newSelection)
@@ -210,15 +210,16 @@ pasteInlineArray inlineFragment editorState =
                                                         let
                                                             replaceResult =
                                                                 replaceWithFragment (anchorNode selection) (InlineFragment inlineFragment) (State.root editorState)
-
-                                                            newSelection =
-                                                                caret (path ++ [ index + Array.length inlineFragment - 1 ]) 0
                                                         in
                                                         case replaceResult of
                                                             Err s ->
                                                                 Err s
 
                                                             Ok newRoot ->
+                                                                let
+                                                                    newSelection =
+                                                                        caret (path ++ [ index + Array.length inlineFragment - 1 ]) 0
+                                                                in
                                                                 Ok
                                                                     (editorState
                                                                         |> withSelection (Just newSelection)

@@ -406,9 +406,6 @@ updateChangeEventTextChanges timestamp composing textChanges selection spec_ edi
 
         Just changes ->
             let
-                editorState =
-                    state editor_
-
                 actualChanges =
                     List.filter (differentText (State.root stateToCompare)) changes
             in
@@ -416,6 +413,10 @@ updateChangeEventTextChanges timestamp composing textChanges selection spec_ edi
                 editor_
 
             else
+                let
+                    editorState =
+                        state editor_
+                in
                 case replaceText (State.root editorState) actualChanges of
                     Nothing ->
                         applyForceFunctionOnEditor forceRerender editor_
@@ -600,14 +601,14 @@ applyTextChange editorNode ( path, text ) =
                                         )
 
                 InlineChildren array ->
-                    let
-                        a =
-                            toInlineArray array
-                    in
                     if not <| List.isEmpty xs then
                         Nothing
 
                     else
+                        let
+                            a =
+                                toInlineArray array
+                        in
                         case Array.get x a of
                             Nothing ->
                                 Nothing

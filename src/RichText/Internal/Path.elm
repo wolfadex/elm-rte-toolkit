@@ -245,8 +245,7 @@ pathToChildContentsFromMark spec mark =
     let
         markDefinition =
             markDefinitionWithDefault mark spec
-    in
-    let
+
         markStructure =
             MarkDefinition.toHtmlNode markDefinition mark childNodesPlaceholder
     in

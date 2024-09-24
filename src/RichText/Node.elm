@@ -1186,9 +1186,6 @@ removeInRange start end node =
         startIndex =
             Maybe.withDefault 0 (List.head start)
 
-        startRest =
-            Maybe.withDefault [] (List.tail start)
-
         endIndex =
             Maybe.withDefault
                 (case childNodes node of
@@ -1202,109 +1199,114 @@ removeInRange start end node =
                         0
                 )
                 (List.head end)
-
-        endRest =
-            Maybe.withDefault [] (List.tail end)
     in
     if startIndex > endIndex then
         node
 
-    else if startIndex == endIndex then
-        case childNodes node of
-            BlockChildren a ->
-                let
-                    array =
-                        toBlockArray a
-                in
-                if List.isEmpty startRest && List.isEmpty endRest then
-                    node |> withChildNodes (blockChildren <| Array.Extra.removeAt startIndex array)
+    else
+        let
+            startRest =
+                Maybe.withDefault [] (List.tail start)
 
-                else
-                    case Array.get startIndex array of
-                        Nothing ->
-                            node
+            endRest =
+                Maybe.withDefault [] (List.tail end)
+        in
+        if startIndex == endIndex then
+            case childNodes node of
+                BlockChildren a ->
+                    let
+                        array =
+                            toBlockArray a
+                    in
+                    if List.isEmpty startRest && List.isEmpty endRest then
+                        node |> withChildNodes (blockChildren <| Array.Extra.removeAt startIndex array)
 
-                        Just b ->
-                            node |> withChildNodes (blockChildren <| Array.set startIndex (removeInRange startRest endRest b) array)
+                    else
+                        case Array.get startIndex array of
+                            Nothing ->
+                                node
 
-            InlineChildren a ->
-                if List.isEmpty startRest && List.isEmpty endRest then
-                    node |> withChildNodes (inlineChildren <| Array.Extra.removeAt startIndex (toInlineArray a))
+                            Just b ->
+                                node |> withChildNodes (blockChildren <| Array.set startIndex (removeInRange startRest endRest b) array)
 
-                else
+                InlineChildren a ->
+                    if List.isEmpty startRest && List.isEmpty endRest then
+                        node |> withChildNodes (inlineChildren <| Array.Extra.removeAt startIndex (toInlineArray a))
+
+                    else
+                        node
+
+                Leaf ->
                     node
 
-            Leaf ->
-                node
+        else
+            case childNodes node of
+                BlockChildren a ->
+                    let
+                        arr =
+                            toBlockArray a
 
-    else
-        case childNodes node of
-            BlockChildren a ->
-                let
-                    arr =
-                        toBlockArray a
+                        left =
+                            Array.Extra.sliceUntil startIndex arr
 
-                    left =
-                        Array.Extra.sliceUntil startIndex arr
+                        right =
+                            Array.Extra.sliceFrom (endIndex + 1) arr
 
-                    right =
-                        Array.Extra.sliceFrom (endIndex + 1) arr
+                        leftRest =
+                            if List.isEmpty startRest then
+                                Array.empty
 
-                    leftRest =
-                        if List.isEmpty startRest then
-                            Array.empty
+                            else
+                                case Array.get startIndex arr of
+                                    Nothing ->
+                                        Array.empty
 
-                        else
-                            case Array.get startIndex arr of
-                                Nothing ->
-                                    Array.empty
+                                    Just b ->
+                                        Array.fromList [ removeInRange startRest (last b |> Tuple.first) b ]
 
-                                Just b ->
-                                    Array.fromList [ removeInRange startRest (last b |> Tuple.first) b ]
+                        rightRest =
+                            if List.isEmpty endRest then
+                                Array.empty
 
-                    rightRest =
-                        if List.isEmpty endRest then
-                            Array.empty
+                            else
+                                case Array.get endIndex arr of
+                                    Nothing ->
+                                        Array.empty
 
-                        else
-                            case Array.get endIndex arr of
-                                Nothing ->
-                                    Array.empty
+                                    Just b ->
+                                        Array.fromList [ removeInRange [] endRest b ]
+                    in
+                    node |> withChildNodes (blockChildren <| List.foldr Array.append Array.empty [ left, leftRest, rightRest, right ])
 
-                                Just b ->
-                                    Array.fromList [ removeInRange [] endRest b ]
-                in
-                node |> withChildNodes (blockChildren <| List.foldr Array.append Array.empty [ left, leftRest, rightRest, right ])
+                InlineChildren a ->
+                    let
+                        arr =
+                            toInlineArray a
 
-            InlineChildren a ->
-                let
-                    arr =
-                        toInlineArray a
+                        left =
+                            Array.Extra.sliceUntil
+                                (if List.isEmpty startRest then
+                                    startIndex
 
-                    left =
-                        Array.Extra.sliceUntil
-                            (if List.isEmpty startRest then
-                                startIndex
+                                 else
+                                    startIndex + 1
+                                )
+                                arr
 
-                             else
-                                startIndex + 1
-                            )
-                            arr
+                        right =
+                            Array.Extra.sliceFrom
+                                (if List.isEmpty endRest then
+                                    endIndex + 1
 
-                    right =
-                        Array.Extra.sliceFrom
-                            (if List.isEmpty endRest then
-                                endIndex + 1
+                                 else
+                                    endIndex
+                                )
+                                arr
+                    in
+                    node |> withChildNodes (inlineChildren <| Array.append left right)
 
-                             else
-                                endIndex
-                            )
-                            arr
-                in
-                node |> withChildNodes (inlineChildren <| Array.append left right)
-
-            Leaf ->
-                node
+                Leaf ->
+                    node
 
 
 {-| Removes the node at the given path, and recursively removes parent blocks that have no remaining

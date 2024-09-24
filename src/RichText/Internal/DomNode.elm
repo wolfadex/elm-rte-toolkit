@@ -95,10 +95,6 @@ findTextChangesRec htmlNode domNode backwardsNodePath =
         DomNode domNodeContents ->
             case htmlNode of
                 ElementNode tag _ children ->
-                    let
-                        domChildNodes =
-                            Maybe.withDefault Array.empty domNodeContents.childNodes
-                    in
                     if domNodeContents.nodeType /= domElementNodeType then
                         Err "Dom node is a text node, but I was expecting an element node"
 
@@ -109,34 +105,39 @@ findTextChangesRec htmlNode domNode backwardsNodePath =
                                 ++ ", but I was expecting "
                                 ++ tag
 
-                    else if Array.length domChildNodes /= Array.length children then
-                        Err <|
-                            "Dom node's children length was "
-                                ++ (String.fromInt <| Array.length domChildNodes)
-                                ++ ", but I was expecting "
-                                ++ (String.fromInt <| Array.length children)
-
                     else
                         let
-                            indexedNodePairs =
-                                Array.indexedMap Tuple.pair <| Array.Extra.map2 Tuple.pair children domChildNodes
+                            domChildNodes =
+                                Maybe.withDefault Array.empty domNodeContents.childNodes
                         in
-                        Array.foldl
-                            (\( i, ( htmlChild, domChild ) ) resultTextChangeList ->
-                                case resultTextChangeList of
-                                    Err s ->
-                                        Err s
+                        if Array.length domChildNodes /= Array.length children then
+                            Err <|
+                                "Dom node's children length was "
+                                    ++ (String.fromInt <| Array.length domChildNodes)
+                                    ++ ", but I was expecting "
+                                    ++ (String.fromInt <| Array.length children)
 
-                                    Ok x ->
-                                        case findTextChangesRec htmlChild domChild (i :: backwardsNodePath) of
-                                            Err s ->
-                                                Err s
+                        else
+                            let
+                                indexedNodePairs =
+                                    Array.indexedMap Tuple.pair <| Array.Extra.map2 Tuple.pair children domChildNodes
+                            in
+                            Array.foldl
+                                (\( i, ( htmlChild, domChild ) ) resultTextChangeList ->
+                                    case resultTextChangeList of
+                                        Err s ->
+                                            Err s
 
-                                            Ok y ->
-                                                Ok (x ++ y)
-                            )
-                            (Ok [])
-                            indexedNodePairs
+                                        Ok x ->
+                                            case findTextChangesRec htmlChild domChild (i :: backwardsNodePath) of
+                                                Err s ->
+                                                    Err s
+
+                                                Ok y ->
+                                                    Ok (x ++ y)
+                                )
+                                (Ok [])
+                                indexedNodePairs
 
                 TextNode textNodeText ->
                     if domNodeContents.nodeType /= domTextNodeType then

@@ -437,8 +437,7 @@ validateEditorBlockNode spec allowedGroups node =
 
         definition =
             elementDefinitionWithDefault parameters spec
-    in
-    let
+
         allowedGroupsErrors =
             validateAllowedGroups allowedGroups (ElementDefinition.group definition) (ElementDefinition.name definition)
     in
