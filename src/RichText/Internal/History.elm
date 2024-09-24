@@ -1,4 +1,4 @@
-module RichText.Internal.History exposing (..)
+module RichText.Internal.History exposing (Contents, History(..), contents, empty, fromContents, peek, redoList, undoList)
 
 {-| This module contains the internal data structure for undo/redo history.
 -}

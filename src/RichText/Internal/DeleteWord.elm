@@ -1,4 +1,4 @@
-module RichText.Internal.DeleteWord exposing (..)
+module RichText.Internal.DeleteWord exposing (backspaceWordRegex, backspaceWordRegexString, chameleonCharactersRegexString, deleteWordRegex, deleteWordRegexString, punctuationRegexString, whitespaceAndPunctuationRegexString)
 
 {-
    This is a helper module derived from the DraftJS logic for determining how to delete a word.

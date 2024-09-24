@@ -1,4 +1,4 @@
-module RichText.Internal.HtmlNode exposing (..)
+module RichText.Internal.HtmlNode exposing (childNodesPlaceholder, childNodesToHtmlNode, editorBlockNodeToHtmlNode, editorInlineLeafToHtmlNode, editorInlineLeafTreeToHtmlNode, elementToHtmlNode, errorNode, markToHtmlNode, textToHtmlNode)
 
 import Array exposing (Array)
 import RichText.Config.ElementDefinition as ElementDefinition

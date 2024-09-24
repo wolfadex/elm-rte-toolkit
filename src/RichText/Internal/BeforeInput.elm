@@ -1,4 +1,4 @@
-module RichText.Internal.BeforeInput exposing (..)
+module RichText.Internal.BeforeInput exposing (beforeInputDecoder, handleBeforeInput, handleInputEvent, preventDefaultOn, preventDefaultOnBeforeInputDecoder, shouldPreventDefault)
 
 import Json.Decode as D
 import RichText.Config.Command exposing (CommandMap, namedCommandListFromInputEvent)
