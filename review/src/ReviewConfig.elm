@@ -56,7 +56,7 @@ config =
     -- ,
     NoExposingEverything.rule
     , NoImportingEverything.rule []
-    -- , NoMissingTypeAnnotation.rule
+    , NoMissingTypeAnnotation.rule
     -- , NoMissingTypeAnnotationInLetIn.rule
     -- , NoMissingTypeExpose.rule
     -- , NoSimpleLetBody.rule

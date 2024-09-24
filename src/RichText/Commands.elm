@@ -151,6 +151,7 @@ import RichText.Node as RTNode
 import RichText.State exposing (translateReducedTextBlockSelection)
 
 
+backspaceCommands : List ( String, RichText.Config.Command.Command )
 backspaceCommands =
     [ ( "removeRange", transform removeRange )
     , ( "removeSelectedLeafElementCommand", transform removeSelectedLeafElement )
@@ -161,6 +162,7 @@ backspaceCommands =
     ]
 
 
+deleteCommands : List ( String, RichText.Config.Command.Command )
 deleteCommands =
     [ ( "removeRange", transform removeRange )
     , ( "removeSelectedLeafElementCommand", transform removeSelectedLeafElement )

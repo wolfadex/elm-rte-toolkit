@@ -23,6 +23,7 @@ import RichText.Model.Node as Node
 import RichText.Model.Text exposing (text)
 
 
+childNodesPlaceholder : Array HtmlNode
 childNodesPlaceholder =
     Array.fromList
         [ ElementNode "__child_node_marker__" [] Array.empty ]

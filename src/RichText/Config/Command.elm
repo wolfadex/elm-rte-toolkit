@@ -390,10 +390,6 @@ combine m1 m2 =
                         }
 
 
-emptyFunction =
-    \_ -> []
-
-
 {-| An empty command map
 -}
 emptyCommandMap : CommandMap
@@ -401,6 +397,6 @@ emptyCommandMap =
     CommandMap
         { keyMap = Dict.empty
         , inputEventTypeMap = Dict.empty
-        , defaultKeyCommand = emptyFunction
-        , defaultInputEventCommand = emptyFunction
+        , defaultKeyCommand = \_ -> []
+        , defaultInputEventCommand = \_ -> []
         }

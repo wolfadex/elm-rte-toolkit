@@ -39,6 +39,7 @@ type DomNode
 {-| The DOM text node nodeType value as specified by the w3c spec [w3c spec][w3c-custom-types-text-node]
 [w3c-custom-types-text-node]: <https://www.w3.org/TR/domcore/#dom-node-text_node>
 -}
+domTextNodeType : Int
 domTextNodeType =
     3
 
@@ -46,6 +47,7 @@ domTextNodeType =
 {-| The DOM element node nodeType value as specified by the [w3c spec][w3c-custom-types-element-node]
 [w3c-custom-types-element-node]: <https://www.w3.org/TR/domcore/#dom-node-element_node>
 -}
+domElementNodeType : Int
 domElementNodeType =
     1
 
