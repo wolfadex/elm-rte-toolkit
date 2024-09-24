@@ -60,7 +60,7 @@ htmlToElementArray spec html =
                         ++ List.foldr
                             (++)
                             ""
-                            (errList |> List.map ((++) "\n"))
+                            (errList |> List.map (\err -> "\n" ++ err))
 
             else
                 Ok <| reduceEditorFragmentArray newArray

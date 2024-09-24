@@ -49,9 +49,9 @@ config =
     -- , Docs.ReviewLinksAndSections.rule
     -- , Docs.ReviewAtDocs.rule
     -- , Docs.UpToDateReadmeLinks.rule
-    -- , NoConfusingPrefixOperator.rule
     -- ,
-    NoDebug.Log.rule
+    NoConfusingPrefixOperator.rule
+    , NoDebug.Log.rule
     , NoDebug.TodoOrToString.rule
         |> Rule.ignoreErrorsForDirectories [ "tests/" ]
     , NoExposingEverything.rule
