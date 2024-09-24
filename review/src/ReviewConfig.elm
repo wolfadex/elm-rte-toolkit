@@ -45,9 +45,7 @@ config =
         { document = onlyExposed
         , from = exposedModules
         }
-    -- , Docs.ReviewLinksAndSections.rule
     , Docs.ReviewAtDocs.rule
-    -- , Docs.UpToDateReadmeLinks.rule
     , NoConfusingPrefixOperator.rule
     , NoDebug.Log.rule
     , NoDebug.TodoOrToString.rule
@@ -55,7 +53,6 @@ config =
     , NoExposingEverything.rule
     , NoImportingEverything.rule []
     , NoMissingTypeAnnotation.rule
-    -- , NoMissingTypeAnnotationInLetIn.rule
     , NoMissingTypeExpose.rule
     , NoSimpleLetBody.rule
     , NoPrematureLetComputation.rule
@@ -73,4 +70,8 @@ config =
         }
     , NoRedundantlyQualifiedType.rule
     , Review.ImportSimple.rule
+    -- TODO: These would be nice to have, but not necessary yet
+    -- , Docs.ReviewLinksAndSections.rule
+    -- , Docs.UpToDateReadmeLinks.rule
+    -- , NoMissingTypeAnnotationInLetIn.rule
     ]
