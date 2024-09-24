@@ -1,4 +1,4 @@
-module RichText.Internal.Paste exposing (handlePaste, pasteBlockArray, pasteFragment, pasteHtml, pasteInlineArray, pasteText)
+module RichText.Internal.Paste exposing (handlePaste)
 
 import Array exposing (Array)
 import List.Extra
