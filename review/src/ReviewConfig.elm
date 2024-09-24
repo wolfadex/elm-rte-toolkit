@@ -47,10 +47,10 @@ config =
     --     , from = exposedModules
     --     }
     -- , Docs.ReviewLinksAndSections.rule
-    -- , Docs.ReviewAtDocs.rule
-    -- , Docs.UpToDateReadmeLinks.rule
     -- ,
-    NoConfusingPrefixOperator.rule
+    Docs.ReviewAtDocs.rule
+    -- , Docs.UpToDateReadmeLinks.rule
+    , NoConfusingPrefixOperator.rule
     , NoDebug.Log.rule
     , NoDebug.TodoOrToString.rule
         |> Rule.ignoreErrorsForDirectories [ "tests/" ]
