@@ -1,5 +1,5 @@
 module RichText.Model.Mark exposing
-    ( Mark, mark, name, attributes, withAttributes
+    ( MarkDefinition, Mark, mark, name, attributes, withAttributes
     , MarkOrder, markOrderFromSpec
     , sort, ToggleAction(..), toggle, hasMarkWithName
     )
@@ -9,7 +9,7 @@ module RichText.Model.Mark exposing
 
 # Mark
 
-@docs Mark, mark, name, attributes, withAttributes
+@docs MarkDefinition, Mark, mark, name, attributes, withAttributes
 
 
 # Mark order
@@ -34,6 +34,12 @@ like color font, or link information.
 -}
 type alias Mark =
     Internal.Mark
+
+
+{-| A mark definition defines how a mark is encoded an decoded.
+-}
+type alias MarkDefinition =
+    Internal.MarkDefinition
 
 
 {-| Creates a mark. The arguments are as follows:

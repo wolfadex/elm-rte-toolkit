@@ -1,8 +1,8 @@
-module RichText.Model.Element exposing (Element, element, annotations, attributes, name, withAnnotations, withAttributes)
+module RichText.Model.Element exposing (ElementDefinition, Element, element, annotations, attributes, name, withAnnotations, withAttributes)
 
 {-| An element represents the parameters of any non-text node.
 
-@docs Element, element, annotations, attributes, name, withAnnotations, withAttributes
+@docs ElementDefinition, Element, element, annotations, attributes, name, withAnnotations, withAttributes
 
 -}
 
@@ -16,6 +16,13 @@ a list of attributes, and a set of annotations.
 -}
 type alias Element =
     Internal.Element
+
+
+{-| A `ElementDefinition` contains information on how to serialize/deserialize an editor node,
+as well as describes what type of node and what children the node can have.
+-}
+type alias ElementDefinition =
+    Internal.ElementDefinition
 
 
 {-| Creates an element. The arguments are as follows:

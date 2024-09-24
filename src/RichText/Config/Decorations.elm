@@ -1,6 +1,7 @@
 module RichText.Config.Decorations exposing
     ( Decorations, ElementDecoration, MarkDecoration, emptyDecorations, elementDecorations, markDecorations, topLevelAttributes, withMarkDecorations, withElementDecorations, withTopLevelAttributes
     , addElementDecoration, addMarkDecoration, selectableDecoration
+    , Tagger, Message
     )
 
 {-| Decorations are functions which add a list of Html.Attribute to rendered elements and marks. They're
@@ -15,6 +16,8 @@ useful for adding things like event listeners and conditional styles/attributes 
 # Helpers
 
 @docs addElementDecoration, addMarkDecoration, selectableDecoration
+
+@docs Tagger, Message
 
 -}
 
@@ -45,6 +48,18 @@ import Set
 -}
 type Decorations msg
     = Decorations (DecorationsContents msg)
+
+
+{-| A mapping from an editor message to your message type.
+-}
+type alias Tagger msg =
+    Message -> msg
+
+
+{-| The internal events that an editor has to respond to.
+-}
+type alias Message =
+    RichText.Internal.Editor.Message
 
 
 type alias DecorationsContents msg =

@@ -205,7 +205,7 @@ defaultCommandMap =
 {-| The default key command does remove range when a range is selected and a regular
 key is pressed. In this case, we want to remove range and insert the character related to that key.
 -}
-defaultKeyCommand : KeyboardEvent -> NamedCommandList
+defaultKeyCommand : RichText.Config.Command.KeyboardEvent -> NamedCommandList
 defaultKeyCommand event =
     if not event.altKey && not event.metaKey && not event.ctrlKey && String.length event.key == 1 then
         [ ( "removeRangeAndInsert", transform <| removeRangeAndInsert event.key ) ]
@@ -218,7 +218,7 @@ defaultKeyCommand event =
 event occurs. In this case, we want to remove range and insert the text related to the input
 data.
 -}
-defaultInputEventCommand : InputEvent -> NamedCommandList
+defaultInputEventCommand : RichText.Config.Command.InputEvent -> NamedCommandList
 defaultInputEventCommand event =
     if event.inputType == "insertText" then
         case event.data of

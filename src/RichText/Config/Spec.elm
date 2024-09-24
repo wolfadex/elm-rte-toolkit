@@ -1,12 +1,18 @@
-module RichText.Config.Spec exposing (Spec, emptySpec, markDefinitions, markDefinition, elementDefinitions, elementDefinition, withMarkDefinitions, withElementDefinitions)
+module RichText.Config.Spec exposing
+    ( Spec, emptySpec, markDefinitions, markDefinition, elementDefinitions, elementDefinition, withMarkDefinitions, withElementDefinitions
+    , MarkDefinition
+    )
 
 {-| A spec describes what nodes and marks can be in an editor.
 
 @docs Spec, emptySpec, markDefinitions, markDefinition, elementDefinitions, elementDefinition, withMarkDefinitions, withElementDefinitions
 
+@docs MarkDefinition
+
 -}
 
 import Dict exposing (Dict)
+import RichText.Config.ElementDefinition
 import RichText.Internal.Definitions
     exposing
         ( ContentType(..)
@@ -45,6 +51,12 @@ type Spec
     = Spec SpecContents
 
 
+{-| A mark definition defines how a mark is encoded an decoded.
+-}
+type alias MarkDefinition =
+    RichText.Internal.Definitions.MarkDefinition
+
+
 {-| An empty spec
 -}
 emptySpec : Spec
@@ -63,7 +75,7 @@ markDefinitions spec =
 
 {-| list of `ElementDefinition` from a spec
 -}
-elementDefinitions : Spec -> List ElementDefinition
+elementDefinitions : Spec -> List RichText.Config.ElementDefinition.ElementDefinition
 elementDefinitions spec =
     case spec of
         Spec c ->
@@ -93,7 +105,7 @@ withMarkDefinitions marks spec =
 
 {-| a spec with the given element definitions
 -}
-withElementDefinitions : List ElementDefinition -> Spec -> Spec
+withElementDefinitions : List RichText.Config.ElementDefinition.ElementDefinition -> Spec -> Spec
 withElementDefinitions nodes spec =
     case spec of
         Spec c ->
@@ -131,7 +143,7 @@ markDefinition name spec =
     --> Just (paragraph element definition)
 
 -}
-elementDefinition : String -> Spec -> Maybe ElementDefinition
+elementDefinition : String -> Spec -> Maybe RichText.Config.ElementDefinition.ElementDefinition
 elementDefinition name spec =
     case spec of
         Spec c ->
@@ -141,6 +153,6 @@ elementDefinition name spec =
 type alias SpecContents =
     { marks : List MarkDefinition
     , nameToMark : Dict String MarkDefinition
-    , elements : List ElementDefinition
-    , nameToElement : Dict String ElementDefinition
+    , elements : List RichText.Config.ElementDefinition.ElementDefinition
+    , nameToElement : Dict String RichText.Config.ElementDefinition.ElementDefinition
     }
