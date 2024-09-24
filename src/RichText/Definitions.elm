@@ -184,7 +184,7 @@ htmlToHorizontalRule def node =
     case node of
         ElementNode name _ _ ->
             if name == "hr" then
-                Just ( element def [] |> Element.withAnnotations (Set.fromList [ selectable ]), Array.empty )
+                Just ( element def [] |> Element.withAnnotations (Set.singleton selectable), Array.empty )
 
             else
                 Nothing

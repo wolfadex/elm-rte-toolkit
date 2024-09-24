@@ -3036,7 +3036,7 @@ groupSameTypeInlineLeaf a b =
 
 textFromGroup : List Inline -> String
 textFromGroup leaves =
-    String.join "" <|
+    String.concat <|
         List.map
             (\leaf ->
                 case leaf of

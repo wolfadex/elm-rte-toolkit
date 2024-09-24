@@ -528,12 +528,12 @@ initDecoder =
 
 onCompositionStart : (Message -> msg) -> Html.Attribute msg
 onCompositionStart msgFunc =
-    Html.Events.on "compositionstart" (D.map msgFunc (D.succeed CompositionStart))
+    Html.Events.on "compositionstart" (D.succeed (msgFunc CompositionStart))
 
 
 onCompositionEnd : (Message -> msg) -> Html.Attribute msg
 onCompositionEnd msgFunc =
-    Html.Events.on "editorcompositionend" (D.map msgFunc (D.succeed CompositionEnd))
+    Html.Events.on "editorcompositionend" (D.succeed (msgFunc CompositionEnd))
 
 
 onPasteWithData : (Message -> msg) -> Html.Attribute msg
@@ -543,7 +543,7 @@ onPasteWithData msgFunc =
 
 onCut : (Message -> msg) -> Html.Attribute msg
 onCut msgFunc =
-    Html.Events.on "cut" (D.map msgFunc (D.succeed CutEvent))
+    Html.Events.on "cut" (D.succeed (msgFunc CutEvent))
 
 
 onInit : (Message -> msg) -> Html.Attribute msg
