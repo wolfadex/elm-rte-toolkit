@@ -88,16 +88,16 @@ view model =
         , h2 [] [ text "About" ]
         , p []
             [ text "Rich Text Editor Toolkit is an "
-            , a [ href "https://github.com/mweiss/elm-rte-toolkit/blob/master/LICENSE" ]
+            , a [ href "https://github.com/wolfadex/elm-rte-toolkit/blob/master/LICENSE" ]
                 [ text "open source" ]
             , text " project that you are free to use commercially. The "
-            , a [ href "https://github.com/mweiss/elm-rte-toolkit" ] [ text "source code is hosted on GitHub." ]
+            , a [ href "https://github.com/wolfadex/elm-rte-toolkit" ] [ text "source code is hosted on GitHub." ]
             ]
         , p []
             [ text "Contributions in the form of bug reports, pull requests, or thoughtful discussions in the "
-            , a [ href "https://github.com/mweiss/elm-rte-toolkit/issues" ] [ text "GitHub issue tracker" ]
+            , a [ href "https://github.com/wolfadex/elm-rte-toolkit/issues" ] [ text "GitHub issue tracker" ]
             , text " are welcome. Please see the "
-            , a [ href "https://github.com/mweiss/elm-rte-toolkit/blob/master/CODE_OF_CONDUCT.md" ] [ text "Code of Conduct" ]
+            , a [ href "https://github.com/wolfadex/elm-rte-toolkit/blob/master/CODE_OF_CONDUCT.md" ] [ text "Code of Conduct" ]
             , text " for our pledge to contributors."
             ]
         ]
