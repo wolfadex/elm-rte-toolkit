@@ -32,7 +32,6 @@ import RichText.Model.Node as Node
         ( Block
         , Children(..)
         , Inline(..)
-        , InlineChildren
         , Path
         , childNodes
         , element

@@ -2,7 +2,7 @@ module RichText.Internal.Paste exposing (handlePaste)
 
 import Array exposing (Array)
 import List.Extra
-import Result exposing (Result)
+import Result
 import RichText.Annotation
     exposing
         ( annotateSelection

@@ -17,8 +17,6 @@ module RichText.Model.Attribute exposing
 
 -}
 
-import String
-
 
 {-| An attribute is a key value pair. It's used to store information on an element or mark.
 Information you can store are things like color, font type, or image or link locations.

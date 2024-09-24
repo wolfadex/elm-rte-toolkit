@@ -93,11 +93,6 @@ type MarkOrder
     = MarkOrder Order
 
 
-markOrder : Dict String Int -> MarkOrder
-markOrder d =
-    MarkOrder d
-
-
 type alias Order =
     Dict String Int
 

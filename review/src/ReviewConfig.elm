@@ -67,7 +67,7 @@ config =
     , NoUnused.Exports.rule
     , NoUnused.Parameters.rule
     , NoUnused.Patterns.rule
-    -- , NoUnused.Variables.rule
+    , NoUnused.Variables.rule
     -- , Simplify.rule Simplify.defaults    , NoEtaReducibleLambdas.rule
     --     { argumentNamePredicate = \_ -> True
     --     , lambdaReduceStrategy = NoEtaReducibleLambdas.OnlyWhenSingleArgument

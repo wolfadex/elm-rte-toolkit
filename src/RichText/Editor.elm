@@ -66,7 +66,6 @@ import RichText.Internal.Editor as InternalEditor
         , isComposing
         , renderCount
         , selectionCount
-        , state
         , updateEditorStateWithTimestamp
         , withBufferedEditorState
         , withComposing

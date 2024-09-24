@@ -77,15 +77,14 @@ Toggle commands for elements and marks
 
 -}
 
-import Array exposing (Array)
+import Array
 import Array.Extra
 import List.Extra
 import Regex
 import RichText.Annotation as Annotation exposing (annotateSelection, clear, clearSelectionAnnotations, doLift, isSelectable, selectionFromAnnotations)
 import RichText.Config.Command
     exposing
-        ( CommandBinding
-        , CommandMap
+        ( CommandMap
         , InternalAction(..)
         , NamedCommandList
         , Transform
@@ -101,11 +100,10 @@ import RichText.Config.Command
 import RichText.Config.Keys exposing (alt, backspace, delete, enter, return, shift, short)
 import RichText.Definitions exposing (hardBreak)
 import RichText.Internal.DeleteWord as DeleteWord
-import RichText.Internal.Event exposing (InputEvent, KeyboardEvent)
 import RichText.Model.Element as Element exposing (Element)
 import RichText.Model.InlineElement as InlineElement
 import RichText.Model.Mark as Mark exposing (Mark, MarkOrder, ToggleAction(..), hasMarkWithName, toggle)
-import RichText.Model.Node as Node exposing (Block, BlockChildren, Children(..), Inline(..), InlineChildren, Path, block, blockChildren, childNodes, commonAncestor, decrement, increment, inlineChildren, marks, parent, plainText, toBlockArray, toInlineArray, toString, withChildNodes, withElement)
+import RichText.Model.Node as Node exposing (Block, Children(..), Inline(..), InlineChildren, Path, block, blockChildren, childNodes, commonAncestor, decrement, increment, inlineChildren, marks, parent, plainText, toBlockArray, toInlineArray, toString, withChildNodes, withElement)
 import RichText.Model.Selection
     exposing
         ( Selection

@@ -31,7 +31,7 @@ The definitions used in the markdown specification.
 
 -}
 
-import Array exposing (Array)
+import Array
 import RichText.Annotation exposing (selectable)
 import RichText.Config.ElementDefinition
     exposing

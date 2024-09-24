@@ -15,15 +15,8 @@ import Dict exposing (Dict)
 import RichText.Config.ElementDefinition
 import RichText.Internal.Definitions
     exposing
-        ( ContentType(..)
-        , Element
-        , ElementDefinition(..)
-        , ElementToHtml
-        , HtmlToElement
-        , HtmlToMark
-        , Mark
+        ( ElementDefinition(..)
         , MarkDefinition(..)
-        , MarkToHtml
         )
 
 

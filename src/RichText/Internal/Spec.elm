@@ -1,7 +1,7 @@
 module RichText.Internal.Spec exposing (elementDefinitionWithDefault, htmlToElementArray, markDefinitionWithDefault)
 
 import Array exposing (Array)
-import Html.Parser as Html exposing (Node(..))
+import Html.Parser as Html exposing (Node)
 import Result exposing (Result)
 import RichText.Config.ElementDefinition as ElementDefinition exposing (ElementDefinition, blockNode, defaultElementDefinition)
 import RichText.Config.MarkDefinition as MarkDefinition exposing (MarkDefinition, defaultMarkDefinition)
@@ -14,19 +14,14 @@ import RichText.Model.InlineElement exposing (inlineElement)
 import RichText.Model.Mark
     exposing
         ( Mark
-        , MarkOrder(..)
         , ToggleAction(..)
-        , mark
         , markOrderFromSpec
         , toggle
         )
 import RichText.Model.Node as Node
     exposing
-        ( Block
-        , Children(..)
-        , Inline(..)
+        ( Children(..)
         , blockChildren
-        , childNodes
         , inlineChildren
         )
 import RichText.Model.Text as Text
