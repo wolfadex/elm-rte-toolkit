@@ -377,7 +377,7 @@ validateAllowedMarks allowedMarks leaf =
         Just allowed ->
             let
                 notAllowed =
-                    Set.diff (Set.fromList (List.map (\m -> Mark.name m) (Node.marks leaf))) allowed
+                    Set.diff (Set.fromList (List.map Mark.name (Node.marks leaf))) allowed
             in
             if Set.isEmpty notAllowed then
                 []
