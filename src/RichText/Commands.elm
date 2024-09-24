@@ -1754,7 +1754,7 @@ toggleMarkFull markOrder mark action editorState =
 
         Just selection ->
             if RichText.Model.Selection.focusNode selection == RichText.Model.Selection.anchorNode selection then
-                toggleMarkSingleInlineNode markOrder mark RichText.Model.Mark.Flip editorState
+                toggleMarkSingleInlineNode markOrder mark action editorState
 
             else
                 let
