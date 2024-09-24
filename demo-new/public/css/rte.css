@@ -1,0 +1,102 @@
+
+.rte-main {
+    margin-top: 16px;
+    min-height: 100px;
+    text-align: left;
+    outline: none;
+    user-select: text;
+    -webkit-user-select: text;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.rte-main img {
+    min-width: 20px;
+    min-height: 20px;
+    max-width: 200px;
+    border: 1px solid #f2f2f2;
+}
+
+.rte-hide-caret {
+    caret-color: transparent;
+}
+
+/*
+ * Workaround for https://github.com/mweiss/elm-rte-toolkit/issues/16, iOS has issues
+ * changing caret color on elements that are already selected.
+ */
+@supports (-webkit-touch-callout: none) {
+    .rte-hide-caret {
+        caret-color: auto;
+    }
+}
+
+.rte-button {
+    color: #999;
+    cursor: pointer;
+    margin-right: 16px;
+    padding: 2px 0;
+    display: inline-block;
+}
+
+.rte-button.rte-active {
+    color: #5890ff;
+}
+
+.rte-button.rte-disabled {
+    color: #ccc;
+    pointer-events: none;
+}
+
+.rte-controls {
+    text-align: left;
+    font-size: 14px;
+    padding-bottom: 8px;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    display: inline-block;
+    margin-left: 16px;
+}
+
+.rte-controls-container {
+    border-bottom: 1px solid #f2f2f2;
+    text-align: left;
+}
+
+.editor-container {
+    padding: 12px 16px 16px 16px;
+    border: 1px solid #f2f2f2;
+}
+
+.rte-selected {
+    outline: 2px solid #8cf;
+}
+
+
+.rte-main a {
+    color: blue;
+}
+
+.rte-main a:hover {
+    color: darkblue;
+}
+
+.rte-main a:visited {
+    color: blueviolet;
+}
+
+.rte-main blockquote {
+    padding-left: 16px;
+    border-left: 2px solid #ccc
+}
+
+.rte-main pre {
+    white-space: pre-wrap;
+}
+
+.rte-main p {
+    margin-bottom: 1em;
+    margin-top: 1em;
+}
