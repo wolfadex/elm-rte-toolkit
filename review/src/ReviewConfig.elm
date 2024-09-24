@@ -73,6 +73,6 @@ config =
         { argumentNamePredicate = \_ -> True
         , lambdaReduceStrategy = NoEtaReducibleLambdas.OnlyWhenSingleArgument
         }
-    -- , NoRedundantlyQualifiedType.rule
+    , NoRedundantlyQualifiedType.rule
     -- , Review.ImportSimple.rule
     ]
