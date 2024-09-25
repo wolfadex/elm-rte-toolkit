@@ -1,6 +1,6 @@
 module Controls exposing (..)
 
-import FontAwesome.Icon as Icon exposing (Icon)
+import FontAwesome as Icon exposing (Icon)
 import FontAwesome.Solid as Solid
 import Html exposing (Attribute, Html, div, span)
 import Html.Attributes exposing (class)
@@ -165,7 +165,7 @@ onButtonPressInsertHR =
     preventDefaultOn "mousedown" (succeed ( InsertHorizontalRule, True ))
 
 
-createButtonForStyle : ControlState -> Style -> Icon -> Html EditorMsg
+createButtonForStyle : ControlState -> Style -> Icon has -> Html EditorMsg
 createButtonForStyle controlState style icon =
     let
         status =
@@ -177,7 +177,7 @@ createButtonForStyle controlState style icon =
     createButton status (onButtonPressToggleStyle style) icon title
 
 
-createButton : Status -> Html.Attribute EditorMsg -> Icon -> String -> Html EditorMsg
+createButton : Status -> Html.Attribute EditorMsg -> Icon hasId -> String -> Html EditorMsg
 createButton status actionAttribute icon title =
     span
         ([ actionAttribute, Html.Attributes.title title, class "rte-button" ]
@@ -192,7 +192,7 @@ createButton status actionAttribute icon title =
                         [ class "rte-enabled" ]
                )
         )
-        [ Icon.viewIcon icon ]
+        [ Icon.view icon ]
 
 
 inlineElementButtons : ControlState -> List (Html EditorMsg)
@@ -381,7 +381,7 @@ deriveControlState editor =
             }
 
 
-styleToIcon : Style -> Icon
+styleToIcon : Style -> Icon Icon.WithoutId
 styleToIcon style =
     case style of
         Bold ->
