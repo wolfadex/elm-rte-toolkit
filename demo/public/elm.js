@@ -791,7 +791,7 @@ ${variant}`;
   var VERSION = "2.0.0-beta.3";
   var TARGET_NAME = "Demo";
   var INITIAL_ELM_COMPILED_TIMESTAMP = Number(
-    "1727226089259"
+    "1727228062660"
   );
   var ORIGINAL_COMPILATION_MODE = "standard";
   var ORIGINAL_BROWSER_UI_POSITION = "BottomLeft";

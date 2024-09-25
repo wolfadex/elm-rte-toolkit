@@ -9,17 +9,16 @@
     "dependencies": {
         "elm-rte-toolkit": "^1.0.1"
     },
-    "devDependencies": {
-        "@webcomponents/webcomponentsjs": "^2.4.3",
-        "create-elm-app": "^5.22.0"
-    },
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
-        "dev": "elm-app start"
+        "dev": "elm-watch hot"
     },
     "author": "",
     "license": "ISC",
     "volta": {
-        "node": "16.20.2"
+        "node": "20.17.0"
+    },
+    "devDependencies": {
+        "elm-watch": "^2.0.0-beta.3"
     }
 }

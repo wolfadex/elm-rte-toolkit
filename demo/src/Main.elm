@@ -36,7 +36,7 @@ type alias Flags =
 -- MODEL
 
 
-init : f -> Url -> Nav.Key -> ( Model, Cmd Msg )
+init : Flags -> Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url navKey =
     changeRouteTo (Route.fromUrl url)
         (Redirect (Session navKey))
@@ -230,7 +230,7 @@ subscriptions model =
 -- MAIN
 
 
-main : Program Value Model Msg
+main : Program Flags Model Msg
 main =
     Browser.application
         { init = init
