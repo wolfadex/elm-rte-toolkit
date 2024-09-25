@@ -1,3137 +1,5 @@
-// elm-watch hot {"version":"2.0.0-beta.3","targetName":"Demo","webSocketConnection":59334}
-"use strict";
-(() => {
-  // node_modules/tiny-decoders/index.mjs
-  function boolean(value) {
-    if (typeof value !== "boolean") {
-      throw new DecoderError({ tag: "boolean", got: value });
-    }
-    return value;
-  }
-  function number(value) {
-    if (typeof value !== "number") {
-      throw new DecoderError({ tag: "number", got: value });
-    }
-    return value;
-  }
-  function string(value) {
-    if (typeof value !== "string") {
-      throw new DecoderError({ tag: "string", got: value });
-    }
-    return value;
-  }
-  function stringUnion(mapping) {
-    return function stringUnionDecoder(value) {
-      const str = string(value);
-      if (!Object.prototype.hasOwnProperty.call(mapping, str)) {
-        throw new DecoderError({
-          tag: "unknown stringUnion variant",
-          knownVariants: Object.keys(mapping),
-          got: str
-        });
-      }
-      return str;
-    };
-  }
-  function unknownArray(value) {
-    if (!Array.isArray(value)) {
-      throw new DecoderError({ tag: "array", got: value });
-    }
-    return value;
-  }
-  function unknownRecord(value) {
-    if (typeof value !== "object" || value === null || Array.isArray(value)) {
-      throw new DecoderError({ tag: "object", got: value });
-    }
-    return value;
-  }
-  function array(decoder) {
-    return function arrayDecoder(value) {
-      const arr = unknownArray(value);
-      const result = [];
-      for (let index = 0; index < arr.length; index++) {
-        try {
-          result.push(decoder(arr[index]));
-        } catch (error) {
-          throw DecoderError.at(error, index);
-        }
-      }
-      return result;
-    };
-  }
-  function record(decoder) {
-    return function recordDecoder(value) {
-      const object = unknownRecord(value);
-      const keys = Object.keys(object);
-      const result = {};
-      for (const key of keys) {
-        if (key === "__proto__") {
-          continue;
-        }
-        try {
-          result[key] = decoder(object[key]);
-        } catch (error) {
-          throw DecoderError.at(error, key);
-        }
-      }
-      return result;
-    };
-  }
-  function fields(callback, { exact = "allow extra", allow = "object" } = {}) {
-    return function fieldsDecoder(value) {
-      const object = allow === "array" ? unknownArray(value) : unknownRecord(value);
-      const knownFields = /* @__PURE__ */ Object.create(null);
-      function field(key, decoder) {
-        try {
-          const result2 = decoder(object[key]);
-          knownFields[key] = null;
-          return result2;
-        } catch (error) {
-          throw DecoderError.at(error, key);
-        }
-      }
-      const result = callback(field, object);
-      if (exact !== "allow extra") {
-        const unknownFields = Object.keys(object).filter((key) => !Object.prototype.hasOwnProperty.call(knownFields, key));
-        if (unknownFields.length > 0) {
-          throw new DecoderError({
-            tag: "exact fields",
-            knownFields: Object.keys(knownFields),
-            got: unknownFields
-          });
-        }
-      }
-      return result;
-    };
-  }
-  function fieldsAuto(mapping, { exact = "allow extra" } = {}) {
-    return function fieldsAutoDecoder(value) {
-      const object = unknownRecord(value);
-      const keys = Object.keys(mapping);
-      const result = {};
-      for (const key of keys) {
-        if (key === "__proto__") {
-          continue;
-        }
-        const decoder = mapping[key];
-        try {
-          result[key] = decoder(object[key]);
-        } catch (error) {
-          throw DecoderError.at(error, key);
-        }
-      }
-      if (exact !== "allow extra") {
-        const unknownFields = Object.keys(object).filter((key) => !Object.prototype.hasOwnProperty.call(mapping, key));
-        if (unknownFields.length > 0) {
-          throw new DecoderError({
-            tag: "exact fields",
-            knownFields: keys,
-            got: unknownFields
-          });
-        }
-      }
-      return result;
-    };
-  }
-  function fieldsUnion(key, mapping) {
-    return fields(function fieldsUnionFields(field, object) {
-      const tag = field(key, string);
-      if (Object.prototype.hasOwnProperty.call(mapping, tag)) {
-        const decoder = mapping[tag];
-        return decoder(object);
-      }
-      throw new DecoderError({
-        tag: "unknown fieldsUnion tag",
-        knownTags: Object.keys(mapping),
-        got: tag,
-        key
-      });
-    });
-  }
-  function multi(mapping) {
-    return function multiDecoder(value) {
-      if (value === void 0) {
-        if (mapping.undefined !== void 0) {
-          return mapping.undefined(value);
-        }
-      } else if (value === null) {
-        if (mapping.null !== void 0) {
-          return mapping.null(value);
-        }
-      } else if (typeof value === "boolean") {
-        if (mapping.boolean !== void 0) {
-          return mapping.boolean(value);
-        }
-      } else if (typeof value === "number") {
-        if (mapping.number !== void 0) {
-          return mapping.number(value);
-        }
-      } else if (typeof value === "string") {
-        if (mapping.string !== void 0) {
-          return mapping.string(value);
-        }
-      } else if (Array.isArray(value)) {
-        if (mapping.array !== void 0) {
-          return mapping.array(value);
-        }
-      } else {
-        if (mapping.object !== void 0) {
-          return mapping.object(value);
-        }
-      }
-      throw new DecoderError({
-        tag: "unknown multi type",
-        knownTypes: Object.keys(mapping),
-        got: value
-      });
-    };
-  }
-  function optional(decoder, defaultValue) {
-    return function optionalDecoder(value) {
-      if (value === void 0) {
-        return defaultValue;
-      }
-      try {
-        return decoder(value);
-      } catch (error) {
-        const newError = DecoderError.at(error);
-        if (newError.path.length === 0) {
-          newError.optional = true;
-        }
-        throw newError;
-      }
-    };
-  }
-  function chain(decoder, next) {
-    return function chainDecoder(value) {
-      return next(decoder(value));
-    };
-  }
-  function formatDecoderErrorVariant(variant, options) {
-    const formatGot = (value) => {
-      const formatted = repr(value, options);
-      return (options === null || options === void 0 ? void 0 : options.sensitive) === true ? `${formatted}
-(Actual values are hidden in sensitive mode.)` : formatted;
-    };
-    const stringList = (strings) => strings.length === 0 ? "(none)" : strings.map((s) => JSON.stringify(s)).join(", ");
-    const got = (message, value) => value === DecoderError.MISSING_VALUE ? message : `${message}
-Got: ${formatGot(value)}`;
-    switch (variant.tag) {
-      case "boolean":
-      case "number":
-      case "string":
-        return got(`Expected a ${variant.tag}`, variant.got);
-      case "array":
-      case "object":
-        return got(`Expected an ${variant.tag}`, variant.got);
-      case "unknown multi type":
-        return `Expected one of these types: ${variant.knownTypes.length === 0 ? "never" : variant.knownTypes.join(", ")}
-Got: ${formatGot(variant.got)}`;
-      case "unknown fieldsUnion tag":
-        return `Expected one of these tags: ${stringList(variant.knownTags)}
-Got: ${formatGot(variant.got)}`;
-      case "unknown stringUnion variant":
-        return `Expected one of these variants: ${stringList(variant.knownVariants)}
-Got: ${formatGot(variant.got)}`;
-      case "exact fields":
-        return `Expected only these fields: ${stringList(variant.knownFields)}
-Found extra fields: ${formatGot(variant.got).replace(/^\[|\]$/g, "")}`;
-      case "tuple size":
-        return `Expected ${variant.expected} items
-Got: ${variant.got}`;
-      case "custom":
-        return got(variant.message, variant.got);
-    }
-  }
-  var DecoderError = class extends TypeError {
-    constructor({ key, ...params }) {
-      const variant = "tag" in params ? params : { tag: "custom", message: params.message, got: params.value };
-      super(`${formatDecoderErrorVariant(
-        variant,
-        { sensitive: true }
-      )}
-
-For better error messages, see https://github.com/lydell/tiny-decoders#error-messages`);
-      this.path = key === void 0 ? [] : [key];
-      this.variant = variant;
-      this.nullable = false;
-      this.optional = false;
-    }
-    static at(error, key) {
-      if (error instanceof DecoderError) {
-        if (key !== void 0) {
-          error.path.unshift(key);
-        }
-        return error;
-      }
-      return new DecoderError({
-        tag: "custom",
-        message: error instanceof Error ? error.message : String(error),
-        got: DecoderError.MISSING_VALUE,
-        key
-      });
-    }
-    format(options) {
-      const path = this.path.map((part) => `[${JSON.stringify(part)}]`).join("");
-      const nullableString = this.nullable ? " (nullable)" : "";
-      const optionalString = this.optional ? " (optional)" : "";
-      const variant = formatDecoderErrorVariant(this.variant, options);
-      return `At root${path}${nullableString}${optionalString}:
-${variant}`;
-    }
-  };
-  DecoderError.MISSING_VALUE = Symbol("DecoderError.MISSING_VALUE");
-  function repr(value, { recurse = true, maxArrayChildren = 5, maxObjectChildren = 3, maxLength = 100, recurseMaxLength = 20, sensitive = false } = {}) {
-    const type = typeof value;
-    const toStringType = Object.prototype.toString.call(value).replace(/^\[object\s+(.+)\]$/, "$1");
-    try {
-      if (value == null || type === "number" || type === "boolean" || type === "symbol" || toStringType === "RegExp") {
-        return sensitive ? toStringType.toLowerCase() : truncate(String(value), maxLength);
-      }
-      if (type === "string") {
-        return sensitive ? type : truncate(JSON.stringify(value), maxLength);
-      }
-      if (typeof value === "function") {
-        return `function ${truncate(JSON.stringify(value.name), maxLength)}`;
-      }
-      if (Array.isArray(value)) {
-        const arr = value;
-        if (!recurse && arr.length > 0) {
-          return `${toStringType}(${arr.length})`;
-        }
-        const lastIndex = arr.length - 1;
-        const items = [];
-        const end = Math.min(maxArrayChildren - 1, lastIndex);
-        for (let index = 0; index <= end; index++) {
-          const item = index in arr ? repr(arr[index], {
-            recurse: false,
-            maxLength: recurseMaxLength,
-            sensitive
-          }) : "<empty>";
-          items.push(item);
-        }
-        if (end < lastIndex) {
-          items.push(`(${lastIndex - end} more)`);
-        }
-        return `[${items.join(", ")}]`;
-      }
-      if (toStringType === "Object") {
-        const object = value;
-        const keys = Object.keys(object);
-        const { name } = object.constructor;
-        if (!recurse && keys.length > 0) {
-          return `${name}(${keys.length})`;
-        }
-        const numHidden = Math.max(0, keys.length - maxObjectChildren);
-        const items = keys.slice(0, maxObjectChildren).map((key2) => `${truncate(JSON.stringify(key2), recurseMaxLength)}: ${repr(object[key2], {
-          recurse: false,
-          maxLength: recurseMaxLength,
-          sensitive
-        })}`).concat(numHidden > 0 ? `(${numHidden} more)` : []);
-        const prefix = name === "Object" ? "" : `${name} `;
-        return `${prefix}{${items.join(", ")}}`;
-      }
-      return toStringType;
-    } catch (_error) {
-      return toStringType;
-    }
-  }
-  function truncate(str, maxLength) {
-    const half = Math.floor(maxLength / 2);
-    return str.length <= maxLength ? str : `${str.slice(0, half)}\u2026${str.slice(-half)}`;
-  }
-
-  // src/Helpers.ts
-  function join(array2, separator) {
-    return array2.join(separator);
-  }
-  function pad(number2) {
-    return number2.toString().padStart(2, "0");
-  }
-  function formatDate(date) {
-    return join(
-      [pad(date.getFullYear()), pad(date.getMonth() + 1), pad(date.getDate())],
-      "-"
-    );
-  }
-  function formatTime(date) {
-    return join(
-      [pad(date.getHours()), pad(date.getMinutes()), pad(date.getSeconds())],
-      ":"
-    );
-  }
-
-  // src/TeaProgram.ts
-  async function runTeaProgram(options) {
-    return new Promise((resolve, reject) => {
-      const [initialModel, initialCmds] = options.init;
-      let model = initialModel;
-      const msgQueue = [];
-      let killed = false;
-      const dispatch = (dispatchedMsg) => {
-        if (killed) {
-          return;
-        }
-        const alreadyRunning = msgQueue.length > 0;
-        msgQueue.push(dispatchedMsg);
-        if (alreadyRunning) {
-          return;
-        }
-        for (const msg of msgQueue) {
-          const [newModel, cmds] = options.update(msg, model);
-          model = newModel;
-          runCmds(cmds);
-        }
-        msgQueue.length = 0;
-      };
-      const runCmds = (cmds) => {
-        for (const cmd of cmds) {
-          options.runCmd(
-            cmd,
-            mutable,
-            dispatch,
-            (result) => {
-              cmds.length = 0;
-              killed = true;
-              resolve(result);
-            },
-            (error) => {
-              cmds.length = 0;
-              killed = true;
-              reject(error);
-            }
-          );
-          if (killed) {
-            break;
-          }
-        }
-      };
-      const mutable = options.initMutable(
-        dispatch,
-        (result) => {
-          killed = true;
-          resolve(result);
-        },
-        (error) => {
-          killed = true;
-          reject(error);
-        }
-      );
-      runCmds(initialCmds);
-    });
-  }
-
-  // src/Types.ts
-  var AbsolutePath = fieldsAuto({
-    tag: () => "AbsolutePath",
-    absolutePath: string
-  });
-  var CompilationMode = stringUnion({
-    debug: null,
-    standard: null,
-    optimize: null
-  });
-  var BrowserUiPosition = stringUnion({
-    TopLeft: null,
-    TopRight: null,
-    BottomLeft: null,
-    BottomRight: null
-  });
-
-  // client/css.ts
-  async function reloadAllCssIfNeeded(originalStyles) {
-    const results = await Promise.allSettled(
-      Array.from(
-        document.styleSheets,
-        (styleSheet) => reloadCssIfNeeded(originalStyles, styleSheet)
-      )
-    );
-    return results.some(
-      (result) => result.status === "fulfilled" && result.value
-    );
-  }
-  async function reloadCssIfNeeded(originalStyles, styleSheet) {
-    if (styleSheet.href === null) {
-      return false;
-    }
-    const url = makeUrl(styleSheet.href);
-    if (url === void 0 || url.host !== window.location.host) {
-      return false;
-    }
-    const response = await fetch(url, { cache: "reload" });
-    if (!response.ok) {
-      return false;
-    }
-    const newCss = await response.text();
-    let newStyleSheet;
-    const isFirefox = "MozAppearance" in document.documentElement.style;
-    if (isFirefox) {
-      if (/@import\b/i.test(newCss)) {
-        console.warn(
-          "elm-watch: Reloading CSS with @import is not possible in Firefox (not even in a comment or string). Style sheet:",
-          url.href
-        );
-        return false;
-      }
-      newStyleSheet = new CSSStyleSheet();
-      await newStyleSheet.replace(newCss);
-    } else {
-      const importUrls = getAllCssImports(url, styleSheet);
-      await Promise.allSettled(
-        importUrls.map((importUrl) => fetch(importUrl, { cache: "reload" }))
-      );
-      newStyleSheet = await parseCssWithImports(newCss);
-    }
-    return newStyleSheet === void 0 ? false : updateStyleSheetIfNeeded(originalStyles, styleSheet, newStyleSheet);
-  }
-  async function parseCssWithImports(css) {
-    return new Promise((resolve) => {
-      const style = document.createElement("style");
-      style.media = "print";
-      style.textContent = css;
-      style.onerror = style.onload = () => {
-        resolve(style.sheet ?? void 0);
-        style.remove();
-      };
-      document.head.append(style);
-    });
-  }
-  function makeUrl(urlString, base) {
-    try {
-      return new URL(urlString, base);
-    } catch {
-      return void 0;
-    }
-  }
-  function getAllCssImports(styleSheetUrl, styleSheet) {
-    return Array.from(styleSheet.cssRules).flatMap((rule) => {
-      if (rule instanceof CSSImportRule) {
-        const url = makeUrl(rule.href, styleSheetUrl);
-        if (url !== void 0 && url.host === styleSheetUrl.host) {
-          return [url, ...getAllCssImports(url, rule.styleSheet)];
-        }
-      }
-      return [];
-    });
-  }
-  function updateStyleSheetIfNeeded(originalStyles, oldStyleSheet, newStyleSheet) {
-    let changed = false;
-    const length = Math.min(
-      oldStyleSheet.cssRules.length,
-      newStyleSheet.cssRules.length
-    );
-    let index = 0;
-    for (; index < length; index++) {
-      const oldRule = oldStyleSheet.cssRules[index];
-      const newRule = newStyleSheet.cssRules[index];
-      if (oldRule instanceof CSSStyleRule && newRule instanceof CSSStyleRule) {
-        if (oldRule.selectorText !== newRule.selectorText) {
-          oldRule.selectorText = newRule.selectorText;
-          changed = true;
-        }
-        let originals = originalStyles.get(oldRule);
-        if (originals === void 0) {
-          originals = oldRule.style.cssText;
-          originalStyles.set(oldRule, originals);
-        }
-        if (originals !== newRule.style.cssText) {
-          oldStyleSheet.deleteRule(index);
-          oldStyleSheet.insertRule(newRule.cssText, index);
-          originalStyles.set(
-            oldStyleSheet.cssRules[index],
-            newRule.style.cssText
-          );
-          changed = true;
-        } else {
-          const nestedChanged = updateStyleSheetIfNeeded(
-            originalStyles,
-            oldRule,
-            newRule
-          );
-          if (nestedChanged) {
-            changed = true;
-            oldRule.selectorText = oldRule.selectorText;
-          }
-        }
-      } else if (oldRule instanceof CSSImportRule && newRule instanceof CSSImportRule && oldRule.cssText === newRule.cssText) {
-        const nestedChanged = updateStyleSheetIfNeeded(
-          originalStyles,
-          oldRule.styleSheet,
-          newRule.styleSheet
-        );
-        if (nestedChanged) {
-          changed = true;
-          oldRule.media = oldRule.media;
-        }
-      } else if (oldRule instanceof CSSConditionRule && newRule instanceof CSSConditionRule && oldRule.conditionText === newRule.conditionText || oldRule instanceof CSSLayerBlockRule && newRule instanceof CSSLayerBlockRule && oldRule.name === newRule.name || oldRule instanceof CSSPageRule && newRule instanceof CSSPageRule && oldRule.selectorText === newRule.selectorText) {
-        const nestedChanged = updateStyleSheetIfNeeded(
-          originalStyles,
-          oldRule,
-          newRule
-        );
-        if (nestedChanged) {
-          changed = true;
-        }
-      } else if (oldRule.cssText !== newRule.cssText) {
-        oldStyleSheet.deleteRule(index);
-        oldStyleSheet.insertRule(newRule.cssText, index);
-        changed = true;
-      }
-    }
-    while (index < oldStyleSheet.cssRules.length) {
-      oldStyleSheet.deleteRule(index);
-      changed = true;
-    }
-    for (; index < newStyleSheet.cssRules.length; index++) {
-      const newRule = newStyleSheet.cssRules[index];
-      oldStyleSheet.insertRule(newRule.cssText, index);
-      changed = true;
-    }
-    return changed;
-  }
-
-  // src/NonEmptyArray.ts
-  function NonEmptyArray(decoder) {
-    return chain(array(decoder), (array2) => {
-      if (isNonEmptyArray(array2)) {
-        return array2;
-      }
-      throw new DecoderError({
-        message: "Expected a non-empty array",
-        value: array2
-      });
-    });
-  }
-  function isNonEmptyArray(array2) {
-    return array2.length >= 1;
-  }
-
-  // client/WebSocketMessages.ts
-  var FocusedTabAcknowledged = fieldsAuto({
-    tag: () => "FocusedTabAcknowledged"
-  });
-  var OpenEditorError = fieldsUnion("tag", {
-    EnvNotSet: fieldsAuto({
-      tag: () => "EnvNotSet"
-    }),
-    CommandFailed: fieldsAuto({
-      tag: () => "CommandFailed",
-      message: string
-    })
-  });
-  var OpenEditorFailed = fieldsAuto({
-    tag: () => "OpenEditorFailed",
-    error: OpenEditorError
-  });
-  var ErrorLocation = fieldsUnion("tag", {
-    FileOnly: fieldsAuto({
-      tag: () => "FileOnly",
-      file: AbsolutePath
-    }),
-    FileWithLineAndColumn: fieldsAuto({
-      tag: () => "FileWithLineAndColumn",
-      file: AbsolutePath,
-      line: number,
-      column: number
-    }),
-    Target: fieldsAuto({
-      tag: () => "Target",
-      targetName: string
-    })
-  });
-  var CompileError = fieldsAuto({
-    title: string,
-    location: optional(ErrorLocation),
-    htmlContent: string
-  });
-  var StaticFilesChanged = fieldsAuto({
-    tag: () => "StaticFilesChanged",
-    changedFileUrlPaths: NonEmptyArray(string)
-  });
-  var StaticFilesMayHaveChangedWhileDisconnected = fieldsAuto({
-    tag: () => "StaticFilesMayHaveChangedWhileDisconnected"
-  });
-  var StatusChanged = fieldsAuto({
-    tag: () => "StatusChanged",
-    status: fieldsUnion("tag", {
-      AlreadyUpToDate: fieldsAuto({
-        tag: () => "AlreadyUpToDate",
-        compilationMode: CompilationMode,
-        browserUiPosition: BrowserUiPosition
-      }),
-      Busy: fieldsAuto({
-        tag: () => "Busy",
-        compilationMode: CompilationMode,
-        browserUiPosition: BrowserUiPosition
-      }),
-      CompileError: fieldsAuto({
-        tag: () => "CompileError",
-        compilationMode: CompilationMode,
-        browserUiPosition: BrowserUiPosition,
-        openErrorOverlay: boolean,
-        errors: array(CompileError),
-        foregroundColor: string,
-        backgroundColor: string
-      }),
-      ElmJsonError: fieldsAuto({
-        tag: () => "ElmJsonError",
-        error: string
-      }),
-      ClientError: fieldsAuto({
-        tag: () => "ClientError",
-        message: string
-      })
-    })
-  });
-  var SuccessfullyCompiled = fieldsAuto({
-    tag: () => "SuccessfullyCompiled",
-    code: string,
-    elmCompiledTimestamp: number,
-    compilationMode: CompilationMode,
-    browserUiPosition: BrowserUiPosition
-  });
-  var SuccessfullyCompiledButRecordFieldsChanged = fieldsAuto({
-    tag: () => "SuccessfullyCompiledButRecordFieldsChanged"
-  });
-  var WebSocketToClientMessage = fieldsUnion("tag", {
-    FocusedTabAcknowledged,
-    OpenEditorFailed,
-    StaticFilesChanged,
-    StaticFilesMayHaveChangedWhileDisconnected,
-    StatusChanged,
-    SuccessfullyCompiled,
-    SuccessfullyCompiledButRecordFieldsChanged
-  });
-  var WebSocketToServerMessage = fieldsUnion("tag", {
-    ChangedCompilationMode: fieldsAuto({
-      tag: () => "ChangedCompilationMode",
-      compilationMode: CompilationMode
-    }),
-    ChangedBrowserUiPosition: fieldsAuto({
-      tag: () => "ChangedBrowserUiPosition",
-      browserUiPosition: BrowserUiPosition
-    }),
-    ChangedOpenErrorOverlay: fieldsAuto({
-      tag: () => "ChangedOpenErrorOverlay",
-      openErrorOverlay: boolean
-    }),
-    FocusedTab: fieldsAuto({
-      tag: () => "FocusedTab"
-    }),
-    PressedOpenEditor: fieldsAuto({
-      tag: () => "PressedOpenEditor",
-      file: AbsolutePath,
-      line: number,
-      column: number
-    })
-  });
-  function decodeWebSocketToClientMessage(message) {
-    if (message.startsWith("//")) {
-      const newlineIndexRaw = message.indexOf("\n");
-      const newlineIndex = newlineIndexRaw === -1 ? message.length : newlineIndexRaw;
-      const jsonString = message.slice(2, newlineIndex);
-      const parsed = SuccessfullyCompiled(JSON.parse(jsonString));
-      return { ...parsed, code: message };
-    } else {
-      return WebSocketToClientMessage(JSON.parse(message));
-    }
-  }
-
-  // client/client.ts
-  var window2 = globalThis;
-  var IS_WEB_WORKER = window2.window === void 0;
-  var RELOAD_MESSAGE_KEY = "__elmWatchReloadMessage";
-  var RELOAD_TARGET_NAME_KEY_PREFIX = "__elmWatchReloadTarget__";
-  var DEFAULT_ELM_WATCH = {
-    MOCKED_TIMINGS: false,
-    WEBSOCKET_TIMEOUT: 1e3,
-    ON_INIT: () => {
-    },
-    ON_RENDER: () => {
-    },
-    ON_REACHED_IDLE_STATE: () => {
-    },
-    CHANGED_CSS: new Date(0),
-    CHANGED_FILE_URL_PATHS: { timestamp: new Date(0), changed: /* @__PURE__ */ new Set() },
-    ORIGINAL_STYLES: /* @__PURE__ */ new WeakMap(),
-    RELOAD_STATUSES: {},
-    RELOAD_PAGE: (message) => {
-      if (message !== void 0) {
-        try {
-          window2.sessionStorage.setItem(RELOAD_MESSAGE_KEY, message);
-        } catch {
-        }
-      }
-      if (IS_WEB_WORKER) {
-        if (message !== void 0) {
-          console.info(message);
-        }
-        console.error(
-          message === void 0 ? "elm-watch: You need to reload the page! I seem to be running in a Web Worker, so I can\u2019t do it for you." : `elm-watch: You need to reload the page! I seem to be running in a Web Worker, so I couldn\u2019t actually reload the page (see above).`
-        );
-      } else {
-        window2.location.reload();
-      }
-    },
-    KILL_MATCHING: () => Promise.resolve(),
-    DISCONNECT: () => {
-    },
-    LOG_DEBUG: console.debug
-  };
-  var { __ELM_WATCH } = window2;
-  if (typeof __ELM_WATCH !== "object" || __ELM_WATCH === null) {
-    __ELM_WATCH = {};
-    Object.defineProperty(window2, "__ELM_WATCH", { value: __ELM_WATCH });
-  }
-  for (const [key, value] of Object.entries(DEFAULT_ELM_WATCH)) {
-    if (__ELM_WATCH[key] === void 0) {
-      __ELM_WATCH[key] = value;
-    }
-  }
-  var VERSION = "2.0.0-beta.3";
-  var TARGET_NAME = "Demo";
-  var INITIAL_ELM_COMPILED_TIMESTAMP = Number(
-    "1727226089259"
-  );
-  var ORIGINAL_COMPILATION_MODE = "standard";
-  var ORIGINAL_BROWSER_UI_POSITION = "BottomLeft";
-  var WEBSOCKET_CONNECTION = "59334";
-  var CONTAINER_ID = "elm-watch";
-  var DEBUG = String("false") === "true";
-  var ELM_WATCH_CHANGED_FILE_URL_PATHS_EVENT = "elm-watch:changed-file-url-paths";
-  var BROWSER_UI_MOVED_EVENT = "BROWSER_UI_MOVED_EVENT";
-  var CLOSE_ALL_ERROR_OVERLAYS_EVENT = "CLOSE_ALL_ERROR_OVERLAYS_EVENT";
-  var ELM_WATCH_CHANGED_FILE_URL_BATCH_TIME = 10;
-  var JUST_CHANGED_BROWSER_UI_POSITION_TIMEOUT = 2e3;
-  var SEND_KEY_DO_NOT_USE_ALL_THE_TIME = Symbol(
-    "This value is supposed to only be obtained via `Status`."
-  );
-  function logDebug(...args) {
-    if (DEBUG) {
-      __ELM_WATCH.LOG_DEBUG(...args);
-    }
-  }
-  function parseBrowseUiPositionWithFallback(value) {
-    try {
-      return BrowserUiPosition(value);
-    } catch {
-      return ORIGINAL_BROWSER_UI_POSITION;
-    }
-  }
-  function removeElmWatchIndexHtmlComment() {
-    const node = document.firstChild;
-    if (node instanceof Comment && node.data.trimStart().startsWith("elm-watch debug information:")) {
-      node.remove();
-    }
-  }
-  function run() {
-    let elmCompiledTimestampBeforeReload = void 0;
-    try {
-      const message = window2.sessionStorage.getItem(RELOAD_MESSAGE_KEY);
-      if (message !== null) {
-        console.info(message);
-        window2.sessionStorage.removeItem(RELOAD_MESSAGE_KEY);
-      }
-      const key = RELOAD_TARGET_NAME_KEY_PREFIX + TARGET_NAME;
-      const previous = window2.sessionStorage.getItem(key);
-      if (previous !== null) {
-        const number2 = Number(previous);
-        if (Number.isFinite(number2)) {
-          elmCompiledTimestampBeforeReload = number2;
-        }
-        window2.sessionStorage.removeItem(key);
-      }
-    } catch {
-    }
-    const elements = IS_WEB_WORKER ? void 0 : getOrCreateTargetRoot();
-    const browserUiPosition = elements === void 0 ? ORIGINAL_BROWSER_UI_POSITION : parseBrowseUiPositionWithFallback(elements.container.dataset.position);
-    const getNow = () => new Date();
-    if (!IS_WEB_WORKER) {
-      removeElmWatchIndexHtmlComment();
-    }
-    runTeaProgram({
-      initMutable: initMutable(getNow, elements),
-      init: init(getNow(), browserUiPosition, elmCompiledTimestampBeforeReload),
-      update: (msg, model) => {
-        const [updatedModel, cmds] = update(msg, model);
-        const modelChanged = updatedModel !== model;
-        const reloadTrouble = model.status.tag !== updatedModel.status.tag && updatedModel.status.tag === "WaitingForReload" && updatedModel.elmCompiledTimestamp === updatedModel.elmCompiledTimestampBeforeReload;
-        const newModel = modelChanged ? {
-          ...updatedModel,
-          uiExpanded: reloadTrouble ? true : updatedModel.uiExpanded
-        } : model;
-        const oldErrorOverlay = getErrorOverlay(model.status);
-        const newErrorOverlay = getErrorOverlay(newModel.status);
-        const statusType = statusToStatusType(newModel.status.tag);
-        const statusTypeChanged = statusType !== statusToStatusType(model.status.tag);
-        const statusFlashType = getStatusFlashType({
-          statusType,
-          statusTypeChanged,
-          hasReceivedHotReload: newModel.elmCompiledTimestamp !== INITIAL_ELM_COMPILED_TIMESTAMP,
-          uiRelatedUpdate: msg.tag === "UiMsg",
-          errorOverlayVisible: elements !== void 0 && !elements.overlay.hidden
-        });
-        const flashCmd = statusFlashType === void 0 || cmds.some((cmd) => cmd.tag === "Flash") ? [] : [{ tag: "Flash", flashType: statusFlashType }];
-        const allCmds = modelChanged ? [
-          ...cmds,
-          {
-            tag: "UpdateGlobalStatus",
-            reloadStatus: statusToReloadStatus(newModel),
-            elmCompiledTimestamp: newModel.elmCompiledTimestamp
-          },
-          newModel.status.tag === model.status.tag && oldErrorOverlay?.openErrorOverlay === newErrorOverlay?.openErrorOverlay ? { tag: "NoCmd" } : {
-            tag: "UpdateErrorOverlay",
-            errors: newErrorOverlay === void 0 || !newErrorOverlay.openErrorOverlay ? /* @__PURE__ */ new Map() : newErrorOverlay.errors,
-            sendKey: statusToSpecialCaseSendKey(newModel.status)
-          },
-          ...elements !== void 0 || newModel.status.tag !== model.status.tag ? [
-            {
-              tag: "Render",
-              model: newModel,
-              manageFocus: msg.tag === "UiMsg"
-            }
-          ] : [],
-          ...flashCmd,
-          model.browserUiPosition === newModel.browserUiPosition ? { tag: "NoCmd" } : {
-            tag: "SetBrowserUiPosition",
-            browserUiPosition: newModel.browserUiPosition
-          },
-          reloadTrouble ? { tag: "TriggerReachedIdleState", reason: "ReloadTrouble" } : { tag: "NoCmd" }
-        ] : [...cmds, ...flashCmd];
-        logDebug(`${msg.tag} (${TARGET_NAME})`, msg, newModel, allCmds);
-        return [newModel, allCmds];
-      },
-      runCmd: runCmd(getNow, elements)
-    }).catch((error) => {
-      console.error("elm-watch: Unexpectedly exited with error:", error);
-    });
-  }
-  function getErrorOverlay(status) {
-    return "errorOverlay" in status ? status.errorOverlay : void 0;
-  }
-  function statusToReloadStatus(model) {
-    switch (model.status.tag) {
-      case "Busy":
-      case "Connecting":
-        return { tag: "MightWantToReload" };
-      case "CompileError":
-      case "ElmJsonError":
-      case "EvalError":
-      case "Idle":
-      case "SleepingBeforeReconnect":
-      case "UnexpectedError":
-        return { tag: "NoReloadWanted" };
-      case "WaitingForReload":
-        return model.elmCompiledTimestamp === model.elmCompiledTimestampBeforeReload ? { tag: "NoReloadWanted" } : { tag: "ReloadRequested", reasons: model.status.reasons };
-    }
-  }
-  function statusToStatusType(statusTag) {
-    switch (statusTag) {
-      case "Idle":
-        return "Success";
-      case "Busy":
-      case "Connecting":
-      case "SleepingBeforeReconnect":
-      case "WaitingForReload":
-        return "Waiting";
-      case "CompileError":
-      case "ElmJsonError":
-      case "EvalError":
-      case "UnexpectedError":
-        return "Error";
-    }
-  }
-  function statusToSpecialCaseSendKey(status) {
-    switch (status.tag) {
-      case "CompileError":
-      case "Idle":
-        return status.sendKey;
-      case "Busy":
-        return SEND_KEY_DO_NOT_USE_ALL_THE_TIME;
-      case "Connecting":
-      case "SleepingBeforeReconnect":
-      case "WaitingForReload":
-      case "ElmJsonError":
-      case "EvalError":
-      case "UnexpectedError":
-        return void 0;
-    }
-  }
-  function getOrCreateContainer() {
-    const existing = document.getElementById(CONTAINER_ID);
-    if (existing !== null) {
-      return existing;
-    }
-    const container = h(HTMLDivElement, { id: CONTAINER_ID });
-    container.style.all = "unset";
-    container.style.position = "fixed";
-    container.style.zIndex = "2147483647";
-    const shadowRoot = container.attachShadow({ mode: "open" });
-    shadowRoot.append(h(HTMLStyleElement, {}, CSS));
-    document.documentElement.append(container);
-    return container;
-  }
-  function getOrCreateTargetRoot() {
-    const container = getOrCreateContainer();
-    const { shadowRoot } = container;
-    if (shadowRoot === null) {
-      throw new Error(
-        `elm-watch: Cannot set up hot reload, because an element with ID ${CONTAINER_ID} exists, but \`.shadowRoot\` is null!`
-      );
-    }
-    let overlay = shadowRoot.querySelector(`.${CLASS.overlay}`);
-    if (overlay === null) {
-      overlay = h(HTMLDivElement, {
-        className: CLASS.overlay,
-        attrs: { "data-test-id": "Overlay" }
-      });
-      shadowRoot.append(overlay);
-    }
-    let overlayCloseButton = shadowRoot.querySelector(
-      `.${CLASS.overlayCloseButton}`
-    );
-    if (overlayCloseButton === null) {
-      const closeAllErrorOverlays = () => {
-        shadowRoot.dispatchEvent(new CustomEvent(CLOSE_ALL_ERROR_OVERLAYS_EVENT));
-      };
-      overlayCloseButton = h(HTMLButtonElement, {
-        className: CLASS.overlayCloseButton,
-        attrs: {
-          "aria-label": "Close error overlay",
-          "data-test-id": "OverlayCloseButton"
-        },
-        onclick: closeAllErrorOverlays
-      });
-      shadowRoot.append(overlayCloseButton);
-      const overlayNonNull = overlay;
-      window2.addEventListener(
-        "keydown",
-        (event) => {
-          if (overlayNonNull.hasChildNodes() && event.key === "Escape") {
-            event.preventDefault();
-            event.stopImmediatePropagation();
-            closeAllErrorOverlays();
-          }
-        },
-        true
-      );
-    }
-    let root = shadowRoot.querySelector(`.${CLASS.root}`);
-    if (root === null) {
-      root = h(HTMLDivElement, { className: CLASS.root });
-      shadowRoot.append(root);
-    }
-    const targetRoot = createTargetRoot(TARGET_NAME);
-    root.append(targetRoot);
-    const elements = {
-      container,
-      shadowRoot,
-      overlay,
-      overlayCloseButton,
-      root,
-      targetRoot
-    };
-    setBrowserUiPosition(ORIGINAL_BROWSER_UI_POSITION, elements);
-    return elements;
-  }
-  function createTargetRoot(targetName) {
-    return h(HTMLDivElement, {
-      className: CLASS.targetRoot,
-      attrs: { "data-target": targetName }
-    });
-  }
-  function browserUiPositionToCss(browserUiPosition) {
-    switch (browserUiPosition) {
-      case "TopLeft":
-        return { top: "-1px", bottom: "auto", left: "-1px", right: "auto" };
-      case "TopRight":
-        return { top: "-1px", bottom: "auto", left: "auto", right: "-1px" };
-      case "BottomLeft":
-        return { top: "auto", bottom: "-1px", left: "-1px", right: "auto" };
-      case "BottomRight":
-        return { top: "auto", bottom: "-1px", left: "auto", right: "-1px" };
-    }
-  }
-  function browserUiPositionToCssForChooser(browserUiPosition) {
-    switch (browserUiPosition) {
-      case "TopLeft":
-        return { top: "auto", bottom: "0", left: "auto", right: "0" };
-      case "TopRight":
-        return { top: "auto", bottom: "0", left: "0", right: "auto" };
-      case "BottomLeft":
-        return { top: "0", bottom: "auto", left: "auto", right: "0" };
-      case "BottomRight":
-        return { top: "0", bottom: "auto", left: "0", right: "auto" };
-    }
-  }
-  function setBrowserUiPosition(browserUiPosition, elements) {
-    const isFirstTargetRoot = elements.targetRoot.previousElementSibling === null;
-    if (!isFirstTargetRoot) {
-      return;
-    }
-    elements.container.dataset.position = browserUiPosition;
-    for (const [key, value] of Object.entries(
-      browserUiPositionToCss(browserUiPosition)
-    )) {
-      elements.container.style.setProperty(key, value);
-    }
-    const isInBottomHalf = browserUiPosition === "BottomLeft" || browserUiPosition === "BottomRight";
-    elements.root.classList.toggle(CLASS.rootBottomHalf, isInBottomHalf);
-    elements.shadowRoot.dispatchEvent(
-      new CustomEvent(BROWSER_UI_MOVED_EVENT, { detail: browserUiPosition })
-    );
-  }
-  var initMutable = (getNow, elements) => (dispatch, resolvePromise) => {
-    let removeListeners = [];
-    const mutable = {
-      removeListeners: () => {
-        for (const removeListener of removeListeners) {
-          removeListener();
-        }
-      },
-      webSocket: initWebSocket(
-        getNow,
-        INITIAL_ELM_COMPILED_TIMESTAMP,
-        dispatch
-      ),
-      webSocketTimeoutId: void 0
-    };
-    mutable.webSocket.addEventListener(
-      "open",
-      () => {
-        removeListeners = [
-          addEventListener(window2, "focus", (event) => {
-            if (event instanceof CustomEvent && event.detail !== TARGET_NAME) {
-              return;
-            }
-            dispatch({ tag: "FocusedTab" });
-          }),
-          addEventListener(window2, "visibilitychange", () => {
-            if (document.visibilityState === "visible") {
-              dispatch({
-                tag: "PageVisibilityChangedToVisible",
-                date: getNow()
-              });
-            }
-          }),
-          ...elements === void 0 ? [] : [
-            addEventListener(
-              elements.shadowRoot,
-              BROWSER_UI_MOVED_EVENT,
-              (event) => {
-                dispatch({
-                  tag: "BrowserUiMoved",
-                  browserUiPosition: fields(
-                    (field) => field("detail", parseBrowseUiPositionWithFallback)
-                  )(event)
-                });
-              }
-            ),
-            addEventListener(
-              elements.shadowRoot,
-              CLOSE_ALL_ERROR_OVERLAYS_EVENT,
-              () => {
-                dispatch({
-                  tag: "UiMsg",
-                  date: getNow(),
-                  msg: {
-                    tag: "ChangedOpenErrorOverlay",
-                    openErrorOverlay: false
-                  }
-                });
-              }
-            )
-          ]
-        ];
-      },
-      { once: true }
-    );
-    __ELM_WATCH.RELOAD_STATUSES[TARGET_NAME] = {
-      tag: "MightWantToReload"
-    };
-    const originalOnInit = __ELM_WATCH.ON_INIT;
-    __ELM_WATCH.ON_INIT = () => {
-      dispatch({ tag: "AppInit" });
-      originalOnInit();
-    };
-    const originalKillMatching = __ELM_WATCH.KILL_MATCHING;
-    __ELM_WATCH.KILL_MATCHING = (targetName) => new Promise((resolve, reject) => {
-      if (targetName.test(TARGET_NAME) && mutable.webSocket.readyState !== WebSocket.CLOSED) {
-        mutable.webSocket.addEventListener("close", () => {
-          originalKillMatching(targetName).then(resolve).catch(reject);
-        });
-        mutable.removeListeners();
-        mutable.webSocket.close();
-        if (mutable.webSocketTimeoutId !== void 0) {
-          clearTimeout(mutable.webSocketTimeoutId);
-          mutable.webSocketTimeoutId = void 0;
-        }
-        elements?.targetRoot.remove();
-        resolvePromise(void 0);
-      } else {
-        originalKillMatching(targetName).then(resolve).catch(reject);
-      }
-    });
-    const originalDisconnect = __ELM_WATCH.DISCONNECT;
-    __ELM_WATCH.DISCONNECT = (targetName) => {
-      if (targetName.test(TARGET_NAME) && mutable.webSocket.readyState !== WebSocket.CLOSED) {
-        mutable.webSocket.close();
-      } else {
-        originalDisconnect(targetName);
-      }
-    };
-    return mutable;
-  };
-  function addEventListener(target, eventName, listener) {
-    target.addEventListener(eventName, listener);
-    return () => {
-      target.removeEventListener(eventName, listener);
-    };
-  }
-  function initWebSocket(getNow, elmCompiledTimestamp, dispatch) {
-    const hostname = window2.location.hostname === "" ? "localhost" : window2.location.hostname;
-    const protocol = window2.location.protocol === "https:" ? "wss" : "ws";
-    const url = new URL(
-      /^\d+$/.test(WEBSOCKET_CONNECTION) ? `${protocol}://${hostname}:${WEBSOCKET_CONNECTION}/elm-watch` : WEBSOCKET_CONNECTION
-    );
-    url.searchParams.set("elmWatchVersion", VERSION);
-    url.searchParams.set("targetName", TARGET_NAME);
-    url.searchParams.set("elmCompiledTimestamp", elmCompiledTimestamp.toString());
-    const webSocket = new WebSocket(url);
-    webSocket.addEventListener("open", () => {
-      dispatch({ tag: "WebSocketConnected", date: getNow() });
-    });
-    webSocket.addEventListener("close", () => {
-      dispatch({
-        tag: "WebSocketClosed",
-        date: getNow()
-      });
-    });
-    webSocket.addEventListener("message", (event) => {
-      dispatch({
-        tag: "WebSocketMessageReceived",
-        date: getNow(),
-        data: event.data
-      });
-    });
-    return webSocket;
-  }
-  var init = (date, browserUiPosition, elmCompiledTimestampBeforeReload) => {
-    const model = {
-      status: { tag: "Connecting", date, attemptNumber: 1 },
-      compilationMode: ORIGINAL_COMPILATION_MODE,
-      browserUiPosition,
-      lastBrowserUiPositionChangeDate: void 0,
-      elmCompiledTimestamp: INITIAL_ELM_COMPILED_TIMESTAMP,
-      elmCompiledTimestampBeforeReload,
-      uiExpanded: false
-    };
-    return [model, [{ tag: "Render", model, manageFocus: false }]];
-  };
-  function update(msg, model) {
-    switch (msg.tag) {
-      case "AppInit":
-        return [{ ...model }, []];
-      case "BrowserUiMoved":
-        return [{ ...model, browserUiPosition: msg.browserUiPosition }, []];
-      case "EvalErrored":
-        return [
-          {
-            ...model,
-            status: { tag: "EvalError", date: msg.date },
-            uiExpanded: true
-          },
-          [
-            {
-              tag: "TriggerReachedIdleState",
-              reason: "EvalErrored"
-            }
-          ]
-        ];
-      case "EvalNeedsReload":
-        return [
-          {
-            ...model,
-            status: {
-              tag: "WaitingForReload",
-              date: msg.date,
-              reasons: msg.reasons
-            }
-          },
-          []
-        ];
-      case "EvalSucceeded":
-        return [
-          {
-            ...model,
-            status: {
-              tag: "Idle",
-              date: msg.date,
-              sendKey: SEND_KEY_DO_NOT_USE_ALL_THE_TIME
-            }
-          },
-          [
-            {
-              tag: "TriggerReachedIdleState",
-              reason: "EvalSucceeded"
-            }
-          ]
-        ];
-      case "FocusedTab":
-        return [
-          model,
-          [
-            ...statusToStatusType(model.status.tag) === "Error" ? [{ tag: "Flash", flashType: "error" }] : [],
-            {
-              tag: "SendMessage",
-              message: { tag: "FocusedTab" },
-              sendKey: SEND_KEY_DO_NOT_USE_ALL_THE_TIME
-            },
-            {
-              tag: "WebSocketTimeoutBegin"
-            }
-          ]
-        ];
-      case "PageVisibilityChangedToVisible":
-        return reconnect(model, msg.date, { force: true });
-      case "ReloadAllCssDone":
-        return [
-          model,
-          msg.didChange ? [{ tag: "Flash", flashType: "success" }] : []
-        ];
-      case "SleepBeforeReconnectDone":
-        return reconnect(model, msg.date, { force: false });
-      case "UiMsg":
-        return onUiMsg(msg.date, msg.msg, model);
-      case "WebSocketClosed": {
-        const attemptNumber = "attemptNumber" in model.status ? model.status.attemptNumber + 1 : 1;
-        return [
-          {
-            ...model,
-            status: {
-              tag: "SleepingBeforeReconnect",
-              date: msg.date,
-              attemptNumber
-            }
-          },
-          [{ tag: "SleepBeforeReconnect", attemptNumber }]
-        ];
-      }
-      case "WebSocketConnected":
-        return [
-          {
-            ...model,
-            status: { tag: "Busy", date: msg.date, errorOverlay: void 0 }
-          },
-          []
-        ];
-      case "WebSocketMessageReceived": {
-        const result = parseWebSocketMessageData(msg.data);
-        switch (result.tag) {
-          case "Success":
-            return onWebSocketToClientMessage(msg.date, result.message, model);
-          case "Error":
-            return [
-              {
-                ...model,
-                status: {
-                  tag: "UnexpectedError",
-                  date: msg.date,
-                  message: result.message
-                },
-                uiExpanded: true
-              },
-              []
-            ];
-        }
-      }
-    }
-  }
-  function onUiMsg(date, msg, model) {
-    switch (msg.tag) {
-      case "ChangedBrowserUiPosition":
-        return [
-          {
-            ...model,
-            browserUiPosition: msg.browserUiPosition,
-            lastBrowserUiPositionChangeDate: date
-          },
-          [
-            {
-              tag: "SendMessage",
-              message: {
-                tag: "ChangedBrowserUiPosition",
-                browserUiPosition: msg.browserUiPosition
-              },
-              sendKey: msg.sendKey
-            }
-          ]
-        ];
-      case "ChangedCompilationMode":
-        return [
-          {
-            ...model,
-            status: {
-              tag: "Busy",
-              date,
-              errorOverlay: getErrorOverlay(model.status)
-            },
-            compilationMode: msg.compilationMode
-          },
-          [
-            {
-              tag: "SendMessage",
-              message: {
-                tag: "ChangedCompilationMode",
-                compilationMode: msg.compilationMode
-              },
-              sendKey: msg.sendKey
-            }
-          ]
-        ];
-      case "ChangedOpenErrorOverlay":
-        return "errorOverlay" in model.status && model.status.errorOverlay !== void 0 ? [
-          {
-            ...model,
-            status: {
-              ...model.status,
-              errorOverlay: {
-                ...model.status.errorOverlay,
-                openErrorOverlay: msg.openErrorOverlay
-              }
-            },
-            uiExpanded: false
-          },
-          [
-            {
-              tag: "SendMessage",
-              message: {
-                tag: "ChangedOpenErrorOverlay",
-                openErrorOverlay: msg.openErrorOverlay
-              },
-              sendKey: model.status.tag === "Busy" ? SEND_KEY_DO_NOT_USE_ALL_THE_TIME : model.status.sendKey
-            }
-          ]
-        ] : [model, []];
-      case "PressedChevron":
-        return [{ ...model, uiExpanded: !model.uiExpanded }, []];
-      case "PressedOpenEditor":
-        return [
-          model,
-          [
-            {
-              tag: "SendMessage",
-              message: {
-                tag: "PressedOpenEditor",
-                file: msg.file,
-                line: msg.line,
-                column: msg.column
-              },
-              sendKey: msg.sendKey
-            }
-          ]
-        ];
-      case "PressedReconnectNow":
-        return reconnect(model, date, { force: true });
-    }
-  }
-  function onWebSocketToClientMessage(date, msg, model) {
-    switch (msg.tag) {
-      case "FocusedTabAcknowledged":
-        return [model, [{ tag: "WebSocketTimeoutClear" }]];
-      case "OpenEditorFailed":
-        return [
-          model.status.tag === "CompileError" ? {
-            ...model,
-            status: { ...model.status, openEditorError: msg.error },
-            uiExpanded: true
-          } : model,
-          [
-            {
-              tag: "TriggerReachedIdleState",
-              reason: "OpenEditorFailed"
-            }
-          ]
-        ];
-      case "StaticFilesChanged":
-        return [
-          { ...model, status: { ...model.status, date } },
-          [
-            {
-              tag: "HandleStaticFilesChanged",
-              changedFileUrlPaths: msg.changedFileUrlPaths
-            }
-          ]
-        ];
-      case "StaticFilesMayHaveChangedWhileDisconnected":
-        return [
-          { ...model, status: { ...model.status, date } },
-          [
-            {
-              tag: "HandleStaticFilesChanged",
-              changedFileUrlPaths: "AnyFileMayHaveChanged"
-            }
-          ]
-        ];
-      case "StatusChanged":
-        return statusChanged(date, msg, model);
-      case "SuccessfullyCompiled": {
-        const justChangedBrowserUiPosition = model.lastBrowserUiPositionChangeDate !== void 0 && date.getTime() - model.lastBrowserUiPositionChangeDate.getTime() < JUST_CHANGED_BROWSER_UI_POSITION_TIMEOUT;
-        return msg.compilationMode !== ORIGINAL_COMPILATION_MODE ? [
-          {
-            ...model,
-            status: {
-              tag: "WaitingForReload",
-              date,
-              reasons: ORIGINAL_COMPILATION_MODE === "proxy" ? [] : [
-                `compilation mode changed from ${ORIGINAL_COMPILATION_MODE} to ${msg.compilationMode}.`
-              ]
-            },
-            compilationMode: msg.compilationMode
-          },
-          []
-        ] : [
-          {
-            ...model,
-            compilationMode: msg.compilationMode,
-            elmCompiledTimestamp: msg.elmCompiledTimestamp,
-            browserUiPosition: msg.browserUiPosition,
-            lastBrowserUiPositionChangeDate: void 0
-          },
-          [
-            { tag: "Eval", code: msg.code },
-            justChangedBrowserUiPosition ? {
-              tag: "SetBrowserUiPosition",
-              browserUiPosition: msg.browserUiPosition
-            } : { tag: "NoCmd" }
-          ]
-        ];
-      }
-      case "SuccessfullyCompiledButRecordFieldsChanged":
-        return [
-          {
-            ...model,
-            status: {
-              tag: "WaitingForReload",
-              date,
-              reasons: [
-                `record field mangling in optimize mode was different than last time.`
-              ]
-            }
-          },
-          []
-        ];
-    }
-  }
-  function statusChanged(date, { status }, model) {
-    switch (status.tag) {
-      case "AlreadyUpToDate":
-        return [
-          {
-            ...model,
-            status: {
-              tag: "Idle",
-              date,
-              sendKey: SEND_KEY_DO_NOT_USE_ALL_THE_TIME
-            },
-            compilationMode: status.compilationMode,
-            browserUiPosition: status.browserUiPosition
-          },
-          [
-            {
-              tag: "TriggerReachedIdleState",
-              reason: "AlreadyUpToDate"
-            }
-          ]
-        ];
-      case "Busy":
-        return [
-          {
-            ...model,
-            status: {
-              tag: "Busy",
-              date,
-              errorOverlay: getErrorOverlay(model.status)
-            },
-            compilationMode: status.compilationMode,
-            browserUiPosition: status.browserUiPosition
-          },
-          []
-        ];
-      case "ClientError":
-        return [
-          {
-            ...model,
-            status: { tag: "UnexpectedError", date, message: status.message },
-            uiExpanded: true
-          },
-          [
-            {
-              tag: "TriggerReachedIdleState",
-              reason: "ClientError"
-            }
-          ]
-        ];
-      case "CompileError":
-        return [
-          {
-            ...model,
-            status: {
-              tag: "CompileError",
-              date,
-              sendKey: SEND_KEY_DO_NOT_USE_ALL_THE_TIME,
-              errorOverlay: {
-                errors: new Map(
-                  status.errors.map((error) => {
-                    const overlayError = {
-                      title: error.title,
-                      location: error.location,
-                      htmlContent: error.htmlContent,
-                      foregroundColor: status.foregroundColor,
-                      backgroundColor: status.backgroundColor
-                    };
-                    const id = JSON.stringify(overlayError);
-                    return [id, overlayError];
-                  })
-                ),
-                openErrorOverlay: status.openErrorOverlay
-              },
-              openEditorError: void 0
-            },
-            compilationMode: status.compilationMode,
-            browserUiPosition: status.browserUiPosition
-          },
-          [
-            {
-              tag: "TriggerReachedIdleState",
-              reason: "CompileError"
-            }
-          ]
-        ];
-      case "ElmJsonError":
-        return [
-          {
-            ...model,
-            status: { tag: "ElmJsonError", date, error: status.error }
-          },
-          [
-            {
-              tag: "TriggerReachedIdleState",
-              reason: "ElmJsonError"
-            }
-          ]
-        ];
-    }
-  }
-  function reconnect(model, date, { force }) {
-    return model.status.tag === "SleepingBeforeReconnect" && (date.getTime() - model.status.date.getTime() >= retryWaitMs(model.status.attemptNumber) || force) ? [
-      {
-        ...model,
-        status: {
-          tag: "Connecting",
-          date,
-          attemptNumber: model.status.attemptNumber
-        }
-      },
-      [
-        {
-          tag: "Reconnect",
-          elmCompiledTimestamp: model.elmCompiledTimestamp
-        }
-      ]
-    ] : [model, []];
-  }
-  function retryWaitMs(attemptNumber) {
-    return Math.min(1e3 + 10 * attemptNumber ** 2, 1e3 * 60);
-  }
-  function printRetryWaitMs(attemptNumber) {
-    return `${retryWaitMs(attemptNumber) / 1e3} seconds`;
-  }
-  var runCmd = (getNow, elements) => (cmd, mutable, dispatch, _resolvePromise, rejectPromise) => {
-    switch (cmd.tag) {
-      case "Eval": {
-        try {
-          const f = new Function(cmd.code);
-          f();
-          dispatch({ tag: "EvalSucceeded", date: getNow() });
-        } catch (unknownError) {
-          if (unknownError instanceof Error && unknownError.message.startsWith("ELM_WATCH_RELOAD_NEEDED")) {
-            dispatch({
-              tag: "EvalNeedsReload",
-              date: getNow(),
-              reasons: unknownError.message.split("\n\n---\n\n").slice(1)
-            });
-          } else {
-            void Promise.reject(unknownError);
-            dispatch({ tag: "EvalErrored", date: getNow() });
-          }
-        }
-        return;
-      }
-      case "Flash":
-        if (elements !== void 0) {
-          flash(elements, cmd.flashType);
-        }
-        return;
-      case "HandleStaticFilesChanged": {
-        const now = getNow();
-        let shouldReloadCss = false;
-        if (cmd.changedFileUrlPaths === "AnyFileMayHaveChanged") {
-          shouldReloadCss = true;
-        } else {
-          if (now.getTime() - __ELM_WATCH.CHANGED_FILE_URL_PATHS.timestamp.getTime() > ELM_WATCH_CHANGED_FILE_URL_BATCH_TIME) {
-            __ELM_WATCH.CHANGED_FILE_URL_PATHS = {
-              timestamp: now,
-              changed: /* @__PURE__ */ new Set()
-            };
-          }
-          const justChangedFileUrlPaths = /* @__PURE__ */ new Set();
-          for (const path of cmd.changedFileUrlPaths) {
-            if (path.toLowerCase().endsWith(".css")) {
-              shouldReloadCss = true;
-            } else if (!__ELM_WATCH.CHANGED_FILE_URL_PATHS.changed.has(path)) {
-              justChangedFileUrlPaths.add(path);
-            }
-          }
-          if (justChangedFileUrlPaths.size > 0) {
-            for (const path of justChangedFileUrlPaths) {
-              __ELM_WATCH.CHANGED_FILE_URL_PATHS.changed.add(path);
-            }
-            window2.dispatchEvent(
-              new CustomEvent(ELM_WATCH_CHANGED_FILE_URL_PATHS_EVENT, {
-                detail: justChangedFileUrlPaths
-              })
-            );
-          }
-        }
-        if (shouldReloadCss && now.getTime() - __ELM_WATCH.CHANGED_CSS.getTime() > ELM_WATCH_CHANGED_FILE_URL_BATCH_TIME) {
-          __ELM_WATCH.CHANGED_CSS = now;
-          reloadAllCssIfNeeded(__ELM_WATCH.ORIGINAL_STYLES).then((didChange) => {
-            dispatch({ tag: "ReloadAllCssDone", didChange });
-          }).catch(rejectPromise);
-        }
-        return;
-      }
-      case "NoCmd":
-        return;
-      case "Reconnect":
-        mutable.webSocket = initWebSocket(
-          getNow,
-          cmd.elmCompiledTimestamp,
-          dispatch
-        );
-        return;
-      case "Render": {
-        const { model } = cmd;
-        const info = {
-          version: VERSION,
-          webSocketUrl: new URL(mutable.webSocket.url),
-          targetName: TARGET_NAME,
-          originalCompilationMode: ORIGINAL_COMPILATION_MODE,
-          initializedElmAppsStatus: checkInitializedElmAppsStatus()
-        };
-        if (elements === void 0) {
-          const isError = statusToStatusType(model.status.tag) === "Error";
-          const consoleMethod = isError ? console.error : console.info;
-          consoleMethod(renderWebWorker(model, info));
-        } else {
-          const { targetRoot } = elements;
-          render(getNow, targetRoot, dispatch, model, info, cmd.manageFocus);
-        }
-        return;
-      }
-      case "SendMessage": {
-        const json = JSON.stringify(cmd.message);
-        try {
-          mutable.webSocket.send(json);
-        } catch (error) {
-          console.error("elm-watch: Failed to send WebSocket message:", error);
-        }
-        return;
-      }
-      case "SetBrowserUiPosition":
-        if (elements !== void 0) {
-          setBrowserUiPosition(cmd.browserUiPosition, elements);
-        }
-        return;
-      case "SleepBeforeReconnect":
-        setTimeout(() => {
-          if (typeof document === "undefined" || document.visibilityState === "visible") {
-            dispatch({ tag: "SleepBeforeReconnectDone", date: getNow() });
-          }
-        }, retryWaitMs(cmd.attemptNumber));
-        return;
-      case "TriggerReachedIdleState":
-        Promise.resolve().then(() => {
-          __ELM_WATCH.ON_REACHED_IDLE_STATE(cmd.reason);
-        }).catch(rejectPromise);
-        return;
-      case "UpdateErrorOverlay":
-        if (elements !== void 0) {
-          updateErrorOverlay(
-            TARGET_NAME,
-            (msg) => {
-              dispatch({ tag: "UiMsg", date: getNow(), msg });
-            },
-            cmd.sendKey,
-            cmd.errors,
-            elements.overlay,
-            elements.overlayCloseButton
-          );
-        }
-        return;
-      case "UpdateGlobalStatus":
-        __ELM_WATCH.RELOAD_STATUSES[TARGET_NAME] = cmd.reloadStatus;
-        switch (cmd.reloadStatus.tag) {
-          case "NoReloadWanted":
-          case "MightWantToReload":
-            break;
-          case "ReloadRequested":
-            try {
-              window2.sessionStorage.setItem(
-                RELOAD_TARGET_NAME_KEY_PREFIX + TARGET_NAME,
-                cmd.elmCompiledTimestamp.toString()
-              );
-            } catch {
-            }
-        }
-        reloadPageIfNeeded();
-        return;
-      case "WebSocketTimeoutBegin":
-        if (mutable.webSocketTimeoutId === void 0) {
-          mutable.webSocketTimeoutId = setTimeout(() => {
-            mutable.webSocketTimeoutId = void 0;
-            mutable.webSocket.close();
-            dispatch({
-              tag: "WebSocketClosed",
-              date: getNow()
-            });
-          }, __ELM_WATCH.WEBSOCKET_TIMEOUT);
-        }
-        return;
-      case "WebSocketTimeoutClear":
-        if (mutable.webSocketTimeoutId !== void 0) {
-          clearTimeout(mutable.webSocketTimeoutId);
-          mutable.webSocketTimeoutId = void 0;
-        }
-        return;
-    }
-  };
-  function parseWebSocketMessageData(data) {
-    try {
-      return {
-        tag: "Success",
-        message: decodeWebSocketToClientMessage(string(data))
-      };
-    } catch (unknownError) {
-      return {
-        tag: "Error",
-        message: `Failed to decode web socket message sent from the server:
-${possiblyDecodeErrorToString(
-          unknownError
-        )}`
-      };
-    }
-  }
-  function possiblyDecodeErrorToString(unknownError) {
-    return unknownError instanceof DecoderError ? unknownError.format() : unknownError instanceof Error ? unknownError.message : repr(unknownError);
-  }
-  function functionToNull(value) {
-    return typeof value === "function" ? null : value;
-  }
-  var ProgramType = stringUnion({
-    "Platform.worker": null,
-    "Browser.sandbox": null,
-    "Browser.element": null,
-    "Browser.document": null,
-    "Browser.application": null,
-    Html: null
-  });
-  var ElmModule = chain(
-    record(
-      chain(
-        functionToNull,
-        multi({
-          null: () => [],
-          array: array(
-            fields((field) => field("__elmWatchProgramType", ProgramType))
-          ),
-          object: (value) => ElmModule(value)
-        })
-      )
-    ),
-    (record2) => Object.values(record2).flat()
-  );
-  var ProgramTypes = fields((field) => field("Elm", ElmModule));
-  function checkInitializedElmAppsStatus() {
-    if (window2.Elm !== void 0 && "__elmWatchProxy" in window2.Elm) {
-      return {
-        tag: "DebuggerModeStatus",
-        status: {
-          tag: "Disabled",
-          reason: noDebuggerYetReason
-        }
-      };
-    }
-    if (window2.Elm === void 0) {
-      return { tag: "MissingWindowElm" };
-    }
-    let programTypes;
-    try {
-      programTypes = ProgramTypes(window2);
-    } catch (unknownError) {
-      return {
-        tag: "DecodeError",
-        message: possiblyDecodeErrorToString(unknownError)
-      };
-    }
-    if (programTypes.length === 0) {
-      return { tag: "NoProgramsAtAll" };
-    }
-    const noDebugger = programTypes.filter((programType) => {
-      switch (programType) {
-        case "Platform.worker":
-        case "Html":
-          return true;
-        case "Browser.sandbox":
-        case "Browser.element":
-        case "Browser.document":
-        case "Browser.application":
-          return false;
-      }
-    });
-    return {
-      tag: "DebuggerModeStatus",
-      status: noDebugger.length === programTypes.length ? {
-        tag: "Disabled",
-        reason: noDebuggerReason(new Set(noDebugger))
-      } : { tag: "Enabled" }
-    };
-  }
-  function reloadPageIfNeeded() {
-    let shouldReload = false;
-    const reasons = [];
-    for (const [targetName, reloadStatus] of Object.entries(
-      __ELM_WATCH.RELOAD_STATUSES
-    )) {
-      switch (reloadStatus.tag) {
-        case "MightWantToReload":
-          return;
-        case "NoReloadWanted":
-          break;
-        case "ReloadRequested":
-          shouldReload = true;
-          if (reloadStatus.reasons.length > 0) {
-            reasons.push([targetName, reloadStatus.reasons]);
-          }
-          break;
-      }
-    }
-    if (!shouldReload) {
-      return;
-    }
-    const first = reasons[0];
-    const [separator, reasonString] = reasons.length === 1 && first !== void 0 && first[1].length === 1 ? [" ", `${first[1].join("")}
-(target: ${first[0]})`] : [
-      ":\n\n",
-      reasons.map(
-        ([targetName, subReasons]) => [
-          targetName,
-          ...subReasons.map((subReason) => `- ${subReason}`)
-        ].join("\n")
-      ).join("\n\n")
-    ];
-    const message = reasons.length === 0 ? void 0 : `elm-watch: I did a full page reload because${separator}${reasonString}`;
-    __ELM_WATCH.RELOAD_STATUSES = {};
-    __ELM_WATCH.RELOAD_PAGE(message);
-  }
-  function h(t, {
-    attrs,
-    style,
-    localName,
-    ...props
-  }, ...children) {
-    const element = document.createElement(
-      localName ?? t.name.replace(/^HTML(\w+)Element$/, "$1").replace("Anchor", "a").replace("Paragraph", "p").replace(/^([DOU])List$/, "$1l").toLowerCase()
-    );
-    Object.assign(element, props);
-    if (attrs !== void 0) {
-      for (const [key, value] of Object.entries(attrs)) {
-        element.setAttribute(key, value);
-      }
-    }
-    if (style !== void 0) {
-      for (const [key, value] of Object.entries(style)) {
-        element.style[key] = value;
-      }
-    }
-    for (const child of children) {
-      if (child !== void 0) {
-        element.append(
-          typeof child === "string" ? document.createTextNode(child) : child
-        );
-      }
-    }
-    return element;
-  }
-  function renderWebWorker(model, info) {
-    const statusData = statusIconAndText(model, info);
-    return `${statusData.icon} elm-watch: ${statusData.status} ${formatTime(
-      model.status.date
-    )} (${info.targetName})`;
-  }
-  function render(getNow, targetRoot, dispatch, model, info, manageFocus) {
-    targetRoot.replaceChildren(
-      view(
-        (msg) => {
-          dispatch({ tag: "UiMsg", date: getNow(), msg });
-        },
-        model,
-        info
-      )
-    );
-    const firstFocusableElement = targetRoot.querySelector(`button, [tabindex]`);
-    if (manageFocus && firstFocusableElement instanceof HTMLElement) {
-      firstFocusableElement.focus();
-    }
-    __ELM_WATCH.ON_RENDER(TARGET_NAME);
-  }
-  var CLASS = {
-    browserUiPositionButton: "browserUiPositionButton",
-    browserUiPositionChooser: "browserUiPositionChooser",
-    chevronButton: "chevronButton",
-    compilationModeWithIcon: "compilationModeWithIcon",
-    container: "container",
-    debugModeIcon: "debugModeIcon",
-    envNotSet: "envNotSet",
-    errorLocationButton: "errorLocationButton",
-    errorTitle: "errorTitle",
-    expandedUiContainer: "expandedUiContainer",
-    flash: "flash",
-    overlay: "overlay",
-    overlayCloseButton: "overlayCloseButton",
-    root: "root",
-    rootBottomHalf: "rootBottomHalf",
-    shortStatusContainer: "shortStatusContainer",
-    targetName: "targetName",
-    targetRoot: "targetRoot"
-  };
-  function getStatusFlashType({
-    statusType,
-    statusTypeChanged,
-    hasReceivedHotReload,
-    uiRelatedUpdate,
-    errorOverlayVisible
-  }) {
-    switch (statusType) {
-      case "Success":
-        return statusTypeChanged && hasReceivedHotReload ? "success" : void 0;
-      case "Error":
-        return errorOverlayVisible ? statusTypeChanged && hasReceivedHotReload ? "error" : void 0 : uiRelatedUpdate ? void 0 : "error";
-      case "Waiting":
-        return void 0;
-    }
-  }
-  function flash(elements, flashType) {
-    for (const element of elements.targetRoot.querySelectorAll(
-      `.${CLASS.flash}`
-    )) {
-      element.setAttribute("data-flash", flashType);
-    }
-  }
-  var CHEVRON_UP = "\u25B2";
-  var CHEVRON_DOWN = "\u25BC";
-  var CSS = `
-input,
-button,
-select,
-textarea {
-  font-family: inherit;
-  font-size: inherit;
-  font-weight: inherit;
-  letter-spacing: inherit;
-  line-height: inherit;
-  color: inherit;
-  margin: 0;
-}
-
-fieldset {
-  display: grid;
-  gap: 0.25em;
-  margin: 0;
-  border: 1px solid var(--grey);
-  padding: 0.25em 0.75em 0.5em;
-}
-
-fieldset:disabled {
-  color: var(--grey);
-}
-
-p,
-dd {
-  margin: 0;
-}
-
-dl {
-  display: grid;
-  grid-template-columns: auto auto;
-  gap: 0.25em 1em;
-  margin: 0;
-  white-space: nowrap;
-}
-
-dt {
-  text-align: right;
-  color: var(--grey);
-}
-
-time {
-  display: inline-grid;
-  overflow: hidden;
-}
-
-time::after {
-  content: attr(data-format);
-  visibility: hidden;
-  height: 0;
-}
-
-.${CLASS.overlay} {
-  position: fixed;
-  z-index: -2;
-  inset: 0;
-  overflow-y: auto;
-  padding: 2ch 0;
-}
-
-.${CLASS.overlayCloseButton} {
-  position: fixed;
-  z-index: -1;
-  top: 0;
-  right: 0;
-  appearance: none;
-  padding: 1em;
-  border: none;
-  border-radius: 0;
-  background: none;
-  cursor: pointer;
-  font-size: 1.25em;
-  filter: drop-shadow(0 0 0.125em var(--backgroundColor));
-}
-
-.${CLASS.overlayCloseButton}::before,
-.${CLASS.overlayCloseButton}::after {
-  content: "";
-  display: block;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0.125em;
-  height: 1em;
-  background-color: var(--foregroundColor);
-  transform: translate(-50%, -50%) rotate(45deg);
-}
-
-.${CLASS.overlayCloseButton}::after {
-  transform: translate(-50%, -50%) rotate(-45deg);
-}
-
-.${CLASS.overlay},
-.${CLASS.overlay} pre {
-  font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
-}
-
-.${CLASS.overlay} details {
-  --border-thickness: 0.125em;
-  border-top: var(--border-thickness) solid;
-  margin: 2ch 0;
-}
-
-.${CLASS.overlay} summary {
-  cursor: pointer;
-  pointer-events: none;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 0 2ch;
-  word-break: break-word;
-}
-
-.${CLASS.overlay} summary::-webkit-details-marker {
-  display: none;
-}
-
-.${CLASS.overlay} summary::marker {
-  content: none;
-}
-
-.${CLASS.overlay} summary > * {
-  pointer-events: auto;
-}
-
-.${CLASS.errorTitle} {
-  display: inline-block;
-  font-weight: bold;
-  --padding: 1ch;
-  padding: 0 var(--padding);
-  transform: translate(calc(var(--padding) * -1), calc(-50% - var(--border-thickness) / 2));
-}
-
-.${CLASS.errorTitle}::before {
-  content: "${CHEVRON_DOWN}";
-  display: inline-block;
-  margin-right: 1ch;
-  transform: translateY(-0.0625em);
-}
-
-details[open] > summary > .${CLASS.errorTitle}::before {
-  content: "${CHEVRON_UP}";
-}
-
-.${CLASS.errorLocationButton} {
-  appearance: none;
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background: none;
-  text-align: left;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.${CLASS.overlay} pre {
-  margin: 0;
-  padding: 2ch;
-  overflow-x: auto;
-}
-
-.${CLASS.root} {
-  all: initial;
-  --grey: #767676;
-  display: flex;
-  align-items: start;
-  overflow: auto;
-  max-height: 100vh;
-  max-width: 100vw;
-  color: black;
-  font-family: system-ui;
-}
-
-.${CLASS.rootBottomHalf} {
-  align-items: end;
-}
-
-.${CLASS.targetRoot} + .${CLASS.targetRoot} {
-  margin-left: -1px;
-}
-
-.${CLASS.targetRoot}:only-of-type .${CLASS.debugModeIcon},
-.${CLASS.targetRoot}:only-of-type .${CLASS.targetName} {
-  display: none;
-}
-
-.${CLASS.container} {
-  display: flex;
-  flex-direction: column-reverse;
-  background-color: white;
-  border: 1px solid var(--grey);
-}
-
-.${CLASS.rootBottomHalf} .${CLASS.container} {
-  flex-direction: column;
-}
-
-.${CLASS.envNotSet} {
-  display: grid;
-  gap: 0.75em;
-  margin: 2em 0;
-}
-
-.${CLASS.envNotSet},
-.${CLASS.root} pre {
-  border-left: 0.25em solid var(--grey);
-  padding-left: 0.5em;
-}
-
-.${CLASS.root} pre {
-  margin: 0;
-  white-space: pre-wrap;
-}
-
-.${CLASS.expandedUiContainer} {
-  padding: 1em;
-  padding-top: 0.75em;
-  display: grid;
-  gap: 0.75em;
-  outline: none;
-  contain: paint;
-}
-
-.${CLASS.rootBottomHalf} .${CLASS.expandedUiContainer} {
-  padding-bottom: 0.75em;
-}
-
-.${CLASS.expandedUiContainer}:is(.length0, .length1) {
-  grid-template-columns: min-content;
-}
-
-.${CLASS.expandedUiContainer} > dl {
-  justify-self: start;
-}
-
-.${CLASS.expandedUiContainer} label {
-  display: grid;
-  grid-template-columns: min-content auto;
-  align-items: center;
-  gap: 0.25em;
-}
-
-.${CLASS.expandedUiContainer} label.Disabled {
-  color: var(--grey);
-}
-
-.${CLASS.expandedUiContainer} label > small {
-  grid-column: 2;
-}
-
-.${CLASS.compilationModeWithIcon} {
-  display: flex;
-  align-items: center;
-  gap: 0.25em;
-}
-
-.${CLASS.browserUiPositionChooser} {
-  position: absolute;
-  display: grid;
-  grid-template-columns: min-content min-content;
-  pointer-events: none;
-}
-
-.${CLASS.browserUiPositionButton} {
-  appearance: none;
-  padding: 0;
-  border: none;
-  background: none;
-  border-radius: none;
-  pointer-events: auto;
-  width: 1em;
-  height: 1em;
-  text-align: center;
-  line-height: 1em;
-}
-
-.${CLASS.browserUiPositionButton}:hover {
-  background-color: rgba(0, 0, 0, 0.25);
-}
-
-.${CLASS.targetRoot}:not(:first-child) .${CLASS.browserUiPositionChooser} {
-  display: none;
-}
-
-.${CLASS.shortStatusContainer} {
-  line-height: 1;
-  padding: 0.25em;
-  cursor: pointer;
-  user-select: none;
-  display: flex;
-  align-items: center;
-  gap: 0.25em;
-}
-
-[data-flash]::before {
-  content: "";
-  position: absolute;
-  margin-top: 0.5em;
-  margin-left: 0.5em;
-  --size: min(500px, 100vmin);
-  width: var(--size);
-  height: var(--size);
-  border-radius: 50%;
-  animation: flash 0.7s 0.05s ease-out both;
-  pointer-events: none;
-}
-
-[data-flash="error"]::before {
-  background-color: #eb0000;
-}
-
-[data-flash="success"]::before {
-  background-color: #00b600;
-}
-
-@keyframes flash {
-  from {
-    transform: translate(-50%, -50%) scale(0);
-    opacity: 0.9;
-  }
-
-  to {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 0;
-  }
-}
-
-@keyframes nudge {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 0.8;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  [data-flash]::before {
-    transform: translate(-50%, -50%);
-    width: 2em;
-    height: 2em;
-    animation: nudge 0.25s ease-in-out 4 alternate forwards;
-  }
-}
-
-.${CLASS.chevronButton} {
-  appearance: none;
-  border: none;
-  border-radius: 0;
-  background: none;
-  padding: 0;
-  cursor: pointer;
-}
-`;
-  function view(dispatch, passedModel, info) {
-    const model = __ELM_WATCH.MOCKED_TIMINGS ? {
-      ...passedModel,
-      status: {
-        ...passedModel.status,
-        date: new Date("2022-02-05T13:10:05Z")
-      }
-    } : passedModel;
-    const statusData = {
-      ...statusIconAndText(model, info),
-      ...viewStatus(dispatch, model, info)
-    };
-    return h(
-      HTMLDivElement,
-      { className: CLASS.container },
-      model.uiExpanded ? viewExpandedUi(
-        model.status,
-        statusData,
-        info,
-        model.browserUiPosition,
-        dispatch
-      ) : void 0,
-      h(
-        HTMLDivElement,
-        {
-          className: CLASS.shortStatusContainer,
-          onclick: () => {
-            dispatch({ tag: "PressedChevron" });
-          }
-        },
-        h(
-          HTMLButtonElement,
-          {
-            className: CLASS.chevronButton,
-            attrs: { "aria-expanded": model.uiExpanded.toString() }
-          },
-          icon(
-            model.uiExpanded ? CHEVRON_UP : CHEVRON_DOWN,
-            model.uiExpanded ? "Collapse elm-watch" : "Expand elm-watch"
-          )
-        ),
-        compilationModeIcon(model.compilationMode),
-        icon(statusData.icon, statusData.status, {
-          className: CLASS.flash,
-          onanimationend: (event) => {
-            if (event.currentTarget instanceof HTMLElement) {
-              event.currentTarget.removeAttribute("data-flash");
-            }
-          }
-        }),
-        h(
-          HTMLTimeElement,
-          { dateTime: model.status.date.toISOString() },
-          formatTime(model.status.date)
-        ),
-        h(HTMLSpanElement, { className: CLASS.targetName }, TARGET_NAME)
-      )
-    );
-  }
-  function icon(emoji, alt, props) {
-    return h(
-      HTMLSpanElement,
-      { attrs: { "aria-label": alt }, ...props },
-      h(HTMLSpanElement, { attrs: { "aria-hidden": "true" } }, emoji)
-    );
-  }
-  function viewExpandedUi(status, statusData, info, browserUiPosition, dispatch) {
-    const items = [
-      ["target", info.targetName],
-      ["elm-watch", info.version],
-      ["web socket", printWebSocketUrl(info.webSocketUrl)],
-      [
-        "updated",
-        h(
-          HTMLTimeElement,
-          {
-            dateTime: status.date.toISOString(),
-            attrs: { "data-format": "2044-04-30 04:44:44" }
-          },
-          `${formatDate(status.date)} ${formatTime(status.date)}`
-        )
-      ],
-      ["status", statusData.status],
-      ...statusData.dl
-    ];
-    const browserUiPositionSendKey = statusToSpecialCaseSendKey(status);
-    return h(
-      HTMLDivElement,
-      {
-        className: `${CLASS.expandedUiContainer} length${statusData.content.length}`,
-        attrs: {
-          tabindex: "-1"
-        }
-      },
-      h(
-        HTMLDListElement,
-        {},
-        ...items.flatMap(([key, value]) => [
-          h(HTMLElement, { localName: "dt" }, key),
-          h(HTMLElement, { localName: "dd" }, value)
-        ])
-      ),
-      ...statusData.content,
-      browserUiPositionSendKey === void 0 ? void 0 : viewBrowserUiPositionChooser(
-        browserUiPosition,
-        dispatch,
-        browserUiPositionSendKey
-      )
-    );
-  }
-  var allBrowserUiPositionsInOrder = [
-    "TopLeft",
-    "TopRight",
-    "BottomLeft",
-    "BottomRight"
-  ];
-  function viewBrowserUiPositionChooser(currentPosition, dispatch, sendKey) {
-    const arrows = getBrowserUiPositionArrows(currentPosition);
-    return h(
-      HTMLDivElement,
-      {
-        className: CLASS.browserUiPositionChooser,
-        style: browserUiPositionToCssForChooser(currentPosition)
-      },
-      ...allBrowserUiPositionsInOrder.map((position) => {
-        const arrow = arrows[position];
-        return arrow === void 0 ? h(HTMLDivElement, { style: { visibility: "hidden" } }, "\xB7") : h(
-          HTMLButtonElement,
-          {
-            className: CLASS.browserUiPositionButton,
-            attrs: { "data-position": position },
-            onclick: () => {
-              dispatch({
-                tag: "ChangedBrowserUiPosition",
-                browserUiPosition: position,
-                sendKey
-              });
-            }
-          },
-          arrow
-        );
-      })
-    );
-  }
-  var ARROW_UP = "\u2191";
-  var ARROW_DOWN = "\u2193";
-  var ARROW_LEFT = "\u2190";
-  var ARROW_RIGHT = "\u2192";
-  var ARROW_UP_LEFT = "\u2196";
-  var ARROW_UP_RIGHT = "\u2197";
-  var ARROW_DOWN_LEFT = "\u2199";
-  var ARROW_DOWN_RIGHT = "\u2198";
-  function getBrowserUiPositionArrows(browserUiPosition) {
-    switch (browserUiPosition) {
-      case "TopLeft":
-        return {
-          TopLeft: void 0,
-          TopRight: ARROW_RIGHT,
-          BottomLeft: ARROW_DOWN,
-          BottomRight: ARROW_DOWN_RIGHT
-        };
-      case "TopRight":
-        return {
-          TopLeft: ARROW_LEFT,
-          TopRight: void 0,
-          BottomLeft: ARROW_DOWN_LEFT,
-          BottomRight: ARROW_DOWN
-        };
-      case "BottomLeft":
-        return {
-          TopLeft: ARROW_UP,
-          TopRight: ARROW_UP_RIGHT,
-          BottomLeft: void 0,
-          BottomRight: ARROW_RIGHT
-        };
-      case "BottomRight":
-        return {
-          TopLeft: ARROW_UP_LEFT,
-          TopRight: ARROW_UP,
-          BottomLeft: ARROW_LEFT,
-          BottomRight: void 0
-        };
-    }
-  }
-  function statusIconAndText(model, info) {
-    switch (model.status.tag) {
-      case "Busy":
-        return {
-          icon: "\u23F3",
-          status: "Waiting for compilation"
-        };
-      case "CompileError":
-        return {
-          icon: "\u{1F6A8}",
-          status: "Compilation error"
-        };
-      case "Connecting":
-        return {
-          icon: "\u{1F50C}",
-          status: "Connecting"
-        };
-      case "ElmJsonError":
-        return {
-          icon: "\u{1F6A8}",
-          status: "elm.json or inputs error"
-        };
-      case "EvalError":
-        return {
-          icon: "\u26D4\uFE0F",
-          status: "Eval error"
-        };
-      case "Idle":
-        return {
-          icon: idleIcon(info.initializedElmAppsStatus),
-          status: "Successfully compiled"
-        };
-      case "SleepingBeforeReconnect":
-        return {
-          icon: "\u{1F50C}",
-          status: "Sleeping"
-        };
-      case "UnexpectedError":
-        return {
-          icon: "\u274C",
-          status: "Unexpected error"
-        };
-      case "WaitingForReload":
-        return model.elmCompiledTimestamp === model.elmCompiledTimestampBeforeReload ? {
-          icon: "\u274C",
-          status: "Reload trouble"
-        } : {
-          icon: "\u23F3",
-          status: "Waiting for reload"
-        };
-    }
-  }
-  function viewStatus(dispatch, model, info) {
-    const { status, compilationMode } = model;
-    switch (status.tag) {
-      case "Busy":
-        return {
-          dl: [],
-          content: [
-            ...viewCompilationModeChooser({
-              dispatch,
-              sendKey: void 0,
-              compilationMode,
-              warnAboutCompilationModeMismatch: false,
-              info
-            }),
-            ...status.errorOverlay === void 0 ? [] : [viewErrorOverlayToggleButton(dispatch, status.errorOverlay)]
-          ]
-        };
-      case "CompileError":
-        return {
-          dl: [],
-          content: [
-            ...viewCompilationModeChooser({
-              dispatch,
-              sendKey: status.sendKey,
-              compilationMode,
-              warnAboutCompilationModeMismatch: true,
-              info
-            }),
-            viewErrorOverlayToggleButton(dispatch, status.errorOverlay),
-            ...status.openEditorError === void 0 ? [] : viewOpenEditorError(status.openEditorError)
-          ]
-        };
-      case "Connecting":
-        return {
-          dl: [
-            ["attempt", status.attemptNumber.toString()],
-            ["sleep", printRetryWaitMs(status.attemptNumber)]
-          ],
-          content: [
-            ...viewHttpsInfo(info.webSocketUrl),
-            h(HTMLButtonElement, { disabled: true }, "Connecting web socket\u2026")
-          ]
-        };
-      case "ElmJsonError":
-        return {
-          dl: [],
-          content: [
-            h(HTMLPreElement, { style: { minWidth: "80ch" } }, status.error)
-          ]
-        };
-      case "EvalError":
-        return {
-          dl: [],
-          content: [
-            h(
-              HTMLParagraphElement,
-              {},
-              "Check the console in the browser developer tools to see errors!"
-            )
-          ]
-        };
-      case "Idle":
-        return {
-          dl: [],
-          content: viewCompilationModeChooser({
-            dispatch,
-            sendKey: status.sendKey,
-            compilationMode,
-            warnAboutCompilationModeMismatch: true,
-            info
-          })
-        };
-      case "SleepingBeforeReconnect":
-        return {
-          dl: [
-            ["attempt", status.attemptNumber.toString()],
-            ["sleep", printRetryWaitMs(status.attemptNumber)]
-          ],
-          content: [
-            ...viewHttpsInfo(info.webSocketUrl),
-            h(
-              HTMLButtonElement,
-              {
-                onclick: () => {
-                  dispatch({ tag: "PressedReconnectNow" });
-                }
-              },
-              "Reconnect web socket now"
-            )
-          ]
-        };
-      case "UnexpectedError":
-        return {
-          dl: [],
-          content: [
-            h(
-              HTMLParagraphElement,
-              {},
-              "I ran into an unexpected error! This is the error message:"
-            ),
-            h(HTMLPreElement, {}, status.message)
-          ]
-        };
-      case "WaitingForReload":
-        return {
-          dl: [],
-          content: model.elmCompiledTimestamp === model.elmCompiledTimestampBeforeReload ? [
-            "A while ago I reloaded the page to get new compiled JavaScript.",
-            "But it looks like after the last page reload I got the same JavaScript as before, instead of new stuff!",
-            `The old JavaScript was compiled ${new Date(
-              model.elmCompiledTimestamp
-            ).toLocaleString()}, and so was the JavaScript currently running.`,
-            "I currently need to reload the page again, but fear a reload loop if I try.",
-            "Do you have accidental HTTP caching enabled maybe?",
-            "Try hard refreshing the page and see if that helps, and consider disabling HTTP caching during development."
-          ].map((text) => h(HTMLParagraphElement, {}, text)) : [h(HTMLParagraphElement, {}, "Waiting for other targets\u2026")]
-        };
-    }
-  }
-  function viewErrorOverlayToggleButton(dispatch, errorOverlay) {
-    return h(
-      HTMLButtonElement,
-      {
-        attrs: {
-          "data-test-id": errorOverlay.openErrorOverlay ? "HideErrorOverlayButton" : "ShowErrorOverlayButton"
-        },
-        onclick: () => {
-          dispatch({
-            tag: "ChangedOpenErrorOverlay",
-            openErrorOverlay: !errorOverlay.openErrorOverlay
-          });
-        }
-      },
-      errorOverlay.openErrorOverlay ? "Hide errors" : "Show errors"
-    );
-  }
-  function viewOpenEditorError(error) {
-    switch (error.tag) {
-      case "EnvNotSet":
-        return [
-          h(
-            HTMLDivElement,
-            { className: CLASS.envNotSet },
-            h(
-              HTMLParagraphElement,
-              {},
-              "\u2139\uFE0F Clicking error locations only works if you set it up."
-            ),
-            h(
-              HTMLParagraphElement,
-              {},
-              "Check this out: ",
-              h(
-                HTMLAnchorElement,
-                {
-                  href: "https://lydell.github.io/elm-watch/browser-ui/#clickable-error-locations",
-                  target: "_blank",
-                  rel: "noreferrer"
-                },
-                h(
-                  HTMLElement,
-                  { localName: "strong" },
-                  "Clickable error locations"
-                )
-              )
-            )
-          )
-        ];
-      case "CommandFailed":
-        return [
-          h(
-            HTMLParagraphElement,
-            {},
-            h(
-              HTMLElement,
-              { localName: "strong" },
-              "Opening the location in your editor failed!"
-            )
-          ),
-          h(HTMLPreElement, {}, error.message)
-        ];
-    }
-  }
-  function idleIcon(status) {
-    switch (status.tag) {
-      case "DecodeError":
-      case "MissingWindowElm":
-        return "\u274C";
-      case "NoProgramsAtAll":
-        return "\u2753";
-      case "DebuggerModeStatus":
-        return "\u2705";
-    }
-  }
-  function compilationModeIcon(compilationMode) {
-    switch (compilationMode) {
-      case "proxy":
-        return void 0;
-      case "debug":
-        return icon("\u{1F41B}", "Debug mode", { className: CLASS.debugModeIcon });
-      case "standard":
-        return void 0;
-      case "optimize":
-        return icon("\u{1F680}", "Optimize mode");
-    }
-  }
-  function printWebSocketUrl(url) {
-    const hostname = url.hostname.endsWith(".localhost") ? "localhost" : url.hostname;
-    return `${url.protocol}//${hostname}:${url.port}${url.pathname}`;
-  }
-  function viewHttpsInfo(webSocketUrl) {
-    return webSocketUrl.protocol === "wss:" ? [
-      h(
-        HTMLParagraphElement,
-        {},
-        h(HTMLElement, { localName: "strong" }, "Having trouble connecting?")
-      ),
-      h(HTMLParagraphElement, {}, "Setting up HTTPS can be a bit tricky."),
-      h(
-        HTMLParagraphElement,
-        {},
-        "Read all about ",
-        h(
-          HTMLAnchorElement,
-          {
-            href: "https://lydell.github.io/elm-watch/https/",
-            target: "_blank",
-            rel: "noreferrer"
-          },
-          "HTTPS with elm-watch"
-        ),
-        "."
-      )
-    ] : [];
-  }
-  var noDebuggerYetReason = "The Elm debugger isn't available at this point.";
-  function noDebuggerReason(noDebuggerProgramTypes) {
-    return `The Elm debugger isn't supported by ${humanList(
-      Array.from(noDebuggerProgramTypes, (programType) => `\`${programType}\``),
-      "and"
-    )} programs.`;
-  }
-  function humanList(list, joinWord) {
-    const { length } = list;
-    return length <= 1 ? list.join("") : length === 2 ? list.join(` ${joinWord} `) : `${list.slice(0, length - 2).join(", ")}, ${list.slice(-2).join(` ${joinWord} `)}`;
-  }
-  function viewCompilationModeChooser({
-    dispatch,
-    sendKey,
-    compilationMode: selectedMode,
-    warnAboutCompilationModeMismatch,
-    info
-  }) {
-    switch (info.initializedElmAppsStatus.tag) {
-      case "DecodeError":
-        return [
-          h(
-            HTMLParagraphElement,
-            {},
-            "window.Elm does not look like expected! This is the error message:"
-          ),
-          h(HTMLPreElement, {}, info.initializedElmAppsStatus.message)
-        ];
-      case "MissingWindowElm":
-        return [
-          h(
-            HTMLParagraphElement,
-            {},
-            "elm-watch requires ",
-            h(
-              HTMLAnchorElement,
-              {
-                href: "https://lydell.github.io/elm-watch/window.Elm/",
-                target: "_blank",
-                rel: "noreferrer"
-              },
-              "window.Elm"
-            ),
-            " to exist, but it is undefined!"
-          )
-        ];
-      case "NoProgramsAtAll":
-        return [
-          h(
-            HTMLParagraphElement,
-            {},
-            "It looks like no Elm apps were initialized by elm-watch. Check the console in the browser developer tools to see potential errors!"
-          )
-        ];
-      case "DebuggerModeStatus": {
-        const compilationModes = [
-          {
-            mode: "debug",
-            name: "Debug",
-            status: info.initializedElmAppsStatus.status
-          },
-          { mode: "standard", name: "Standard", status: { tag: "Enabled" } },
-          { mode: "optimize", name: "Optimize", status: { tag: "Enabled" } }
-        ];
-        return [
-          h(
-            HTMLFieldSetElement,
-            { disabled: sendKey === void 0 },
-            h(HTMLLegendElement, {}, "Compilation mode"),
-            ...compilationModes.map(({ mode, name, status }) => {
-              const nameWithIcon = h(
-                HTMLSpanElement,
-                { className: CLASS.compilationModeWithIcon },
-                name,
-                mode === selectedMode ? compilationModeIcon(mode) : void 0
-              );
-              return h(
-                HTMLLabelElement,
-                { className: status.tag },
-                h(HTMLInputElement, {
-                  type: "radio",
-                  name: `CompilationMode-${info.targetName}`,
-                  value: mode,
-                  checked: mode === selectedMode,
-                  disabled: sendKey === void 0 || status.tag === "Disabled",
-                  onchange: sendKey === void 0 ? void 0 : () => {
-                    dispatch({
-                      tag: "ChangedCompilationMode",
-                      compilationMode: mode,
-                      sendKey
-                    });
-                  }
-                }),
-                ...status.tag === "Enabled" ? [
-                  nameWithIcon,
-                  warnAboutCompilationModeMismatch && mode === selectedMode && selectedMode !== info.originalCompilationMode && info.originalCompilationMode !== "proxy" ? h(
-                    HTMLElement,
-                    { localName: "small" },
-                    `Note: The code currently running is in ${ORIGINAL_COMPILATION_MODE} mode.`
-                  ) : void 0
-                ] : [
-                  nameWithIcon,
-                  h(HTMLElement, { localName: "small" }, status.reason)
-                ]
-              );
-            })
-          )
-        ];
-      }
-    }
-  }
-  var DATA_TARGET_NAMES = "data-target-names";
-  function updateErrorOverlay(targetName, dispatch, sendKey, errors, overlay, overlayCloseButton) {
-    const existingErrorElements = new Map(
-      Array.from(overlay.children, (element) => [
-        element.id,
-        {
-          targetNames: new Set(
-            (element.getAttribute(DATA_TARGET_NAMES) ?? "").split("\n")
-          ),
-          element
-        }
-      ])
-    );
-    for (const [id, { targetNames, element }] of existingErrorElements) {
-      if (targetNames.has(targetName) && !errors.has(id)) {
-        targetNames.delete(targetName);
-        if (targetNames.size === 0) {
-          element.remove();
-        } else {
-          element.setAttribute(DATA_TARGET_NAMES, [...targetNames].join("\n"));
-        }
-      }
-    }
-    let previousElement = void 0;
-    for (const [id, error] of errors) {
-      const maybeExisting = existingErrorElements.get(id);
-      if (maybeExisting === void 0) {
-        const element = viewOverlayError(
-          targetName,
-          dispatch,
-          sendKey,
-          id,
-          error
-        );
-        if (previousElement === void 0) {
-          overlay.prepend(element);
-        } else {
-          previousElement.after(element);
-        }
-        overlay.style.backgroundColor = error.backgroundColor;
-        overlayCloseButton.style.setProperty(
-          "--foregroundColor",
-          error.foregroundColor
-        );
-        overlayCloseButton.style.setProperty(
-          "--backgroundColor",
-          error.backgroundColor
-        );
-        previousElement = element;
-      } else {
-        if (!maybeExisting.targetNames.has(targetName)) {
-          maybeExisting.element.setAttribute(
-            DATA_TARGET_NAMES,
-            [...maybeExisting.targetNames, targetName].join("\n")
-          );
-        }
-        previousElement = maybeExisting.element;
-      }
-    }
-    const hidden = !overlay.hasChildNodes();
-    overlay.hidden = hidden;
-    overlayCloseButton.hidden = hidden;
-    overlayCloseButton.style.right = `${overlay.offsetWidth - overlay.clientWidth}px`;
-  }
-  function viewOverlayError(targetName, dispatch, sendKey, id, error) {
-    return h(
-      HTMLDetailsElement,
-      {
-        open: true,
-        id,
-        style: {
-          backgroundColor: error.backgroundColor,
-          color: error.foregroundColor
-        },
-        attrs: {
-          [DATA_TARGET_NAMES]: targetName
-        }
-      },
-      h(
-        HTMLElement,
-        { localName: "summary" },
-        h(
-          HTMLSpanElement,
-          {
-            className: CLASS.errorTitle,
-            style: {
-              backgroundColor: error.backgroundColor
-            }
-          },
-          error.title
-        ),
-        error.location === void 0 ? void 0 : h(
-          HTMLParagraphElement,
-          {},
-          viewErrorLocation(dispatch, sendKey, error.location)
-        )
-      ),
-      h(HTMLPreElement, { innerHTML: error.htmlContent })
-    );
-  }
-  function viewErrorLocation(dispatch, sendKey, location) {
-    switch (location.tag) {
-      case "FileOnly":
-        return viewErrorLocationButton(
-          dispatch,
-          sendKey,
-          {
-            file: location.file,
-            line: 1,
-            column: 1
-          },
-          location.file.absolutePath
-        );
-      case "FileWithLineAndColumn": {
-        return viewErrorLocationButton(
-          dispatch,
-          sendKey,
-          location,
-          `${location.file.absolutePath}:${location.line}:${location.column}`
-        );
-      }
-      case "Target":
-        return `Target: ${location.targetName}`;
-    }
-  }
-  function viewErrorLocationButton(dispatch, sendKey, location, text) {
-    return sendKey === void 0 ? text : h(
-      HTMLButtonElement,
-      {
-        className: CLASS.errorLocationButton,
-        onclick: () => {
-          dispatch({
-            tag: "PressedOpenEditor",
-            file: location.file,
-            line: location.line,
-            column: location.column,
-            sendKey
-          });
-        }
-      },
-      text
-    );
-  }
-  if (typeof WebSocket !== "undefined") {
-    run();
-  }
-})();
 (function(scope){
 'use strict';
-
-var _Platform_effectManagers = {}, _Scheduler_enqueue; // added by elm-watch
 
 function F(arity, fun, wrapper) {
   wrapper.a = arity;
@@ -3209,7 +77,7 @@ function A9(fun, a, b, c, d, e, f, g, h, i) {
   return fun.a === 9 ? fun.f(a, b, c, d, e, f, g, h, i) : fun(a)(b)(c)(d)(e)(f)(g)(h)(i);
 }
 
-console.warn('Compiled in DEV mode. Follow the advice at https://elm-lang.org/0.19.1/optimize for better performance and smaller assets.');
+
 
 
 // EQUALITY
@@ -3245,7 +113,7 @@ function _Utils_eqHelp(x, y, depth, stack)
 		return true;
 	}
 
-	/**/
+	/**_UNUSED/
 	if (x.$ === 'Set_elm_builtin')
 	{
 		x = $elm$core$Set$toList(x);
@@ -3258,7 +126,7 @@ function _Utils_eqHelp(x, y, depth, stack)
 	}
 	//*/
 
-	/**_UNUSED/
+	/**/
 	if (x.$ < 0)
 	{
 		x = $elm$core$Dict$toList(x);
@@ -3293,7 +161,7 @@ function _Utils_cmp(x, y, ord)
 		return x === y ? /*EQ*/ 0 : x < y ? /*LT*/ -1 : /*GT*/ 1;
 	}
 
-	/**/
+	/**_UNUSED/
 	if (x instanceof String)
 	{
 		var a = x.valueOf();
@@ -3302,10 +170,10 @@ function _Utils_cmp(x, y, ord)
 	}
 	//*/
 
-	/**_UNUSED/
+	/**/
 	if (typeof x.$ === 'undefined')
 	//*/
-	/**/
+	/**_UNUSED/
 	if (x.$[0] === '#')
 	//*/
 	{
@@ -3335,17 +203,17 @@ var _Utils_compare = F2(function(x, y)
 
 // COMMON VALUES
 
-var _Utils_Tuple0_UNUSED = 0;
-var _Utils_Tuple0 = { $: '#0' };
+var _Utils_Tuple0 = 0;
+var _Utils_Tuple0_UNUSED = { $: '#0' };
 
-function _Utils_Tuple2_UNUSED(a, b) { return { a: a, b: b }; }
-function _Utils_Tuple2(a, b) { return { $: '#2', a: a, b: b }; }
+function _Utils_Tuple2(a, b) { return { a: a, b: b }; }
+function _Utils_Tuple2_UNUSED(a, b) { return { $: '#2', a: a, b: b }; }
 
-function _Utils_Tuple3_UNUSED(a, b, c) { return { a: a, b: b, c: c }; }
-function _Utils_Tuple3(a, b, c) { return { $: '#3', a: a, b: b, c: c }; }
+function _Utils_Tuple3(a, b, c) { return { a: a, b: b, c: c }; }
+function _Utils_Tuple3_UNUSED(a, b, c) { return { $: '#3', a: a, b: b, c: c }; }
 
-function _Utils_chr_UNUSED(c) { return c; }
-function _Utils_chr(c) { return new String(c); }
+function _Utils_chr(c) { return c; }
+function _Utils_chr_UNUSED(c) { return new String(c); }
 
 
 // RECORDS
@@ -3396,11 +264,11 @@ function _Utils_ap(xs, ys)
 
 
 
-var _List_Nil_UNUSED = { $: 0 };
-var _List_Nil = { $: '[]' };
+var _List_Nil = { $: 0 };
+var _List_Nil_UNUSED = { $: '[]' };
 
-function _List_Cons_UNUSED(hd, tl) { return { $: 1, a: hd, b: tl }; }
-function _List_Cons(hd, tl) { return { $: '::', a: hd, b: tl }; }
+function _List_Cons(hd, tl) { return { $: 1, a: hd, b: tl }; }
+function _List_Cons_UNUSED(hd, tl) { return { $: '::', a: hd, b: tl }; }
 
 
 var _List_cons = F2(_List_Cons);
@@ -3631,12 +499,12 @@ var _JsArray_appendN = F3(function(n, dest, source)
 
 // LOG
 
-var _Debug_log_UNUSED = F2(function(tag, value)
+var _Debug_log = F2(function(tag, value)
 {
 	return value;
 });
 
-var _Debug_log = F2(function(tag, value)
+var _Debug_log_UNUSED = F2(function(tag, value)
 {
 	console.log(tag + ': ' + _Debug_toString(value));
 	return value;
@@ -3662,12 +530,12 @@ function _Debug_todoCase(moduleName, region, value)
 
 // TO STRING
 
-function _Debug_toString_UNUSED(value)
+function _Debug_toString(value)
 {
 	return '<internals>';
 }
 
-function _Debug_toString(value)
+function _Debug_toString_UNUSED(value)
 {
 	return _Debug_toAnsiString(false, value);
 }
@@ -3852,13 +720,13 @@ function _Debug_toHexDigit(n)
 // CRASH
 
 
-function _Debug_crash_UNUSED(identifier)
+function _Debug_crash(identifier)
 {
 	throw new Error('https://github.com/elm/core/blob/1.0.0/hints/' + identifier + '.md');
 }
 
 
-function _Debug_crash(identifier, fact1, fact2, fact3, fact4)
+function _Debug_crash_UNUSED(identifier, fact1, fact2, fact3, fact4)
 {
 	switch(identifier)
 	{
@@ -3916,11 +784,11 @@ function _Debug_crash(identifier, fact1, fact2, fact3, fact4)
 
 function _Debug_regionToString(region)
 {
-	if (region.start.line === region.end.line)
+	if (region.bG.aH === region.b4.aH)
 	{
-		return 'on line ' + region.start.line;
+		return 'on line ' + region.bG.aH;
 	}
-	return 'on lines ' + region.start.line + ' through ' + region.end.line;
+	return 'on lines ' + region.bG.aH + ' through ' + region.b4.aH;
 }
 
 
@@ -4344,7 +1212,7 @@ function _Char_toLocaleLower(char)
 
 
 
-/**/
+/**_UNUSED/
 function _Json_errorToString(error)
 {
 	return $elm$json$Json$Decode$errorToString(error);
@@ -4748,11 +1616,11 @@ var _Json_encode = F2(function(indentLevel, value)
 	return JSON.stringify(_Json_unwrap(value), null, indentLevel) + '';
 });
 
-function _Json_wrap(value) { return { $: 0, a: value }; }
-function _Json_unwrap(value) { return value.a; }
+function _Json_wrap_UNUSED(value) { return { $: 0, a: value }; }
+function _Json_unwrap_UNUSED(value) { return value.a; }
 
-function _Json_wrap_UNUSED(value) { return value; }
-function _Json_unwrap_UNUSED(value) { return value; }
+function _Json_wrap(value) { return value; }
+function _Json_unwrap(value) { return value; }
 
 function _Json_emptyArray() { return []; }
 function _Json_emptyObject() { return {}; }
@@ -4794,14 +1662,12 @@ function _Scheduler_fail(error)
 	};
 }
 
-// This function was slightly modified by elm-watch.
 function _Scheduler_binding(callback)
 {
 	return {
 		$: 2,
 		b: callback,
-		// c: null // commented out by elm-watch
-		c: Function.prototype // added by elm-watch
+		c: null
 	};
 }
 
@@ -4944,8 +1810,7 @@ function _Scheduler_step(proc)
 			proc.f.c = proc.f.b(function(newRoot) {
 				proc.f = newRoot;
 				_Scheduler_enqueue(proc);
-			// }); // commented out by elm-watch
-			}) || Function.prototype; // added by elm-watch
+			});
 			return;
 		}
 		else if (rootTag === 5)
@@ -4987,19 +1852,14 @@ function _Process_sleep(time)
 // PROGRAMS
 
 
-// This function was slightly modified by elm-watch.
 var _Platform_worker = F4(function(impl, flagDecoder, debugMetadata, args)
 {
 	return _Platform_initialize(
-		"Platform.worker", // added by elm-watch
-		false, // isDebug, added by elm-watch
-		debugMetadata, // added by elm-watch
 		flagDecoder,
 		args,
-		impl.init,
-		// impl.update, // commented out by elm-watch
-		// impl.subscriptions, // commented out by elm-watch
-		impl, // added by elm-watch
+		impl.dK,
+		impl.es,
+		impl.eo,
 		function() { return function() {} }
 	);
 });
@@ -5009,178 +1869,26 @@ var _Platform_worker = F4(function(impl, flagDecoder, debugMetadata, args)
 // INITIALIZE A PROGRAM
 
 
-// This whole function was changed by elm-watch.
-function _Platform_initialize(programType, isDebug, debugMetadata, flagDecoder, args, init, impl, stepperBuilder)
+function _Platform_initialize(flagDecoder, args, init, update, subscriptions, stepperBuilder)
 {
-	if (args === "__elmWatchReturnData") {
-		return { impl: impl, debugMetadata: debugMetadata, flagDecoder : flagDecoder, programType: programType };
-	}
-
-	var flags = _Json_wrap(args ? args['flags'] : undefined);
-	var flagResult = A2(_Json_run, flagDecoder, flags);
-	$elm$core$Result$isOk(flagResult) || _Debug_crash(2 /**/, _Json_errorToString(flagResult.a) /**/);
+	var result = A2(_Json_run, flagDecoder, _Json_wrap(args ? args['flags'] : undefined));
+	$elm$core$Result$isOk(result) || _Debug_crash(2 /**_UNUSED/, _Json_errorToString(result.a) /**/);
 	var managers = {};
-	var initUrl = programType === "Browser.application" ? _Browser_getUrl() : undefined;
-	globalThis.__ELM_WATCH.INIT_URL = initUrl;
-	var initPair = init(flagResult.a);
+	var initPair = init(result.a);
 	var model = initPair.a;
 	var stepper = stepperBuilder(sendToApp, model);
 	var ports = _Platform_setupEffects(managers, sendToApp);
-	var update;
-	var subscriptions;
 
-	function setUpdateAndSubscriptions() {
-		update = impl.update || impl._impl.update;
-		subscriptions = impl.subscriptions || impl._impl.subscriptions;
-		if (isDebug) {
-			update = $elm$browser$Debugger$Main$wrapUpdate(update);
-			subscriptions = $elm$browser$Debugger$Main$wrapSubs(subscriptions);
-		}
-	}
-
-	function sendToApp(msg, viewMetadata) {
+	function sendToApp(msg, viewMetadata)
+	{
 		var pair = A2(update, msg, model);
 		stepper(model = pair.a, viewMetadata);
 		_Platform_enqueueEffects(managers, pair.b, subscriptions(model));
 	}
 
-	setUpdateAndSubscriptions();
 	_Platform_enqueueEffects(managers, initPair.b, subscriptions(model));
 
-	function __elmWatchHotReload(newData, new_Platform_effectManagers, new_Scheduler_enqueue, moduleName) {
-		_Platform_enqueueEffects(managers, _Platform_batch(_List_Nil), _Platform_batch(_List_Nil));
-		_Scheduler_enqueue = new_Scheduler_enqueue;
-
-		var reloadReasons = [];
-
-		for (var key in new_Platform_effectManagers) {
-			var manager = new_Platform_effectManagers[key];
-			if (!(key in _Platform_effectManagers)) {
-				_Platform_effectManagers[key] = manager;
-				managers[key] = _Platform_instantiateManager(manager, sendToApp);
-				if (manager.a) {
-					reloadReasons.push("a new port '" + key + "' was added. The idea is to give JavaScript code a chance to set it up!");
-					manager.a(key, sendToApp)
-				}
-			}
-		}
-
-		for (var key in newData.impl) {
-			if (key === "_impl" && impl._impl) {
-				for (var subKey in newData.impl[key]) {
-					impl._impl[subKey] = newData.impl[key][subKey];
-				}
-			} else {
-				impl[key] = newData.impl[key];
-			}
-		}
-
-		var newFlagResult = A2(_Json_run, newData.flagDecoder, flags);
-		if (!$elm$core$Result$isOk(newFlagResult)) {
-			return reloadReasons.concat("the flags type in `" + moduleName + "` changed and now the passed flags aren't correct anymore. The idea is to try to run with new flags!\nThis is the error:\n" + _Json_errorToString(newFlagResult.a));
-		}
-		if (!_Utils_eq_elmWatchInternal(debugMetadata, newData.debugMetadata)) {
-			return reloadReasons.concat("the message type in `" + moduleName + '` changed in debug mode ("debug metadata" changed).');
-		}
-		init = impl.init || impl._impl.init;
-		if (isDebug) {
-			init = A3($elm$browser$Debugger$Main$wrapInit, _Json_wrap(newData.debugMetadata), initPair.a.popout, init);
-		}
-		globalThis.__ELM_WATCH.INIT_URL = initUrl;
-		var newInitPair = init(newFlagResult.a);
-		if (!_Utils_eq_elmWatchInternal(initPair, newInitPair)) {
-			return reloadReasons.concat("`" + moduleName + ".init` returned something different than last time. Let's start fresh!");
-		}
-
-		setUpdateAndSubscriptions();
-		stepper(model, true /* isSync */);
-		_Platform_enqueueEffects(managers, _Platform_batch(_List_Nil), subscriptions(model));
-		return reloadReasons;
-	}
-
-	return Object.defineProperties(
-		ports ? { ports: ports } : {},
-		{
-			__elmWatchHotReload: { value: __elmWatchHotReload },
-			__elmWatchProgramType: { value: programType },
-		}
-	);
-}
-
-// This whole function was added by elm-watch.
-// Copy-paste of _Utils_eq but does not assume that x and y have the same type,
-// and considers functions to always be equal.
-function _Utils_eq_elmWatchInternal(x, y)
-{
-	for (
-		var pair, stack = [], isEqual = _Utils_eqHelp_elmWatchInternal(x, y, 0, stack);
-		isEqual && (pair = stack.pop());
-		isEqual = _Utils_eqHelp_elmWatchInternal(pair.a, pair.b, 0, stack)
-		)
-	{}
-
-	return isEqual;
-}
-
-// This whole function was added by elm-watch.
-function _Utils_eqHelp_elmWatchInternal(x, y, depth, stack)
-{
-	if (x === y) {
-		return true;
-	}
-
-	var xType = _Utils_typeof_elmWatchInternal(x);
-	var yType = _Utils_typeof_elmWatchInternal(y);
-
-	if (xType !== yType) {
-		return false;
-	}
-
-	switch (xType) {
-		case "primitive":
-			return false;
-		case "function":
-			return true;
-	}
-
-	if (x.$ !== y.$) {
-		return false;
-	}
-
-	if (x.$ === 'Set_elm_builtin') {
-		x = $elm$core$Set$toList(x);
-		y = $elm$core$Set$toList(y);
-	} else if (x.$ === 'RBNode_elm_builtin' || x.$ === 'RBEmpty_elm_builtin' || x.$ < 0) {
-		x = $elm$core$Dict$toList(x);
-		y = $elm$core$Dict$toList(y);
-	}
-
-	if (Object.keys(x).length !== Object.keys(y).length) {
-		return false;
-	}
-
-	if (depth > 100) {
-		stack.push(_Utils_Tuple2(x, y));
-		return true;
-	}
-
-	for (var key in x) {
-		if (!_Utils_eqHelp_elmWatchInternal(x[key], y[key], depth + 1, stack)) {
-			return false;
-		}
-	}
-	return true;
-}
-
-// This whole function was added by elm-watch.
-function _Utils_typeof_elmWatchInternal(x)
-{
-	var type = typeof x;
-	return type === "function"
-		? "function"
-		: type !== "object" || type === null
-		? "primitive"
-		: "objectOrArray";
+	return ports ? { ports: ports } : {};
 }
 
 
@@ -5608,7 +2316,7 @@ function _Platform_setupIncomingPort(name, sendToApp)
 //
 
 
-function _Platform_export_UNUSED(exports)
+function _Platform_export(exports)
 {
 	scope['Elm']
 		? _Platform_mergeExportsProd(scope['Elm'], exports)
@@ -5629,55 +2337,11 @@ function _Platform_mergeExportsProd(obj, exports)
 }
 
 
-// This whole function was changed by elm-watch.
-function _Platform_export(exports)
+function _Platform_export_UNUSED(exports)
 {
-	var reloadReasons = _Platform_mergeExportsElmWatch('Elm', scope['Elm'] || (scope['Elm'] = {}), exports);
-	if (reloadReasons.length > 0) {
-		throw new Error(["ELM_WATCH_RELOAD_NEEDED"].concat(Array.from(new Set(reloadReasons))).join("\n\n---\n\n"));
-	}
-}
-
-// This whole function was added by elm-watch.
-function _Platform_mergeExportsElmWatch(moduleName, obj, exports)
-{
-	var reloadReasons = [];
-	for (var name in exports) {
-		if (name === "init") {
-			if ("init" in obj) {
-				if ("__elmWatchApps" in obj) {
-					var data = exports.init("__elmWatchReturnData");
-					for (var index = 0; index < obj.__elmWatchApps.length; index++) {
-						var app = obj.__elmWatchApps[index];
-						if (app.__elmWatchProgramType !== data.programType) {
-							reloadReasons.push("`" + moduleName + ".main` changed from `" + app.__elmWatchProgramType + "` to `" + data.programType + "`.");
-						} else {
-							try {
-								var innerReasons = app.__elmWatchHotReload(data, _Platform_effectManagers, _Scheduler_enqueue, moduleName);
-								reloadReasons = reloadReasons.concat(innerReasons);
-							} catch (error) {
-								reloadReasons.push("hot reload for `" + moduleName + "` failed, probably because of incompatible model changes.\nThis is the error:\n" + error + "\n" + (error ? error.stack : ""));
-							}
-						}
-					}
-				} else {
-					throw new Error("elm-watch: I'm trying to create `" + moduleName + ".init`, but it already exists and wasn't created by elm-watch. Maybe a duplicate script is getting loaded accidentally?");
-				}
-			} else {
-				obj.__elmWatchApps = [];
-				obj.init = function() {
-					var app = exports.init.apply(exports, arguments);
-					obj.__elmWatchApps.push(app);
-					globalThis.__ELM_WATCH.ON_INIT();
-					return app;
-				};
-			}
-		} else {
-			var innerReasons = _Platform_mergeExportsElmWatch(moduleName + "." + name, obj[name] || (obj[name] = {}), exports[name]);
-			reloadReasons = reloadReasons.concat(innerReasons);
-		}
-	}
-	return reloadReasons;
+	scope['Elm']
+		? _Platform_mergeExportsDebug('Elm', scope['Elm'], exports)
+		: scope['Elm'] = exports;
 }
 
 
@@ -5709,41 +2373,23 @@ function _VirtualDom_appendChild(parent, child)
 	parent.appendChild(child);
 }
 
-// This whole function was changed by elm-watch.
 var _VirtualDom_init = F4(function(virtualNode, flagDecoder, debugMetadata, args)
 {
-	var programType = "Html";
+	// NOTE: this function needs _Platform_export available to work
 
-	if (args === "__elmWatchReturnData") {
-		return { virtualNode: virtualNode, programType: programType };
-	}
-
-	/**_UNUSED/ // always UNUSED with elm-watch
+	/**/
 	var node = args['node'];
 	//*/
-	/**/
+	/**_UNUSED/
 	var node = args && args['node'] ? args['node'] : _Debug_crash(0);
 	//*/
 
-	var nextNode = _VirtualDom_render(virtualNode, function() {});
-	node.parentNode.replaceChild(nextNode, node);
-	node = nextNode;
-	var sendToApp = function() {};
-
-	function __elmWatchHotReload(newData) {
-		var patches = _VirtualDom_diff(virtualNode, newData.virtualNode);
-		node = _VirtualDom_applyPatches(node, virtualNode, patches, sendToApp);
-		virtualNode = newData.virtualNode;
-		return [];
-	}
-
-	return Object.defineProperties(
-		{},
-		{
-			__elmWatchHotReload: { value: __elmWatchHotReload },
-			__elmWatchProgramType: { value: programType },
-		}
+	node.parentNode.replaceChild(
+		_VirtualDom_render(virtualNode, function() {}),
+		node
 	);
+
+	return {};
 });
 
 
@@ -6009,14 +2655,14 @@ function _VirtualDom_noInnerHtmlOrFormAction(key)
 function _VirtualDom_noJavaScriptUri(value)
 {
 	return _VirtualDom_RE_js.test(value)
-		? /**_UNUSED/''//*//**/'javascript:alert("This is an XSS vector. Please use ports or web components instead.")'//*/
+		? /**/''//*//**_UNUSED/'javascript:alert("This is an XSS vector. Please use ports or web components instead.")'//*/
 		: value;
 }
 
 function _VirtualDom_noJavaScriptOrHtmlUri(value)
 {
 	return _VirtualDom_RE_js_html.test(value)
-		? /**_UNUSED/''//*//**/'javascript:alert("This is an XSS vector. Please use ports or web components instead.")'//*/
+		? /**/''//*//**_UNUSED/'javascript:alert("This is an XSS vector. Please use ports or web components instead.")'//*/
 		: value;
 }
 
@@ -6024,7 +2670,7 @@ function _VirtualDom_noJavaScriptOrHtmlJson(value)
 {
 	return (typeof _Json_unwrap(value) === 'string' && _VirtualDom_RE_js_html.test(_Json_unwrap(value)))
 		? _Json_wrap(
-			/**_UNUSED/''//*//**/'javascript:alert("This is an XSS vector. Please use ports or web components instead.")'//*/
+			/**/''//*//**_UNUSED/'javascript:alert("This is an XSS vector. Please use ports or web components instead.")'//*/
 		) : value;
 }
 
@@ -6073,9 +2719,9 @@ var _VirtualDom_mapEventTuple = F2(function(func, tuple)
 var _VirtualDom_mapEventRecord = F2(function(func, record)
 {
 	return {
-		message: func(record.message),
-		stopPropagation: record.stopPropagation,
-		preventDefault: record.preventDefault
+		ab: func(record.ab),
+		bH: record.bH,
+		bC: record.bC
 	}
 });
 
@@ -6343,11 +2989,11 @@ function _VirtualDom_makeCallback(eventNode, initialHandler)
 		// 3 = Custom
 
 		var value = result.a;
-		var message = !tag ? value : tag < 3 ? value.a : value.message;
-		var stopPropagation = tag == 1 ? value.b : tag == 3 && value.stopPropagation;
+		var message = !tag ? value : tag < 3 ? value.a : value.ab;
+		var stopPropagation = tag == 1 ? value.b : tag == 3 && value.bH;
 		var currentEventNode = (
 			stopPropagation && event.stopPropagation(),
-			(tag == 2 ? value.b : tag == 3 && value.preventDefault) && event.preventDefault(),
+			(tag == 2 ? value.b : tag == 3 && value.bC) && event.preventDefault(),
 			eventNode
 		);
 		var tagger;
@@ -7292,33 +3938,27 @@ function _VirtualDom_dekey(keyedNode)
 
 var _Debugger_element;
 
-// This function was slightly modified by elm-watch.
 var _Browser_element = _Debugger_element || F4(function(impl, flagDecoder, debugMetadata, args)
 {
 	return _Platform_initialize(
-		impl._impl ? "Browser.sandbox" : "Browser.element", // added by elm-watch
-		false, // isDebug, added by elm-watch
-		debugMetadata, // added by elm-watch
 		flagDecoder,
 		args,
-		impl.init,
-		// impl.update, // commented out by elm-watch
-		// impl.subscriptions, // commented out by elm-watch
-		impl, // added by elm-watch
+		impl.dK,
+		impl.es,
+		impl.eo,
 		function(sendToApp, initialModel) {
-			// var view = impl.view; // commented out by elm-watch
-			/**_UNUSED/ // always UNUSED with elm-watch
+			var view = impl.et;
+			/**/
 			var domNode = args['node'];
 			//*/
-			/**/
+			/**_UNUSED/
 			var domNode = args && args['node'] ? args['node'] : _Debug_crash(0);
 			//*/
 			var currNode = _VirtualDom_virtualize(domNode);
 
 			return _Browser_makeAnimator(initialModel, function(model)
 			{
-				// var nextNode = view(model); // commented out by elm-watch
-				var nextNode = impl.view(model); // added by elm-watch
+				var nextNode = view(model);
 				var patches = _VirtualDom_diff(currNode, nextNode);
 				domNode = _VirtualDom_applyPatches(domNode, currNode, patches, sendToApp);
 				currNode = nextNode;
@@ -7334,36 +3974,30 @@ var _Browser_element = _Debugger_element || F4(function(impl, flagDecoder, debug
 
 var _Debugger_document;
 
-// This function was slightly modified by elm-watch.
 var _Browser_document = _Debugger_document || F4(function(impl, flagDecoder, debugMetadata, args)
 {
 	return _Platform_initialize(
-		impl._impl ? "Browser.application" : "Browser.document", // added by elm-watch
-		false, // isDebug, added by elm-watch
-		debugMetadata, // added by elm-watch
 		flagDecoder,
 		args,
-		impl.init,
-		// impl.update, // commented out by elm-watch
-		// impl.subscriptions, // commented out by elm-watch
-		impl, // added by elm-watch
+		impl.dK,
+		impl.es,
+		impl.eo,
 		function(sendToApp, initialModel) {
-			var divertHrefToApp = impl.setup && impl.setup(sendToApp)
-			// var view = impl.view; // commented out by elm-watch
+			var divertHrefToApp = impl.bF && impl.bF(sendToApp)
+			var view = impl.et;
 			var title = _VirtualDom_doc.title;
 			var bodyNode = _VirtualDom_doc.body;
 			var currNode = _VirtualDom_virtualize(bodyNode);
 			return _Browser_makeAnimator(initialModel, function(model)
 			{
 				_VirtualDom_divertHrefToApp = divertHrefToApp;
-				// var doc = view(model); // commented out by elm-watch
-				var doc = impl.view(model); // added by elm-watch
-				var nextNode = _VirtualDom_node('body')(_List_Nil)(doc.body);
+				var doc = view(model);
+				var nextNode = _VirtualDom_node('body')(_List_Nil)(doc.bW);
 				var patches = _VirtualDom_diff(currNode, nextNode);
 				bodyNode = _VirtualDom_applyPatches(bodyNode, currNode, patches, sendToApp);
 				currNode = nextNode;
 				_VirtualDom_divertHrefToApp = 0;
-				(title !== doc.title) && (_VirtualDom_doc.title = title = doc.title);
+				(title !== doc.c$) && (_VirtualDom_doc.title = title = doc.c$);
 			});
 		}
 	);
@@ -7417,16 +4051,14 @@ function _Browser_makeAnimator(model, draw)
 // APPLICATION
 
 
-// This function was slightly modified by elm-watch.
 function _Browser_application(impl)
 {
-	// var onUrlChange = impl.onUrlChange; // commented out by elm-watch
-	// var onUrlRequest = impl.onUrlRequest; // commented out by elm-watch
-	// var key = function() { key.a(onUrlChange(_Browser_getUrl())); }; // commented out by elm-watch
-	var key = function() { key.a(impl.onUrlChange(_Browser_getUrl())); }; // added by elm-watch
+	var onUrlChange = impl.d3;
+	var onUrlRequest = impl.d4;
+	var key = function() { key.a(onUrlChange(_Browser_getUrl())); };
 
 	return _Browser_document({
-		setup: function(sendToApp)
+		bF: function(sendToApp)
 		{
 			key.a = sendToApp;
 			_Browser_window.addEventListener('popstate', key);
@@ -7440,11 +4072,11 @@ function _Browser_application(impl)
 					var href = domNode.href;
 					var curr = _Browser_getUrl();
 					var next = $elm$url$Url$fromString(href).a;
-					sendToApp(impl.onUrlRequest(
+					sendToApp(onUrlRequest(
 						(next
-							&& curr.protocol === next.protocol
-							&& curr.host === next.host
-							&& curr.port_.a === next.port_.a
+							&& curr.cI === next.cI
+							&& curr.cg === next.cg
+							&& curr.cB.a === next.cB.a
 						)
 							? $elm$browser$Browser$Internal(next)
 							: $elm$browser$Browser$External(href)
@@ -7452,16 +4084,13 @@ function _Browser_application(impl)
 				}
 			});
 		},
-		init: function(flags)
+		dK: function(flags)
 		{
-			// return A3(impl.init, flags, _Browser_getUrl(), key); // commented out by elm-watch
-			return A3(impl.init, flags, globalThis.__ELM_WATCH.INIT_URL, key); // added by elm-watch
+			return A3(impl.dK, flags, _Browser_getUrl(), key);
 		},
-		// view: impl.view, // commented out by elm-watch
-		// update: impl.update, // commented out by elm-watch
-		// subscriptions: impl.subscriptions // commented out by elm-watch
-		view: function(model) { return impl.view(model); }, // added by elm-watch
-		_impl: impl // added by elm-watch
+		et: impl.et,
+		es: impl.es,
+		eo: impl.eo
 	});
 }
 
@@ -7527,17 +4156,17 @@ var _Browser_decodeEvent = F2(function(decoder, event)
 function _Browser_visibilityInfo()
 {
 	return (typeof _VirtualDom_doc.hidden !== 'undefined')
-		? { hidden: 'hidden', change: 'visibilitychange' }
+		? { dH: 'hidden', dj: 'visibilitychange' }
 		:
 	(typeof _VirtualDom_doc.mozHidden !== 'undefined')
-		? { hidden: 'mozHidden', change: 'mozvisibilitychange' }
+		? { dH: 'mozHidden', dj: 'mozvisibilitychange' }
 		:
 	(typeof _VirtualDom_doc.msHidden !== 'undefined')
-		? { hidden: 'msHidden', change: 'msvisibilitychange' }
+		? { dH: 'msHidden', dj: 'msvisibilitychange' }
 		:
 	(typeof _VirtualDom_doc.webkitHidden !== 'undefined')
-		? { hidden: 'webkitHidden', change: 'webkitvisibilitychange' }
-		: { hidden: 'hidden', change: 'visibilitychange' };
+		? { dH: 'webkitHidden', dj: 'webkitvisibilitychange' }
+		: { dH: 'hidden', dj: 'visibilitychange' };
 }
 
 
@@ -7618,12 +4247,12 @@ var _Browser_call = F2(function(functionName, id)
 function _Browser_getViewport()
 {
 	return {
-		scene: _Browser_getScene(),
-		viewport: {
-			x: _Browser_window.pageXOffset,
-			y: _Browser_window.pageYOffset,
-			width: _Browser_doc.documentElement.clientWidth,
-			height: _Browser_doc.documentElement.clientHeight
+		cP: _Browser_getScene(),
+		c3: {
+			c6: _Browser_window.pageXOffset,
+			c7: _Browser_window.pageYOffset,
+			c5: _Browser_doc.documentElement.clientWidth,
+			ce: _Browser_doc.documentElement.clientHeight
 		}
 	};
 }
@@ -7633,8 +4262,8 @@ function _Browser_getScene()
 	var body = _Browser_doc.body;
 	var elem = _Browser_doc.documentElement;
 	return {
-		width: Math.max(body.scrollWidth, body.offsetWidth, elem.scrollWidth, elem.offsetWidth, elem.clientWidth),
-		height: Math.max(body.scrollHeight, body.offsetHeight, elem.scrollHeight, elem.offsetHeight, elem.clientHeight)
+		c5: Math.max(body.scrollWidth, body.offsetWidth, elem.scrollWidth, elem.offsetWidth, elem.clientWidth),
+		ce: Math.max(body.scrollHeight, body.offsetHeight, elem.scrollHeight, elem.offsetHeight, elem.clientHeight)
 	};
 }
 
@@ -7657,15 +4286,15 @@ function _Browser_getViewportOf(id)
 	return _Browser_withNode(id, function(node)
 	{
 		return {
-			scene: {
-				width: node.scrollWidth,
-				height: node.scrollHeight
+			cP: {
+				c5: node.scrollWidth,
+				ce: node.scrollHeight
 			},
-			viewport: {
-				x: node.scrollLeft,
-				y: node.scrollTop,
-				width: node.clientWidth,
-				height: node.clientHeight
+			c3: {
+				c6: node.scrollLeft,
+				c7: node.scrollTop,
+				c5: node.clientWidth,
+				ce: node.clientHeight
 			}
 		};
 	});
@@ -7695,18 +4324,18 @@ function _Browser_getElement(id)
 		var x = _Browser_window.pageXOffset;
 		var y = _Browser_window.pageYOffset;
 		return {
-			scene: _Browser_getScene(),
-			viewport: {
-				x: x,
-				y: y,
-				width: _Browser_doc.documentElement.clientWidth,
-				height: _Browser_doc.documentElement.clientHeight
+			cP: _Browser_getScene(),
+			c3: {
+				c6: x,
+				c7: y,
+				c5: _Browser_doc.documentElement.clientWidth,
+				ce: _Browser_doc.documentElement.clientHeight
 			},
-			element: {
-				x: x + rect.left,
-				y: y + rect.top,
-				width: rect.width,
-				height: rect.height
+			aZ: {
+				c6: x + rect.left,
+				c7: y + rect.top,
+				c5: rect.width,
+				ce: rect.height
 			}
 		};
 	});
@@ -7804,8 +4433,8 @@ var _Regex_never = /.^/;
 var _Regex_fromStringWith = F2(function(options, string)
 {
 	var flags = 'g';
-	if (options.multiline) { flags += 'm'; }
-	if (options.caseInsensitive) { flags += 'i'; }
+	if (options.dW) { flags += 'm'; }
+	if (options.di) { flags += 'i'; }
 
 	try
 	{
@@ -8027,20 +4656,20 @@ var _Parser_findSubString = F5(function(smallString, offset, row, col, bigString
 	return _Utils_Tuple3(newOffset, row, col);
 });
 var $author$project$Main$ChangedUrl = function (a) {
-	return {$: 'ChangedUrl', a: a};
+	return {$: 0, a: a};
 };
 var $author$project$Main$ClickedLink = function (a) {
-	return {$: 'ClickedLink', a: a};
+	return {$: 1, a: a};
 };
-var $elm$core$Basics$EQ = {$: 'EQ'};
-var $elm$core$Basics$GT = {$: 'GT'};
-var $elm$core$Basics$LT = {$: 'LT'};
+var $elm$core$Basics$EQ = 1;
+var $elm$core$Basics$GT = 2;
+var $elm$core$Basics$LT = 0;
 var $elm$core$List$cons = _List_cons;
 var $elm$core$Dict$foldr = F3(
 	function (func, acc, t) {
 		foldr:
 		while (true) {
-			if (t.$ === 'RBEmpty_elm_builtin') {
+			if (t.$ === -2) {
 				return acc;
 			} else {
 				var key = t.b;
@@ -8085,7 +4714,7 @@ var $elm$core$Dict$keys = function (dict) {
 		dict);
 };
 var $elm$core$Set$toList = function (_v0) {
-	var dict = _v0.a;
+	var dict = _v0;
 	return $elm$core$Dict$keys(dict);
 };
 var $elm$core$Elm$JsArray$foldr = _JsArray_foldr;
@@ -8095,7 +4724,7 @@ var $elm$core$Array$foldr = F3(
 		var tail = _v0.d;
 		var helper = F2(
 			function (node, acc) {
-				if (node.$ === 'SubTree') {
+				if (!node.$) {
 					var subTree = node.a;
 					return A3($elm$core$Elm$JsArray$foldr, helper, acc, subTree);
 				} else {
@@ -8113,32 +4742,32 @@ var $elm$core$Array$toList = function (array) {
 	return A3($elm$core$Array$foldr, $elm$core$List$cons, _List_Nil, array);
 };
 var $elm$core$Result$Err = function (a) {
-	return {$: 'Err', a: a};
+	return {$: 1, a: a};
 };
 var $elm$json$Json$Decode$Failure = F2(
 	function (a, b) {
-		return {$: 'Failure', a: a, b: b};
+		return {$: 3, a: a, b: b};
 	});
 var $elm$json$Json$Decode$Field = F2(
 	function (a, b) {
-		return {$: 'Field', a: a, b: b};
+		return {$: 0, a: a, b: b};
 	});
 var $elm$json$Json$Decode$Index = F2(
 	function (a, b) {
-		return {$: 'Index', a: a, b: b};
+		return {$: 1, a: a, b: b};
 	});
 var $elm$core$Result$Ok = function (a) {
-	return {$: 'Ok', a: a};
+	return {$: 0, a: a};
 };
 var $elm$json$Json$Decode$OneOf = function (a) {
-	return {$: 'OneOf', a: a};
+	return {$: 2, a: a};
 };
-var $elm$core$Basics$False = {$: 'False'};
+var $elm$core$Basics$False = 1;
 var $elm$core$Basics$add = _Basics_add;
 var $elm$core$Maybe$Just = function (a) {
-	return {$: 'Just', a: a};
+	return {$: 0, a: a};
 };
-var $elm$core$Maybe$Nothing = {$: 'Nothing'};
+var $elm$core$Maybe$Nothing = {$: 1};
 var $elm$core$String$all = _String_all;
 var $elm$core$Basics$and = _Basics_and;
 var $elm$core$Basics$append = _Utils_append;
@@ -8263,12 +4892,12 @@ var $elm$json$Json$Decode$errorToStringHelp = F2(
 		errorToStringHelp:
 		while (true) {
 			switch (error.$) {
-				case 'Field':
+				case 0:
 					var f = error.a;
 					var err = error.b;
 					var isSimple = function () {
 						var _v1 = $elm$core$String$uncons(f);
-						if (_v1.$ === 'Nothing') {
+						if (_v1.$ === 1) {
 							return false;
 						} else {
 							var _v2 = _v1.a;
@@ -8283,7 +4912,7 @@ var $elm$json$Json$Decode$errorToStringHelp = F2(
 					error = $temp$error;
 					context = $temp$context;
 					continue errorToStringHelp;
-				case 'Index':
+				case 1:
 					var i = error.a;
 					var err = error.b;
 					var indexName = '[' + ($elm$core$String$fromInt(i) + ']');
@@ -8292,7 +4921,7 @@ var $elm$json$Json$Decode$errorToStringHelp = F2(
 					error = $temp$error;
 					context = $temp$context;
 					continue errorToStringHelp;
-				case 'OneOf':
+				case 2:
 					var errors = error.a;
 					if (!errors.b) {
 						return 'Ran into a Json.Decode.oneOf with no possibilities' + function () {
@@ -8356,7 +4985,7 @@ var $elm$json$Json$Decode$errorToStringHelp = F2(
 var $elm$core$Array$branchFactor = 32;
 var $elm$core$Array$Array_elm_builtin = F4(
 	function (a, b, c, d) {
-		return {$: 'Array_elm_builtin', a: a, b: b, c: c, d: d};
+		return {$: 0, a: a, b: b, c: c, d: d};
 	});
 var $elm$core$Elm$JsArray$empty = _JsArray_empty;
 var $elm$core$Basics$ceiling = _Basics_ceiling;
@@ -8371,7 +5000,7 @@ var $elm$core$Array$shiftStep = $elm$core$Basics$ceiling(
 var $elm$core$Array$empty = A4($elm$core$Array$Array_elm_builtin, 0, $elm$core$Array$shiftStep, $elm$core$Elm$JsArray$empty, $elm$core$Elm$JsArray$empty);
 var $elm$core$Elm$JsArray$initialize = _JsArray_initialize;
 var $elm$core$Array$Leaf = function (a) {
-	return {$: 'Leaf', a: a};
+	return {$: 1, a: a};
 };
 var $elm$core$Basics$apL = F2(
 	function (f, x) {
@@ -8391,7 +5020,7 @@ var $elm$core$Basics$max = F2(
 	});
 var $elm$core$Basics$mul = _Basics_mul;
 var $elm$core$Array$SubTree = function (a) {
-	return {$: 'SubTree', a: a};
+	return {$: 0, a: a};
 };
 var $elm$core$Elm$JsArray$initializeFromList = _JsArray_initializeFromList;
 var $elm$core$Array$compressNodes = F2(
@@ -8438,25 +5067,25 @@ var $elm$core$Array$treeFromBuilder = F2(
 	});
 var $elm$core$Array$builderToArray = F2(
 	function (reverseNodeList, builder) {
-		if (!builder.nodeListSize) {
+		if (!builder.l) {
 			return A4(
 				$elm$core$Array$Array_elm_builtin,
-				$elm$core$Elm$JsArray$length(builder.tail),
+				$elm$core$Elm$JsArray$length(builder.n),
 				$elm$core$Array$shiftStep,
 				$elm$core$Elm$JsArray$empty,
-				builder.tail);
+				builder.n);
 		} else {
-			var treeLen = builder.nodeListSize * $elm$core$Array$branchFactor;
+			var treeLen = builder.l * $elm$core$Array$branchFactor;
 			var depth = $elm$core$Basics$floor(
 				A2($elm$core$Basics$logBase, $elm$core$Array$branchFactor, treeLen - 1));
-			var correctNodeList = reverseNodeList ? $elm$core$List$reverse(builder.nodeList) : builder.nodeList;
-			var tree = A2($elm$core$Array$treeFromBuilder, correctNodeList, builder.nodeListSize);
+			var correctNodeList = reverseNodeList ? $elm$core$List$reverse(builder.o) : builder.o;
+			var tree = A2($elm$core$Array$treeFromBuilder, correctNodeList, builder.l);
 			return A4(
 				$elm$core$Array$Array_elm_builtin,
-				$elm$core$Elm$JsArray$length(builder.tail) + treeLen,
+				$elm$core$Elm$JsArray$length(builder.n) + treeLen,
 				A2($elm$core$Basics$max, 5, depth * $elm$core$Array$shiftStep),
 				tree,
-				builder.tail);
+				builder.n);
 		}
 	});
 var $elm$core$Basics$idiv = _Basics_idiv;
@@ -8469,7 +5098,7 @@ var $elm$core$Array$initializeHelp = F5(
 				return A2(
 					$elm$core$Array$builderToArray,
 					false,
-					{nodeList: nodeList, nodeListSize: (len / $elm$core$Array$branchFactor) | 0, tail: tail});
+					{o: nodeList, l: (len / $elm$core$Array$branchFactor) | 0, n: tail});
 			} else {
 				var leaf = $elm$core$Array$Leaf(
 					A3($elm$core$Elm$JsArray$initialize, $elm$core$Array$branchFactor, fromIndex, fn));
@@ -8499,9 +5128,9 @@ var $elm$core$Array$initialize = F2(
 			return A5($elm$core$Array$initializeHelp, fn, initialFromIndex, len, _List_Nil, tail);
 		}
 	});
-var $elm$core$Basics$True = {$: 'True'};
+var $elm$core$Basics$True = 0;
 var $elm$core$Result$isOk = function (result) {
-	if (result.$ === 'Ok') {
+	if (!result.$) {
 		return true;
 	} else {
 		return false;
@@ -8512,33 +5141,31 @@ var $elm$json$Json$Decode$map2 = _Json_map2;
 var $elm$json$Json$Decode$succeed = _Json_succeed;
 var $elm$virtual_dom$VirtualDom$toHandlerInt = function (handler) {
 	switch (handler.$) {
-		case 'Normal':
+		case 0:
 			return 0;
-		case 'MayStopPropagation':
+		case 1:
 			return 1;
-		case 'MayPreventDefault':
+		case 2:
 			return 2;
 		default:
 			return 3;
 	}
 };
 var $elm$browser$Browser$External = function (a) {
-	return {$: 'External', a: a};
+	return {$: 1, a: a};
 };
 var $elm$browser$Browser$Internal = function (a) {
-	return {$: 'Internal', a: a};
+	return {$: 0, a: a};
 };
 var $elm$core$Basics$identity = function (x) {
 	return x;
 };
-var $elm$browser$Browser$Dom$NotFound = function (a) {
-	return {$: 'NotFound', a: a};
-};
-var $elm$url$Url$Http = {$: 'Http'};
-var $elm$url$Url$Https = {$: 'Https'};
+var $elm$browser$Browser$Dom$NotFound = $elm$core$Basics$identity;
+var $elm$url$Url$Http = 0;
+var $elm$url$Url$Https = 1;
 var $elm$url$Url$Url = F6(
 	function (protocol, host, port_, path, query, fragment) {
-		return {fragment: fragment, host: host, path: path, port_: port_, protocol: protocol, query: query};
+		return {dF: fragment, cg: host, d7: path, cB: port_, cI: protocol, cJ: query};
 	});
 var $elm$core$String$contains = _String_contains;
 var $elm$core$String$length = _String_length;
@@ -8574,7 +5201,7 @@ var $elm$url$Url$chompBeforePath = F5(
 					var i = _v0.a;
 					var _v1 = $elm$core$String$toInt(
 						A2($elm$core$String$dropLeft, i + 1, str));
-					if (_v1.$ === 'Nothing') {
+					if (_v1.$ === 1) {
 						return $elm$core$Maybe$Nothing;
 					} else {
 						var port_ = _v1;
@@ -8657,26 +5284,24 @@ var $elm$core$String$startsWith = _String_startsWith;
 var $elm$url$Url$fromString = function (str) {
 	return A2($elm$core$String$startsWith, 'http://', str) ? A2(
 		$elm$url$Url$chompAfterProtocol,
-		$elm$url$Url$Http,
+		0,
 		A2($elm$core$String$dropLeft, 7, str)) : (A2($elm$core$String$startsWith, 'https://', str) ? A2(
 		$elm$url$Url$chompAfterProtocol,
-		$elm$url$Url$Https,
+		1,
 		A2($elm$core$String$dropLeft, 8, str)) : $elm$core$Maybe$Nothing);
 };
 var $elm$core$Basics$never = function (_v0) {
 	never:
 	while (true) {
-		var nvr = _v0.a;
+		var nvr = _v0;
 		var $temp$_v0 = nvr;
 		_v0 = $temp$_v0;
 		continue never;
 	}
 };
-var $elm$core$Task$Perform = function (a) {
-	return {$: 'Perform', a: a};
-};
+var $elm$core$Task$Perform = $elm$core$Basics$identity;
 var $elm$core$Task$succeed = _Scheduler_succeed;
-var $elm$core$Task$init = $elm$core$Task$succeed(_Utils_Tuple0);
+var $elm$core$Task$init = $elm$core$Task$succeed(0);
 var $elm$core$List$foldrHelper = F4(
 	function (fn, acc, ctr, ls) {
 		if (!ls.b) {
@@ -8782,7 +5407,7 @@ var $elm$core$Task$sequence = function (tasks) {
 var $elm$core$Platform$sendToApp = _Platform_sendToApp;
 var $elm$core$Task$spawnCmd = F2(
 	function (router, _v0) {
-		var task = _v0.a;
+		var task = _v0;
 		return _Scheduler_spawn(
 			A2(
 				$elm$core$Task$andThen,
@@ -8794,7 +5419,7 @@ var $elm$core$Task$onEffects = F3(
 		return A2(
 			$elm$core$Task$map,
 			function (_v0) {
-				return _Utils_Tuple0;
+				return 0;
 			},
 			$elm$core$Task$sequence(
 				A2(
@@ -8804,167 +5429,149 @@ var $elm$core$Task$onEffects = F3(
 	});
 var $elm$core$Task$onSelfMsg = F3(
 	function (_v0, _v1, _v2) {
-		return $elm$core$Task$succeed(_Utils_Tuple0);
+		return $elm$core$Task$succeed(0);
 	});
 var $elm$core$Task$cmdMap = F2(
 	function (tagger, _v0) {
-		var task = _v0.a;
-		return $elm$core$Task$Perform(
-			A2($elm$core$Task$map, tagger, task));
+		var task = _v0;
+		return A2($elm$core$Task$map, tagger, task);
 	});
 _Platform_effectManagers['Task'] = _Platform_createManager($elm$core$Task$init, $elm$core$Task$onEffects, $elm$core$Task$onSelfMsg, $elm$core$Task$cmdMap);
 var $elm$core$Task$command = _Platform_leaf('Task');
 var $elm$core$Task$perform = F2(
 	function (toMessage, task) {
 		return $elm$core$Task$command(
-			$elm$core$Task$Perform(
-				A2($elm$core$Task$map, toMessage, task)));
+			A2($elm$core$Task$map, toMessage, task));
 	});
 var $elm$browser$Browser$application = _Browser_application;
 var $author$project$Main$Redirect = function (a) {
-	return {$: 'Redirect', a: a};
+	return {$: 0, a: a};
 };
-var $author$project$Session$Session = function (a) {
-	return {$: 'Session', a: a};
-};
+var $author$project$Session$Session = $elm$core$Basics$identity;
 var $author$project$Main$Basic = function (a) {
-	return {$: 'Basic', a: a};
+	return {$: 2, a: a};
 };
 var $author$project$Main$Examples = function (a) {
-	return {$: 'Examples', a: a};
+	return {$: 7, a: a};
 };
 var $author$project$Main$GotBasicMsg = function (a) {
-	return {$: 'GotBasicMsg', a: a};
+	return {$: 2, a: a};
 };
 var $author$project$Main$GotExamplesMsg = function (a) {
-	return {$: 'GotExamplesMsg', a: a};
+	return {$: 6, a: a};
 };
 var $author$project$Main$GotHomeMsg = function (a) {
-	return {$: 'GotHomeMsg', a: a};
+	return {$: 7, a: a};
 };
 var $author$project$Main$GotMarkdownMsg = function (a) {
-	return {$: 'GotMarkdownMsg', a: a};
+	return {$: 3, a: a};
 };
 var $author$project$Main$GotSpecExtensionMsg = function (a) {
-	return {$: 'GotSpecExtensionMsg', a: a};
+	return {$: 4, a: a};
 };
 var $author$project$Main$GotSpecFromScratchMsg = function (a) {
-	return {$: 'GotSpecFromScratchMsg', a: a};
+	return {$: 5, a: a};
 };
 var $author$project$Main$Home = function (a) {
-	return {$: 'Home', a: a};
+	return {$: 6, a: a};
 };
 var $author$project$Main$Markdown = function (a) {
-	return {$: 'Markdown', a: a};
+	return {$: 5, a: a};
 };
 var $author$project$Main$NotFound = function (a) {
-	return {$: 'NotFound', a: a};
+	return {$: 1, a: a};
 };
 var $author$project$Main$SpecExtension = function (a) {
-	return {$: 'SpecExtension', a: a};
+	return {$: 3, a: a};
 };
 var $author$project$Main$SpecFromScratch = function (a) {
-	return {$: 'SpecFromScratch', a: a};
+	return {$: 4, a: a};
 };
-var $author$project$Controls$Bold = {$: 'Bold'};
-var $author$project$Controls$Italic = {$: 'Italic'};
-var $author$project$RichText$Internal$Editor$Editor = function (a) {
-	return {$: 'Editor', a: a};
-};
+var $author$project$Controls$Bold = 0;
+var $author$project$Controls$Italic = 1;
+var $author$project$RichText$Internal$Editor$Editor = $elm$core$Basics$identity;
 var $author$project$RichText$Internal$Editor$defaultDequeSize = 64;
-var $author$project$RichText$Internal$History$History = function (a) {
-	return {$: 'History', a: a};
-};
+var $author$project$RichText$Internal$History$History = $elm$core$Basics$identity;
 var $folkertdev$elm_deque$BoundedDeque$BoundedDeque = F2(
 	function (a, b) {
-		return {$: 'BoundedDeque', a: a, b: b};
+		return {$: 0, a: a, b: b};
 	});
-var $folkertdev$elm_deque$Internal$empty = {front: _List_Nil, rear: _List_Nil, sizeF: 0, sizeR: 0};
+var $folkertdev$elm_deque$Internal$empty = {D: _List_Nil, E: _List_Nil, y: 0, z: 0};
 var $folkertdev$elm_deque$BoundedDeque$empty = function (size) {
 	return A2($folkertdev$elm_deque$BoundedDeque$BoundedDeque, $folkertdev$elm_deque$Internal$empty, size);
 };
 var $author$project$RichText$Internal$History$empty = function (config) {
-	return $author$project$RichText$Internal$History$History(
-		{
-			groupDelayMilliseconds: config.groupDelayMilliseconds,
-			lastTextChangeTimestamp: 0,
-			redoStack: _List_Nil,
-			undoDeque: $folkertdev$elm_deque$BoundedDeque$empty(config.size)
-		});
+	return {
+		cd: config.cd,
+		bt: 0,
+		aK: _List_Nil,
+		S: $folkertdev$elm_deque$BoundedDeque$empty(config.ek)
+	};
 };
 var $author$project$RichText$Config$Keys$meta = 'Meta';
 var $author$project$RichText$Internal$Editor$editor = function (iState) {
-	return $author$project$RichText$Internal$Editor$Editor(
-		{
-			bufferedEditorState: $elm$core$Maybe$Nothing,
-			changeCount: 0,
-			completeRerenderCount: 0,
-			history: $author$project$RichText$Internal$History$empty(
-				{groupDelayMilliseconds: 500, size: $author$project$RichText$Internal$Editor$defaultDequeSize}),
-			isComposing: false,
-			renderCount: 0,
-			selectionCount: 0,
-			shortKey: $author$project$RichText$Config$Keys$meta,
-			state: iState
-		});
+	return {
+		aV: $elm$core$Maybe$Nothing,
+		aD: 0,
+		aE: 0,
+		a3: $author$project$RichText$Internal$History$empty(
+			{cd: 500, ek: $author$project$RichText$Internal$Editor$defaultDequeSize}),
+		cn: false,
+		aL: 0,
+		aN: 0,
+		ej: $author$project$RichText$Config$Keys$meta,
+		be: iState
+	};
 };
 var $author$project$RichText$Editor$init = $author$project$RichText$Internal$Editor$editor;
 var $author$project$Editor$initEditor = function (iState) {
 	return $author$project$RichText$Editor$init(iState);
 };
-var $author$project$Editor$initInsertImageModal = {alt: '', editorState: $elm$core$Maybe$Nothing, src: '', visible: false};
-var $author$project$Editor$initInsertLinkModal = {editorState: $elm$core$Maybe$Nothing, href: '', title: '', visible: false};
+var $author$project$Editor$initInsertImageModal = {bT: '', b3: $elm$core$Maybe$Nothing, cW: '', bl: false};
+var $author$project$Editor$initInsertLinkModal = {b3: $elm$core$Maybe$Nothing, ch: '', c$: '', bl: false};
 var $author$project$Editor$init = function (iState) {
 	return {
-		editor: $author$project$Editor$initEditor(iState),
-		insertImageModal: $author$project$Editor$initInsertImageModal,
-		insertLinkModal: $author$project$Editor$initInsertLinkModal,
-		styles: _List_fromArray(
-			[$author$project$Controls$Bold, $author$project$Controls$Italic])
+		b: $author$project$Editor$initEditor(iState),
+		G: $author$project$Editor$initInsertImageModal,
+		H: $author$project$Editor$initInsertLinkModal,
+		bI: _List_fromArray(
+			[0, 1])
 	};
 };
-var $author$project$RichText$Model$Node$Block = function (a) {
-	return {$: 'Block', a: a};
-};
+var $author$project$RichText$Model$Node$Block = $elm$core$Basics$identity;
 var $author$project$RichText$Model$Node$block = F2(
 	function (parameters, cn) {
-		return $author$project$RichText$Model$Node$Block(
-			{childNodes: cn, parameters: parameters});
+		return {dl: cn, a8: parameters};
 	});
-var $author$project$RichText$Model$Node$BlockArray = function (a) {
-	return {$: 'BlockArray', a: a};
-};
+var $author$project$RichText$Model$Node$BlockArray = $elm$core$Basics$identity;
 var $author$project$RichText$Model$Node$BlockChildren = function (a) {
-	return {$: 'BlockChildren', a: a};
+	return {$: 0, a: a};
 };
 var $author$project$RichText$Model$Node$blockChildren = function (arr) {
-	return $author$project$RichText$Model$Node$BlockChildren(
-		$author$project$RichText$Model$Node$BlockArray(arr));
+	return $author$project$RichText$Model$Node$BlockChildren(arr);
 };
 var $author$project$RichText$Internal$Definitions$BlockNodeType = function (a) {
-	return {$: 'BlockNodeType', a: a};
+	return {$: 0, a: a};
 };
-var $elm$core$Set$Set_elm_builtin = function (a) {
-	return {$: 'Set_elm_builtin', a: a};
-};
-var $elm$core$Dict$RBEmpty_elm_builtin = {$: 'RBEmpty_elm_builtin'};
+var $elm$core$Set$Set_elm_builtin = $elm$core$Basics$identity;
+var $elm$core$Dict$RBEmpty_elm_builtin = {$: -2};
 var $elm$core$Dict$empty = $elm$core$Dict$RBEmpty_elm_builtin;
-var $elm$core$Set$empty = $elm$core$Set$Set_elm_builtin($elm$core$Dict$empty);
-var $elm$core$Dict$Black = {$: 'Black'};
+var $elm$core$Set$empty = $elm$core$Dict$empty;
+var $elm$core$Dict$Black = 1;
 var $elm$core$Dict$RBNode_elm_builtin = F5(
 	function (a, b, c, d, e) {
-		return {$: 'RBNode_elm_builtin', a: a, b: b, c: c, d: d, e: e};
+		return {$: -1, a: a, b: b, c: c, d: d, e: e};
 	});
-var $elm$core$Dict$Red = {$: 'Red'};
+var $elm$core$Dict$Red = 0;
 var $elm$core$Dict$balance = F5(
 	function (color, key, value, left, right) {
-		if ((right.$ === 'RBNode_elm_builtin') && (right.a.$ === 'Red')) {
+		if ((right.$ === -1) && (!right.a)) {
 			var _v1 = right.a;
 			var rK = right.b;
 			var rV = right.c;
 			var rLeft = right.d;
 			var rRight = right.e;
-			if ((left.$ === 'RBNode_elm_builtin') && (left.a.$ === 'Red')) {
+			if ((left.$ === -1) && (!left.a)) {
 				var _v3 = left.a;
 				var lK = left.b;
 				var lV = left.c;
@@ -8972,22 +5579,22 @@ var $elm$core$Dict$balance = F5(
 				var lRight = left.e;
 				return A5(
 					$elm$core$Dict$RBNode_elm_builtin,
-					$elm$core$Dict$Red,
+					0,
 					key,
 					value,
-					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Black, lK, lV, lLeft, lRight),
-					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Black, rK, rV, rLeft, rRight));
+					A5($elm$core$Dict$RBNode_elm_builtin, 1, lK, lV, lLeft, lRight),
+					A5($elm$core$Dict$RBNode_elm_builtin, 1, rK, rV, rLeft, rRight));
 			} else {
 				return A5(
 					$elm$core$Dict$RBNode_elm_builtin,
 					color,
 					rK,
 					rV,
-					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, key, value, left, rLeft),
+					A5($elm$core$Dict$RBNode_elm_builtin, 0, key, value, left, rLeft),
 					rRight);
 			}
 		} else {
-			if ((((left.$ === 'RBNode_elm_builtin') && (left.a.$ === 'Red')) && (left.d.$ === 'RBNode_elm_builtin')) && (left.d.a.$ === 'Red')) {
+			if ((((left.$ === -1) && (!left.a)) && (left.d.$ === -1)) && (!left.d.a)) {
 				var _v5 = left.a;
 				var lK = left.b;
 				var lV = left.c;
@@ -9000,11 +5607,11 @@ var $elm$core$Dict$balance = F5(
 				var lRight = left.e;
 				return A5(
 					$elm$core$Dict$RBNode_elm_builtin,
-					$elm$core$Dict$Red,
+					0,
 					lK,
 					lV,
-					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Black, llK, llV, llLeft, llRight),
-					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Black, key, value, lRight, right));
+					A5($elm$core$Dict$RBNode_elm_builtin, 1, llK, llV, llLeft, llRight),
+					A5($elm$core$Dict$RBNode_elm_builtin, 1, key, value, lRight, right));
 			} else {
 				return A5($elm$core$Dict$RBNode_elm_builtin, color, key, value, left, right);
 			}
@@ -9013,8 +5620,8 @@ var $elm$core$Dict$balance = F5(
 var $elm$core$Basics$compare = _Utils_compare;
 var $elm$core$Dict$insertHelp = F3(
 	function (key, value, dict) {
-		if (dict.$ === 'RBEmpty_elm_builtin') {
-			return A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, key, value, $elm$core$Dict$RBEmpty_elm_builtin, $elm$core$Dict$RBEmpty_elm_builtin);
+		if (dict.$ === -2) {
+			return A5($elm$core$Dict$RBNode_elm_builtin, 0, key, value, $elm$core$Dict$RBEmpty_elm_builtin, $elm$core$Dict$RBEmpty_elm_builtin);
 		} else {
 			var nColor = dict.a;
 			var nKey = dict.b;
@@ -9022,8 +5629,8 @@ var $elm$core$Dict$insertHelp = F3(
 			var nLeft = dict.d;
 			var nRight = dict.e;
 			var _v1 = A2($elm$core$Basics$compare, key, nKey);
-			switch (_v1.$) {
-				case 'LT':
+			switch (_v1) {
+				case 0:
 					return A5(
 						$elm$core$Dict$balance,
 						nColor,
@@ -9031,7 +5638,7 @@ var $elm$core$Dict$insertHelp = F3(
 						nValue,
 						A3($elm$core$Dict$insertHelp, key, value, nLeft),
 						nRight);
-				case 'EQ':
+				case 1:
 					return A5($elm$core$Dict$RBNode_elm_builtin, nColor, nKey, value, nLeft, nRight);
 				default:
 					return A5(
@@ -9047,13 +5654,13 @@ var $elm$core$Dict$insertHelp = F3(
 var $elm$core$Dict$insert = F3(
 	function (key, value, dict) {
 		var _v0 = A3($elm$core$Dict$insertHelp, key, value, dict);
-		if ((_v0.$ === 'RBNode_elm_builtin') && (_v0.a.$ === 'Red')) {
+		if ((_v0.$ === -1) && (!_v0.a)) {
 			var _v1 = _v0.a;
 			var k = _v0.b;
 			var v = _v0.c;
 			var l = _v0.d;
 			var r = _v0.e;
-			return A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Black, k, v, l, r);
+			return A5($elm$core$Dict$RBNode_elm_builtin, 1, k, v, l, r);
 		} else {
 			var x = _v0;
 			return x;
@@ -9061,9 +5668,8 @@ var $elm$core$Dict$insert = F3(
 	});
 var $elm$core$Set$insert = F2(
 	function (key, _v0) {
-		var dict = _v0.a;
-		return $elm$core$Set$Set_elm_builtin(
-			A3($elm$core$Dict$insert, key, _Utils_Tuple0, dict));
+		var dict = _v0;
+		return A3($elm$core$Dict$insert, key, 0, dict);
 	});
 var $elm$core$Set$fromList = function (list) {
 	return A3($elm$core$List$foldl, $elm$core$Set$insert, $elm$core$Set$empty, list);
@@ -9082,7 +5688,7 @@ var $author$project$RichText$Config$ElementDefinition$blockNode = function (allo
 };
 var $author$project$RichText$Model$HtmlNode$ElementNode = F3(
 	function (a, b, c) {
-		return {$: 'ElementNode', a: a, b: b, c: c};
+		return {$: 0, a: a, b: b, c: c};
 	});
 var $author$project$RichText$Definitions$docToHtml = F2(
 	function (_v0, children) {
@@ -9095,38 +5701,32 @@ var $author$project$RichText$Definitions$docToHtml = F2(
 				]),
 			children);
 	});
-var $author$project$RichText$Internal$Definitions$ElementDefinition = function (a) {
-	return {$: 'ElementDefinition', a: a};
-};
+var $author$project$RichText$Internal$Definitions$ElementDefinition = $elm$core$Basics$identity;
 var $author$project$RichText$Config$ElementDefinition$elementDefinition = function (contents) {
-	return $author$project$RichText$Internal$Definitions$ElementDefinition(contents);
+	return contents;
 };
-var $author$project$RichText$Internal$Definitions$ElementParameters = function (a) {
-	return {$: 'ElementParameters', a: a};
-};
+var $author$project$RichText$Internal$Definitions$ElementParameters = $elm$core$Basics$identity;
 var $author$project$RichText$Internal$Constants$selectable = '__selectable__';
 var $elm$core$Dict$singleton = F2(
 	function (key, value) {
-		return A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Black, key, value, $elm$core$Dict$RBEmpty_elm_builtin, $elm$core$Dict$RBEmpty_elm_builtin);
+		return A5($elm$core$Dict$RBNode_elm_builtin, 1, key, value, $elm$core$Dict$RBEmpty_elm_builtin, $elm$core$Dict$RBEmpty_elm_builtin);
 	});
 var $elm$core$Set$singleton = function (key) {
-	return $elm$core$Set$Set_elm_builtin(
-		A2($elm$core$Dict$singleton, key, _Utils_Tuple0));
+	return A2($elm$core$Dict$singleton, key, 0);
 };
 var $author$project$RichText$Internal$Definitions$element = F2(
 	function (def, attrs) {
-		var d = def.a;
-		return $author$project$RichText$Internal$Definitions$ElementParameters(
-			{
-				annotations: d.selectable ? $elm$core$Set$singleton($author$project$RichText$Internal$Constants$selectable) : $elm$core$Set$empty,
-				attributes: attrs,
-				name: d.name
-			});
+		var d = def;
+		return {
+			aU: d.ei ? $elm$core$Set$singleton($author$project$RichText$Internal$Constants$selectable) : $elm$core$Set$empty,
+			V: attrs,
+			ct: d.ct
+		};
 	});
 var $author$project$RichText$Model$Element$element = $author$project$RichText$Internal$Definitions$element;
 var $author$project$RichText$Definitions$htmlToDoc = F2(
 	function (definition, node) {
-		if (node.$ === 'ElementNode') {
+		if (!node.$) {
 			var name = node.a;
 			var attrs = node.b;
 			var children = node.c;
@@ -9145,14 +5745,14 @@ var $author$project$RichText$Definitions$htmlToDoc = F2(
 	});
 var $author$project$RichText$Definitions$doc = $author$project$RichText$Config$ElementDefinition$elementDefinition(
 	{
-		contentType: $author$project$RichText$Config$ElementDefinition$blockNode(
+		dp: $author$project$RichText$Config$ElementDefinition$blockNode(
 			_List_fromArray(
 				['block'])),
-		fromHtmlNode: $author$project$RichText$Definitions$htmlToDoc,
-		group: 'root',
-		name: 'doc',
-		selectable: false,
-		toHtmlNode: $author$project$RichText$Definitions$docToHtml
+		b9: $author$project$RichText$Definitions$htmlToDoc,
+		dG: 'root',
+		ct: 'doc',
+		ei: false,
+		c0: $author$project$RichText$Definitions$docToHtml
 	});
 var $elm$core$Array$fromListHelp = F3(
 	function (list, nodeList, nodeListSize) {
@@ -9167,7 +5767,7 @@ var $elm$core$Array$fromListHelp = F3(
 				return A2(
 					$elm$core$Array$builderToArray,
 					true,
-					{nodeList: nodeList, nodeListSize: nodeListSize, tail: jsArray});
+					{o: nodeList, l: nodeListSize, n: jsArray});
 			} else {
 				var $temp$list = remainingItems,
 					$temp$nodeList = A2(
@@ -9190,11 +5790,9 @@ var $elm$core$Array$fromList = function (list) {
 	}
 };
 var $author$project$RichText$Model$Node$InlineChildren = function (a) {
-	return {$: 'InlineChildren', a: a};
+	return {$: 1, a: a};
 };
-var $author$project$RichText$Model$Node$InlineLeafArray = function (a) {
-	return {$: 'InlineLeafArray', a: a};
-};
+var $author$project$RichText$Model$Node$InlineLeafArray = $elm$core$Basics$identity;
 var $elm$core$List$append = F2(
 	function (xs, ys) {
 		if (!ys.b) {
@@ -9222,7 +5820,7 @@ var $author$project$RichText$Model$Node$inlineTreeToPaths = F2(
 			function (_v0) {
 				var i = _v0.a;
 				var n = _v0.b;
-				if (n.$ === 'LeafNode') {
+				if (n.$ === 1) {
 					return _List_fromArray(
 						[
 							$elm$core$List$reverse(
@@ -9233,7 +5831,7 @@ var $author$project$RichText$Model$Node$inlineTreeToPaths = F2(
 					return A2(
 						$author$project$RichText$Model$Node$inlineTreeToPaths,
 						A2($elm$core$List$cons, i, backwardsPath),
-						mn.children);
+						mn.dm);
 				}
 			},
 			A2(
@@ -9242,15 +5840,15 @@ var $author$project$RichText$Model$Node$inlineTreeToPaths = F2(
 				$elm$core$Array$toList(tree)));
 	});
 var $author$project$RichText$Model$InlineElement$marks = function (parameters) {
-	var c = parameters.a;
-	return c.marks;
+	var c = parameters;
+	return c.am;
 };
 var $author$project$RichText$Model$Text$marks = function (parameters) {
-	var c = parameters.a;
-	return c.marks;
+	var c = parameters;
+	return c.am;
 };
 var $author$project$RichText$Model$Node$marks = function (leaf) {
-	if (leaf.$ === 'Text') {
+	if (leaf.$ === 1) {
 		var l = leaf.a;
 		return $author$project$RichText$Model$Text$marks(l);
 	} else {
@@ -9259,10 +5857,10 @@ var $author$project$RichText$Model$Node$marks = function (leaf) {
 	}
 };
 var $author$project$RichText$Model$Node$LeafNode = function (a) {
-	return {$: 'LeafNode', a: a};
+	return {$: 1, a: a};
 };
 var $author$project$RichText$Model$Node$MarkNode = function (a) {
-	return {$: 'MarkNode', a: a};
+	return {$: 0, a: a};
 };
 var $elm$core$List$drop = F2(
 	function (n, list) {
@@ -9325,8 +5923,8 @@ var $elm$core$List$head = function (list) {
 	}
 };
 var $author$project$RichText$Internal$Definitions$nameFromMark = function (m) {
-	var c = m.a;
-	return c.name;
+	var c = m;
+	return c.ct;
 };
 var $author$project$RichText$Model$Mark$name = $author$project$RichText$Internal$Definitions$nameFromMark;
 var $author$project$RichText$Model$Node$marksToMarkNodeListRec = function (indexedMarkLists) {
@@ -9340,7 +5938,7 @@ var $author$project$RichText$Model$Node$marksToMarkNodeListRec = function (index
 				var m = _v2.a;
 				var rest = _v2.b;
 				var groupRest = _v0.b;
-				if (m.$ === 'Nothing') {
+				if (m.$ === 1) {
 					return A2(
 						$elm$core$List$cons,
 						$author$project$RichText$Model$Node$LeafNode(i),
@@ -9357,7 +5955,7 @@ var $author$project$RichText$Model$Node$marksToMarkNodeListRec = function (index
 						[
 							$author$project$RichText$Model$Node$MarkNode(
 							{
-								children: $author$project$RichText$Model$Node$marksToMarkNodeListRec(
+								dm: $author$project$RichText$Model$Node$marksToMarkNodeListRec(
 									A2(
 										$elm$core$List$cons,
 										_Utils_Tuple2(i, rest),
@@ -9370,7 +5968,7 @@ var $author$project$RichText$Model$Node$marksToMarkNodeListRec = function (index
 												return _Utils_Tuple2(j, r);
 											},
 											groupRest))),
-								mark: mk
+								cr: mk
 							})
 						]);
 				}
@@ -9383,15 +5981,15 @@ var $author$project$RichText$Model$Node$marksToMarkNodeListRec = function (index
 						var m1 = _v8.a;
 						var _v10 = _v9.b;
 						var m2 = _v10.a;
-						if (m1.$ === 'Nothing') {
-							if (m2.$ === 'Nothing') {
+						if (m1.$ === 1) {
+							if (m2.$ === 1) {
 								return true;
 							} else {
 								return false;
 							}
 						} else {
 							var v1 = m1.a;
-							if (m2.$ === 'Just') {
+							if (!m2.$) {
 								var v2 = m2.a;
 								return _Utils_eq(
 									$author$project$RichText$Model$Mark$name(v1),
@@ -9425,17 +6023,16 @@ var $author$project$RichText$Model$Node$inlineChildren = function (arr) {
 			$author$project$RichText$Model$Node$marks,
 			$elm$core$Array$toList(arr)));
 	return $author$project$RichText$Model$Node$InlineChildren(
-		$author$project$RichText$Model$Node$InlineLeafArray(
-			{
-				array: arr,
-				reverseLookup: $elm$core$Array$fromList(
-					A2($author$project$RichText$Model$Node$inlineTreeToPaths, _List_Nil, tree)),
-				tree: tree
-			}));
+		{
+			bm: arr,
+			bD: $elm$core$Array$fromList(
+				A2($author$project$RichText$Model$Node$inlineTreeToPaths, _List_Nil, tree)),
+			bL: tree
+		});
 };
 var $author$project$RichText$Definitions$htmlToParagraph = F2(
 	function (definition, node) {
-		if (node.$ === 'ElementNode') {
+		if (!node.$) {
 			var name = node.a;
 			var children = node.c;
 			return (name === 'p') ? $elm$core$Maybe$Just(
@@ -9451,46 +6048,42 @@ var $author$project$RichText$Definitions$paragraphToHtml = F2(
 		return A3($author$project$RichText$Model$HtmlNode$ElementNode, 'p', _List_Nil, children);
 	});
 var $author$project$RichText$Internal$Definitions$TextBlockNodeType = function (a) {
-	return {$: 'TextBlockNodeType', a: a};
+	return {$: 1, a: a};
 };
 var $author$project$RichText$Config$ElementDefinition$textBlock = function (config) {
 	return $author$project$RichText$Internal$Definitions$TextBlockNodeType(
 		{
-			allowedGroups: $elm$core$List$isEmpty(config.allowedGroups) ? $elm$core$Maybe$Nothing : $elm$core$Maybe$Just(
-				$elm$core$Set$fromList(config.allowedGroups)),
-			allowedMarks: $elm$core$List$isEmpty(config.allowedMarks) ? $elm$core$Maybe$Nothing : $elm$core$Maybe$Just(
-				$elm$core$Set$fromList(config.allowedMarks))
+			da: $elm$core$List$isEmpty(config.da) ? $elm$core$Maybe$Nothing : $elm$core$Maybe$Just(
+				$elm$core$Set$fromList(config.da)),
+			db: $elm$core$List$isEmpty(config.db) ? $elm$core$Maybe$Nothing : $elm$core$Maybe$Just(
+				$elm$core$Set$fromList(config.db))
 		});
 };
 var $author$project$RichText$Definitions$paragraph = $author$project$RichText$Config$ElementDefinition$elementDefinition(
 	{
-		contentType: $author$project$RichText$Config$ElementDefinition$textBlock(
+		dp: $author$project$RichText$Config$ElementDefinition$textBlock(
 			{
-				allowedGroups: _List_fromArray(
+				da: _List_fromArray(
 					['inline']),
-				allowedMarks: _List_Nil
+				db: _List_Nil
 			}),
-		fromHtmlNode: $author$project$RichText$Definitions$htmlToParagraph,
-		group: 'block',
-		name: 'paragraph',
-		selectable: false,
-		toHtmlNode: $author$project$RichText$Definitions$paragraphToHtml
+		b9: $author$project$RichText$Definitions$htmlToParagraph,
+		dG: 'block',
+		ct: 'paragraph',
+		ei: false,
+		c0: $author$project$RichText$Definitions$paragraphToHtml
 	});
 var $author$project$RichText$Model$Node$Text = function (a) {
-	return {$: 'Text', a: a};
+	return {$: 1, a: a};
 };
-var $author$project$RichText$Model$Text$Text = function (a) {
-	return {$: 'Text', a: a};
-};
-var $author$project$RichText$Model$Text$empty = $author$project$RichText$Model$Text$Text(
-	{annotations: $elm$core$Set$empty, marks: _List_Nil, text: ''});
+var $author$project$RichText$Model$Text$Text = $elm$core$Basics$identity;
+var $author$project$RichText$Model$Text$empty = {aU: $elm$core$Set$empty, am: _List_Nil, aP: ''};
 var $author$project$RichText$Model$Text$withText = F2(
 	function (s, parameters) {
-		var c = parameters.a;
-		return $author$project$RichText$Model$Text$Text(
-			_Utils_update(
-				c,
-				{text: s}));
+		var c = parameters;
+		return _Utils_update(
+			c,
+			{aP: s});
 	});
 var $author$project$RichText$Model$Node$plainText = function (s) {
 	return $author$project$RichText$Model$Node$Text(
@@ -9512,13 +6105,10 @@ var $author$project$Editor$docInitNode = A2(
 		$elm$core$Array$fromList(
 			_List_fromArray(
 				[$author$project$Editor$initialEditorNode]))));
-var $author$project$RichText$Model$State$State = function (a) {
-	return {$: 'State', a: a};
-};
+var $author$project$RichText$Model$State$State = $elm$core$Basics$identity;
 var $author$project$RichText$Model$State$state = F2(
 	function (root_, sel_) {
-		return $author$project$RichText$Model$State$State(
-			{root: root_, selection: sel_});
+		return {eg: root_, cR: sel_};
 	});
 var $author$project$Editor$initialState = A2($author$project$RichText$Model$State$state, $author$project$Editor$docInitNode, $elm$core$Maybe$Nothing);
 var $elm$core$Platform$Cmd$batch = _Platform_batch;
@@ -9526,32 +6116,29 @@ var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
 var $author$project$Page$Basic$init = function (session) {
 	return _Utils_Tuple2(
 		{
-			editor: $author$project$Editor$init($author$project$Editor$initialState),
-			session: session
+			b: $author$project$Editor$init($author$project$Editor$initialState),
+			bd: session
 		},
 		$elm$core$Platform$Cmd$none);
 };
 var $author$project$Page$Examples$init = function (session) {
 	return _Utils_Tuple2(
-		{session: session},
+		{bd: session},
 		$elm$core$Platform$Cmd$none);
 };
 var $author$project$RichText$Definitions$codeToHtmlNode = F2(
 	function (_v0, children) {
 		return A3($author$project$RichText$Model$HtmlNode$ElementNode, 'code', _List_Nil, children);
 	});
-var $author$project$RichText$Internal$Definitions$Mark = function (a) {
-	return {$: 'Mark', a: a};
-};
+var $author$project$RichText$Internal$Definitions$Mark = $elm$core$Basics$identity;
 var $author$project$RichText$Internal$Definitions$mark = F2(
 	function (n, a) {
-		var nn = n.a;
-		return $author$project$RichText$Internal$Definitions$Mark(
-			{attributes: a, name: nn.name});
+		var nn = n;
+		return {V: a, ct: nn.ct};
 	});
 var $author$project$RichText$Config$MarkDefinition$defaultHtmlToMark = F3(
 	function (htmlTag, def, node) {
-		if (node.$ === 'ElementNode') {
+		if (!node.$) {
 			var name_ = node.a;
 			var children = node.c;
 			return _Utils_eq(name_, htmlTag) ? $elm$core$Maybe$Just(
@@ -9563,22 +6150,19 @@ var $author$project$RichText$Config$MarkDefinition$defaultHtmlToMark = F3(
 		}
 	});
 var $author$project$RichText$Definitions$htmlNodeToCode = $author$project$RichText$Config$MarkDefinition$defaultHtmlToMark('code');
-var $author$project$RichText$Internal$Definitions$MarkDefinition = function (a) {
-	return {$: 'MarkDefinition', a: a};
-};
+var $author$project$RichText$Internal$Definitions$MarkDefinition = $elm$core$Basics$identity;
 var $author$project$RichText$Config$MarkDefinition$markDefinition = function (contents) {
-	return $author$project$RichText$Internal$Definitions$MarkDefinition(contents);
+	return contents;
 };
 var $author$project$RichText$Definitions$code = $author$project$RichText$Config$MarkDefinition$markDefinition(
-	{fromHtmlNode: $author$project$RichText$Definitions$htmlNodeToCode, name: 'code', toHtmlNode: $author$project$RichText$Definitions$codeToHtmlNode});
+	{b9: $author$project$RichText$Definitions$htmlNodeToCode, ct: 'code', c0: $author$project$RichText$Definitions$codeToHtmlNode});
 var $author$project$RichText$Model$Mark$mark = $author$project$RichText$Internal$Definitions$mark;
 var $author$project$RichText$Model$Text$withMarks = F2(
 	function (m, parameters) {
-		var c = parameters.a;
-		return $author$project$RichText$Model$Text$Text(
-			_Utils_update(
-				c,
-				{marks: m}));
+		var c = parameters;
+		return _Utils_update(
+			c,
+			{am: m});
 	});
 var $author$project$Page$Home$initialEditorNode = A2(
 	$author$project$RichText$Model$Node$block,
@@ -9609,15 +6193,15 @@ var $author$project$Page$Home$initialState = A2($author$project$RichText$Model$S
 var $author$project$Page$Home$init = function (session) {
 	return _Utils_Tuple2(
 		{
-			editor: $author$project$Editor$init($author$project$Page$Home$initialState),
-			session: session
+			b: $author$project$Editor$init($author$project$Page$Home$initialState),
+			bd: session
 		},
 		$elm$core$Platform$Cmd$none);
 };
-var $author$project$Page$Markdown$WYSIWYG = {$: 'WYSIWYG'};
+var $author$project$Page$Markdown$WYSIWYG = 1;
 var $elm$core$Result$andThen = F2(
 	function (callback, result) {
-		if (result.$ === 'Ok') {
+		if (!result.$) {
 			var value = result.a;
 			return callback(value);
 		} else {
@@ -9630,8 +6214,8 @@ var $author$project$Page$Markdown$initializeEditor = function (state) {
 	return _Utils_update(
 		initialEditor,
 		{
-			styles: _List_fromArray(
-				[$author$project$Controls$Bold, $author$project$Controls$Italic])
+			bI: _List_fromArray(
+				[0, 1])
 		});
 };
 var $elm$core$Bitwise$and = _Bitwise_and;
@@ -9668,7 +6252,7 @@ var $author$project$Page$Markdown$escapeForMarkdown = function (s) {
 };
 var $elm$core$Maybe$map = F2(
 	function (f, maybe) {
-		if (maybe.$ === 'Just') {
+		if (!maybe.$) {
 			var value = maybe.a;
 			return $elm$core$Maybe$Just(
 				f(value));
@@ -9678,7 +6262,7 @@ var $elm$core$Maybe$map = F2(
 	});
 var $elm$core$Result$map = F2(
 	function (func, ra) {
-		if (ra.$ === 'Ok') {
+		if (!ra.$) {
 			var a = ra.a;
 			return $elm$core$Result$Ok(
 				func(a));
@@ -9690,7 +6274,7 @@ var $elm$core$Result$map = F2(
 var $elm$core$List$maybeCons = F3(
 	function (f, mx, xs) {
 		var _v0 = f(mx);
-		if (_v0.$ === 'Just') {
+		if (!_v0.$) {
 			var x = _v0.a;
 			return A2($elm$core$List$cons, x, xs);
 		} else {
@@ -9709,7 +6293,7 @@ var $author$project$Page$Markdown$unwrapAndFilterChildNodes = function (results)
 	var unwrappedResults = A2(
 		$elm$core$List$filterMap,
 		function (x) {
-			if (x.$ === 'Ok') {
+			if (!x.$) {
 				var v = x.a;
 				return $elm$core$Maybe$Just(v);
 			} else {
@@ -9726,7 +6310,7 @@ var $author$project$Page$Markdown$unwrapAndFilterChildNodes = function (results)
 			A2(
 				$elm$core$List$filterMap,
 				function (x) {
-					if (x.$ === 'Err') {
+					if (x.$ === 1) {
 						var s = x.a;
 						return $elm$core$Maybe$Just(s);
 					} else {
@@ -9737,7 +6321,7 @@ var $author$project$Page$Markdown$unwrapAndFilterChildNodes = function (results)
 };
 var $elm$core$Maybe$withDefault = F2(
 	function (_default, maybe) {
-		if (maybe.$ === 'Just') {
+		if (!maybe.$) {
 			var value = maybe.a;
 			return value;
 		} else {
@@ -9753,16 +6337,16 @@ var $author$project$Page$Markdown$inlineMarkdownChildrenToString = function (inl
 };
 var $author$project$Page$Markdown$inlineMarkdownToString = function (inline) {
 	switch (inline.$) {
-		case 'Text':
+		case 0:
 			var s = inline.a;
 			return $elm$core$Result$Ok(
 				$author$project$Page$Markdown$escapeForMarkdown(s));
-		case 'HardLineBreak':
+		case 1:
 			return $elm$core$Result$Ok('  \n');
-		case 'CodeInline':
+		case 2:
 			var s = inline.a;
 			return $elm$core$Result$Ok('`' + (s + '`'));
-		case 'Link':
+		case 3:
 			var href = inline.a;
 			var title = inline.b;
 			var children = inline.c;
@@ -9781,7 +6365,7 @@ var $author$project$Page$Markdown$inlineMarkdownToString = function (inline) {
 					return '[' + (c + ('](' + (href + (t + ')'))));
 				},
 				$author$project$Page$Markdown$inlineMarkdownChildrenToString(children));
-		case 'Image':
+		case 4:
 			var url = inline.a;
 			var alt = inline.b;
 			var children = inline.c;
@@ -9800,7 +6384,7 @@ var $author$project$Page$Markdown$inlineMarkdownToString = function (inline) {
 					return '![' + (c + ('](' + (url + (a + ')'))));
 				},
 				$author$project$Page$Markdown$inlineMarkdownChildrenToString(children));
-		case 'Emphasis':
+		case 6:
 			var length = inline.a;
 			var children = inline.b;
 			var e = A2($elm$core$String$repeat, length, '*');
@@ -9812,7 +6396,7 @@ var $author$project$Page$Markdown$inlineMarkdownToString = function (inline) {
 						_Utils_ap(c, e));
 				},
 				$author$project$Page$Markdown$inlineMarkdownChildrenToString(children));
-		case 'HtmlInline':
+		case 5:
 			return $elm$core$Result$Err('Html inline is not implemented.');
 		default:
 			return $elm$core$Result$Err('Custom elements are not implemented');
@@ -9820,9 +6404,9 @@ var $author$project$Page$Markdown$inlineMarkdownToString = function (inline) {
 };
 var $author$project$Page$Markdown$markdownCodeBlockToString = F2(
 	function (cb, s) {
-		if (cb.$ === 'Fenced') {
+		if (cb.$ === 1) {
 			var fence = cb.b;
-			var delimeter = A2($elm$core$String$repeat, fence.fenceLength, fence.fenceChar);
+			var delimeter = A2($elm$core$String$repeat, fence.b7, fence.dC);
 			return $elm$core$Result$Ok(
 				(delimeter + '\n') + (A2(
 					$elm$core$String$join,
@@ -9831,7 +6415,7 @@ var $author$project$Page$Markdown$markdownCodeBlockToString = F2(
 						$elm$core$List$map,
 						function (v) {
 							return _Utils_ap(
-								A2($elm$core$String$repeat, fence.indentLength, ' '),
+								A2($elm$core$String$repeat, fence.a4, ' '),
 								v);
 						},
 						A2($elm$core$String$split, '\n', s))) + ('\n' + delimeter)));
@@ -9868,12 +6452,12 @@ var $author$project$Page$Markdown$listMarkdownToString = F2(
 						F2(
 							function (i, z) {
 								var prefix = function () {
-									var _v1 = listBlock.type_;
-									if (_v1.$ === 'Unordered') {
-										return listBlock.delimiter + ' ';
+									var _v1 = listBlock.bM;
+									if (!_v1.$) {
+										return listBlock.aY + ' ';
 									} else {
 										var startIndex = _v1.a;
-										return $elm$core$String$fromInt(startIndex + i) + (listBlock.delimiter + ' ');
+										return $elm$core$String$fromInt(startIndex + i) + (listBlock.aY + ' ');
 									}
 								}();
 								return _Utils_ap(
@@ -9890,12 +6474,12 @@ var $author$project$Page$Markdown$listMarkdownToString = F2(
 	});
 var $author$project$Page$Markdown$markdownBlockToString = function (block) {
 	switch (block.$) {
-		case 'BlankLine':
+		case 0:
 			var s = block.a;
 			return $elm$core$Result$Ok(s);
-		case 'ThematicBreak':
+		case 1:
 			return $elm$core$Result$Ok('---');
-		case 'Heading':
+		case 2:
 			var i = block.b;
 			var children = block.c;
 			return A2(
@@ -9904,11 +6488,11 @@ var $author$project$Page$Markdown$markdownBlockToString = function (block) {
 					return A2($elm$core$String$repeat, i, '#') + (' ' + x);
 				},
 				$author$project$Page$Markdown$inlineMarkdownChildrenToString(children));
-		case 'CodeBlock':
+		case 3:
 			var cb = block.a;
 			var s = block.b;
 			return A2($author$project$Page$Markdown$markdownCodeBlockToString, cb, s);
-		case 'Paragraph':
+		case 4:
 			var children = block.b;
 			return A2(
 				$elm$core$Result$map,
@@ -9916,7 +6500,7 @@ var $author$project$Page$Markdown$markdownBlockToString = function (block) {
 					return x + '\n';
 				},
 				$author$project$Page$Markdown$inlineMarkdownChildrenToString(children));
-		case 'BlockQuote':
+		case 5:
 			var children = block.a;
 			return A2(
 				$elm$core$Result$map,
@@ -9932,11 +6516,11 @@ var $author$project$Page$Markdown$markdownBlockToString = function (block) {
 							A2($elm$core$String$split, '\n', x)));
 				},
 				$author$project$Page$Markdown$blockMarkdownChildrenToString(children));
-		case 'List':
+		case 6:
 			var lb = block.a;
 			var listItems = block.b;
 			return A2($author$project$Page$Markdown$listMarkdownToString, lb, listItems);
-		case 'PlainInlines':
+		case 7:
 			var children = block.a;
 			return $author$project$Page$Markdown$inlineMarkdownChildrenToString(children);
 		default:
@@ -9945,42 +6529,42 @@ var $author$project$Page$Markdown$markdownBlockToString = function (block) {
 };
 var $author$project$Page$Markdown$markdownToString = $author$project$Page$Markdown$blockMarkdownChildrenToString;
 var $author$project$RichText$Model$State$root = function (st) {
-	var s = st.a;
-	return s.root;
+	var s = st;
+	return s.eg;
 };
 var $pablohirafuji$elm_markdown$Markdown$Block$BlockQuote = function (a) {
-	return {$: 'BlockQuote', a: a};
+	return {$: 5, a: a};
 };
 var $pablohirafuji$elm_markdown$Markdown$Block$List = F2(
 	function (a, b) {
-		return {$: 'List', a: a, b: b};
+		return {$: 6, a: a, b: b};
 	});
 var $pablohirafuji$elm_markdown$Markdown$Block$Ordered = function (a) {
-	return {$: 'Ordered', a: a};
+	return {$: 1, a: a};
 };
 var $pablohirafuji$elm_markdown$Markdown$Block$Paragraph = F2(
 	function (a, b) {
-		return {$: 'Paragraph', a: a, b: b};
+		return {$: 4, a: a, b: b};
 	});
-var $pablohirafuji$elm_markdown$Markdown$Block$ThematicBreak = {$: 'ThematicBreak'};
-var $pablohirafuji$elm_markdown$Markdown$Block$Unordered = {$: 'Unordered'};
+var $pablohirafuji$elm_markdown$Markdown$Block$ThematicBreak = {$: 1};
+var $pablohirafuji$elm_markdown$Markdown$Block$Unordered = {$: 0};
 var $author$project$RichText$Internal$Definitions$attributesFromElement = function (parameters) {
-	var c = parameters.a;
-	return c.attributes;
+	var c = parameters;
+	return c.V;
 };
 var $author$project$RichText$Model$Element$attributes = $author$project$RichText$Internal$Definitions$attributesFromElement;
 var $author$project$RichText$Model$Node$childNodes = function (node) {
-	var n = node.a;
-	return n.childNodes;
+	var n = node;
+	return n.dl;
 };
 var $pablohirafuji$elm_markdown$Markdown$Block$CodeBlock = F2(
 	function (a, b) {
-		return {$: 'CodeBlock', a: a, b: b};
+		return {$: 3, a: a, b: b};
 	});
-var $pablohirafuji$elm_markdown$Markdown$Block$Indented = {$: 'Indented'};
+var $pablohirafuji$elm_markdown$Markdown$Block$Indented = {$: 0};
 var $author$project$RichText$Model$InlineElement$element = function (parameters) {
-	var c = parameters.a;
-	return c.element;
+	var c = parameters;
+	return c.aZ;
 };
 var $elm$core$Elm$JsArray$map = _JsArray_map;
 var $elm$core$Array$map = F2(
@@ -9990,7 +6574,7 @@ var $elm$core$Array$map = F2(
 		var tree = _v0.c;
 		var tail = _v0.d;
 		var helper = function (node) {
-			if (node.$ === 'SubTree') {
+			if (!node.$) {
 				var subTree = node.a;
 				return $elm$core$Array$SubTree(
 					A2($elm$core$Elm$JsArray$map, helper, subTree));
@@ -10008,20 +6592,20 @@ var $elm$core$Array$map = F2(
 			A2($elm$core$Elm$JsArray$map, func, tail));
 	});
 var $author$project$RichText$Internal$Definitions$nameFromElement = function (parameters) {
-	var c = parameters.a;
-	return c.name;
+	var c = parameters;
+	return c.ct;
 };
 var $author$project$RichText$Model$Element$name = $author$project$RichText$Internal$Definitions$nameFromElement;
 var $author$project$RichText$Model$Text$text = function (parameters) {
-	var c = parameters.a;
-	return c.text;
+	var c = parameters;
+	return c.aP;
 };
 var $author$project$RichText$Model$Node$toInlineArray = function (arr) {
-	var a = arr.a;
-	return a.array;
+	var a = arr;
+	return a.bm;
 };
 var $author$project$Page$Markdown$textFromChildNodes = function (cn) {
-	if (cn.$ === 'InlineChildren') {
+	if (cn.$ === 1) {
 		var il = cn.a;
 		return A2(
 			$elm$core$String$join,
@@ -10030,7 +6614,7 @@ var $author$project$Page$Markdown$textFromChildNodes = function (cn) {
 				A2(
 					$elm$core$Array$map,
 					function (l) {
-						if (l.$ === 'Text') {
+						if (l.$ === 1) {
 							var tl = l.a;
 							return $author$project$RichText$Model$Text$text(tl);
 						} else {
@@ -10050,8 +6634,8 @@ var $author$project$Page$Markdown$codeBlockToMarkdown = function (cn) {
 		A2($pablohirafuji$elm_markdown$Markdown$Block$CodeBlock, $pablohirafuji$elm_markdown$Markdown$Block$Indented, t));
 };
 var $author$project$RichText$Model$Node$element = function (node) {
-	var n = node.a;
-	return n.parameters;
+	var n = node;
+	return n.a8;
 };
 var $author$project$RichText$Model$Attribute$findStringAttribute = F2(
 	function (name, attributes) {
@@ -10062,7 +6646,7 @@ var $author$project$RichText$Model$Attribute$findStringAttribute = F2(
 			} else {
 				var x = attributes.a;
 				var xs = attributes.b;
-				if (x.$ === 'StringAttribute') {
+				if (!x.$) {
 					var k = x.a;
 					var v = x.b;
 					if (_Utils_eq(k, name)) {
@@ -10086,7 +6670,7 @@ var $author$project$RichText$Model$Attribute$findStringAttribute = F2(
 	});
 var $pablohirafuji$elm_markdown$Markdown$Block$Heading = F3(
 	function (a, b, c) {
-		return {$: 'Heading', a: a, b: b, c: c};
+		return {$: 2, a: a, b: b, c: c};
 	});
 var $author$project$RichText$Model$Attribute$findIntegerAttribute = F2(
 	function (name, attributes) {
@@ -10097,7 +6681,7 @@ var $author$project$RichText$Model$Attribute$findIntegerAttribute = F2(
 			} else {
 				var x = attributes.a;
 				var xs = attributes.b;
-				if (x.$ === 'IntegerAttribute') {
+				if (x.$ === 1) {
 					var k = x.a;
 					var v = x.b;
 					if (_Utils_eq(k, name)) {
@@ -10120,23 +6704,23 @@ var $author$project$RichText$Model$Attribute$findIntegerAttribute = F2(
 		}
 	});
 var $pablohirafuji$elm_markdown$Markdown$Inline$CodeInline = function (a) {
-	return {$: 'CodeInline', a: a};
+	return {$: 2, a: a};
 };
 var $pablohirafuji$elm_markdown$Markdown$Inline$Emphasis = F2(
 	function (a, b) {
-		return {$: 'Emphasis', a: a, b: b};
+		return {$: 6, a: a, b: b};
 	});
-var $pablohirafuji$elm_markdown$Markdown$Inline$HardLineBreak = {$: 'HardLineBreak'};
+var $pablohirafuji$elm_markdown$Markdown$Inline$HardLineBreak = {$: 1};
 var $pablohirafuji$elm_markdown$Markdown$Inline$Link = F3(
 	function (a, b, c) {
-		return {$: 'Link', a: a, b: b, c: c};
+		return {$: 3, a: a, b: b, c: c};
 	});
 var $pablohirafuji$elm_markdown$Markdown$Inline$Text = function (a) {
-	return {$: 'Text', a: a};
+	return {$: 0, a: a};
 };
 var $author$project$RichText$Internal$Definitions$attributesFromMark = function (m) {
-	var c = m.a;
-	return c.attributes;
+	var c = m;
+	return c.V;
 };
 var $author$project$RichText$Model$Mark$attributes = $author$project$RichText$Internal$Definitions$attributesFromMark;
 var $elm$core$Bitwise$shiftRightZfBy = _Bitwise_shiftRightZfBy;
@@ -10149,7 +6733,7 @@ var $elm$core$Array$getHelp = F3(
 		while (true) {
 			var pos = $elm$core$Array$bitMask & (index >>> shift);
 			var _v0 = A2($elm$core$Elm$JsArray$unsafeGet, pos, tree);
-			if (_v0.$ === 'SubTree') {
+			if (!_v0.$) {
 				var subTree = _v0.a;
 				var $temp$shift = shift - $elm$core$Array$shiftStep,
 					$temp$index = index,
@@ -10182,13 +6766,13 @@ var $elm$core$Array$get = F2(
 	});
 var $pablohirafuji$elm_markdown$Markdown$Inline$Image = F3(
 	function (a, b, c) {
-		return {$: 'Image', a: a, b: b, c: c};
+		return {$: 4, a: a, b: b, c: c};
 	});
 var $author$project$Page$Markdown$imageToMarkdown = function (parameters) {
 	var attributes = $author$project$RichText$Model$Element$attributes(parameters);
 	var alt = A2($author$project$RichText$Model$Attribute$findStringAttribute, 'alt', attributes);
 	var _v0 = A2($author$project$RichText$Model$Attribute$findStringAttribute, 'src', attributes);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return $elm$core$Result$Err('No src attribute found');
 	} else {
 		var src = _v0.a;
@@ -10202,14 +6786,14 @@ var $elm$core$List$singleton = function (value) {
 };
 var $author$project$Page$Markdown$inlineToMarkdown = F2(
 	function (leaves, tree) {
-		if (tree.$ === 'LeafNode') {
+		if (tree.$ === 1) {
 			var i = tree.a;
 			var _v1 = A2($elm$core$Array$get, i, leaves);
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return $elm$core$Result$Err('Invalid leaf tree');
 			} else {
 				var inlineLeaf = _v1.a;
-				if (inlineLeaf.$ === 'Text') {
+				if (inlineLeaf.$ === 1) {
 					var p = inlineLeaf.a;
 					return $elm$core$Result$Ok(
 						_List_fromArray(
@@ -10243,14 +6827,14 @@ var $author$project$Page$Markdown$inlineToMarkdown = F2(
 				A2(
 					$elm$core$List$map,
 					$author$project$Page$Markdown$inlineToMarkdown(leaves),
-					$elm$core$Array$toList(m.children)));
-			if (_v4.$ === 'Err') {
+					$elm$core$Array$toList(m.dm)));
+			if (_v4.$ === 1) {
 				var s = _v4.a;
 				return $elm$core$Result$Err(s);
 			} else {
 				var children = _v4.a;
 				var flattenedChildren = A2($elm$core$List$concatMap, $elm$core$Basics$identity, children);
-				var _v5 = $author$project$RichText$Model$Mark$name(m.mark);
+				var _v5 = $author$project$RichText$Model$Mark$name(m.cr);
 				switch (_v5) {
 					case 'bold':
 						return $elm$core$Result$Ok(
@@ -10269,7 +6853,7 @@ var $author$project$Page$Markdown$inlineToMarkdown = F2(
 							A2(
 								$elm$core$List$map,
 								function (x) {
-									if (x.$ === 'Text') {
+									if (!x.$) {
 										var s = x.a;
 										return $pablohirafuji$elm_markdown$Markdown$Inline$CodeInline(s);
 									} else {
@@ -10278,10 +6862,10 @@ var $author$project$Page$Markdown$inlineToMarkdown = F2(
 								},
 								flattenedChildren));
 					case 'link':
-						var attributes = $author$project$RichText$Model$Mark$attributes(m.mark);
+						var attributes = $author$project$RichText$Model$Mark$attributes(m.cr);
 						var title = A2($author$project$RichText$Model$Attribute$findStringAttribute, 'title', attributes);
 						var _v7 = A2($author$project$RichText$Model$Attribute$findStringAttribute, 'href', attributes);
-						if (_v7.$ === 'Nothing') {
+						if (_v7.$ === 1) {
 							return $elm$core$Result$Err('Invalid link mark');
 						} else {
 							var href = _v7.a;
@@ -10299,12 +6883,12 @@ var $author$project$Page$Markdown$inlineToMarkdown = F2(
 		}
 	});
 var $author$project$RichText$Model$Node$toInlineTree = function (arr) {
-	var a = arr.a;
-	return a.tree;
+	var a = arr;
+	return a.bL;
 };
 var $author$project$Page$Markdown$inlineChildrenToMarkdown = function (cn) {
 	switch (cn.$) {
-		case 'InlineChildren':
+		case 1:
 			var a = cn.a;
 			var results = A2(
 				$elm$core$List$map,
@@ -10316,7 +6900,7 @@ var $author$project$Page$Markdown$inlineChildrenToMarkdown = function (cn) {
 				$elm$core$Result$map,
 				$elm$core$List$concatMap($elm$core$Basics$identity),
 				$author$project$Page$Markdown$unwrapAndFilterChildNodes(results));
-		case 'BlockChildren':
+		case 0:
 			return $elm$core$Result$Err('Invalid child nodes, was expected inline, received block');
 		default:
 			return $elm$core$Result$Err('Invalid child nodes, was expected inline, received leaf');
@@ -10335,12 +6919,12 @@ var $author$project$Page$Markdown$headingToMarkdown = F2(
 			$author$project$Page$Markdown$inlineChildrenToMarkdown(cn));
 	});
 var $author$project$RichText$Model$Node$toBlockArray = function (arr) {
-	var a = arr.a;
+	var a = arr;
 	return a;
 };
 var $author$project$Page$Markdown$blockChildrenToMarkdown = function (cn) {
 	switch (cn.$) {
-		case 'BlockChildren':
+		case 0:
 			var a = cn.a;
 			var results = A2(
 				$elm$core$List$map,
@@ -10348,7 +6932,7 @@ var $author$project$Page$Markdown$blockChildrenToMarkdown = function (cn) {
 				$elm$core$Array$toList(
 					$author$project$RichText$Model$Node$toBlockArray(a)));
 			return $author$project$Page$Markdown$unwrapAndFilterChildNodes(results);
-		case 'InlineChildren':
+		case 1:
 			return $elm$core$Result$Err('Invalid child nodes, received inline, expected block');
 		default:
 			return $elm$core$Result$Err('Invalid child nodes, received leaf, expected block');
@@ -10391,7 +6975,7 @@ var $author$project$Page$Markdown$blockToMarkdown = function (node) {
 var $author$project$Page$Markdown$listToMarkdown = F3(
 	function (type_, parameters, cn) {
 		var listItems = function () {
-			if (cn.$ === 'BlockChildren') {
+			if (!cn.$) {
 				var a = cn.a;
 				var children = $elm$core$Array$toList(
 					$author$project$RichText$Model$Node$toBlockArray(a));
@@ -10408,7 +6992,7 @@ var $author$project$Page$Markdown$listToMarkdown = F3(
 			}
 		}();
 		var defaultDelimiter = function () {
-			if (type_.$ === 'Unordered') {
+			if (!type_.$) {
 				return '*';
 			} else {
 				return '.';
@@ -10421,7 +7005,7 @@ var $author$project$Page$Markdown$listToMarkdown = F3(
 				$author$project$RichText$Model$Attribute$findStringAttribute,
 				'delimiter',
 				$author$project$RichText$Model$Element$attributes(parameters)));
-		if (listItems.$ === 'Err') {
+		if (listItems.$ === 1) {
 			var s = listItems.a;
 			return $elm$core$Result$Err(s);
 		} else {
@@ -10429,7 +7013,7 @@ var $author$project$Page$Markdown$listToMarkdown = F3(
 			return $elm$core$Result$Ok(
 				A2(
 					$pablohirafuji$elm_markdown$Markdown$Block$List,
-					{delimiter: delimiter, indentLength: 3, isLoose: false, type_: type_},
+					{aY: delimiter, a4: 3, dN: false, bM: type_},
 					lis));
 		}
 	});
@@ -10442,7 +7026,7 @@ var $author$project$Page$Markdown$init = function (session) {
 		$author$project$RichText$Model$State$root($author$project$Editor$initialState));
 	var _v0 = function () {
 		var _v1 = A2($elm$core$Result$andThen, $author$project$Page$Markdown$markdownToString, markdownNodes);
-		if (_v1.$ === 'Err') {
+		if (_v1.$ === 1) {
 			var e = _v1.a;
 			return _Utils_Tuple2(
 				'',
@@ -10456,25 +7040,25 @@ var $author$project$Page$Markdown$init = function (session) {
 	var error = _v0.b;
 	return _Utils_Tuple2(
 		{
-			editor: $author$project$Page$Markdown$initializeEditor($author$project$Editor$initialState),
-			editorType: $author$project$Page$Markdown$WYSIWYG,
-			markdownError: error,
-			session: session,
-			textMarkdown: result
+			b: $author$project$Page$Markdown$initializeEditor($author$project$Editor$initialState),
+			Y: 1,
+			al: error,
+			bd: session,
+			ap: result
 		},
 		$elm$core$Platform$Cmd$none);
 };
-var $author$project$Controls$Strikethrough = {$: 'Strikethrough'};
-var $author$project$Controls$Underline = {$: 'Underline'};
-var $author$project$RichText$Model$Node$Leaf = {$: 'Leaf'};
+var $author$project$Controls$Strikethrough = 3;
+var $author$project$Controls$Underline = 4;
+var $author$project$RichText$Model$Node$Leaf = {$: 2};
 var $author$project$RichText$Model$Attribute$StringAttribute = F2(
 	function (a, b) {
-		return {$: 'StringAttribute', a: a, b: b};
+		return {$: 0, a: a, b: b};
 	});
-var $author$project$RichText$Internal$Definitions$BlockLeafNodeType = {$: 'BlockLeafNodeType'};
+var $author$project$RichText$Internal$Definitions$BlockLeafNodeType = {$: 2};
 var $author$project$RichText$Config$ElementDefinition$blockLeaf = $author$project$RichText$Internal$Definitions$BlockLeafNodeType;
 var $author$project$Page$SpecExtension$parseImageAttributes = function (node) {
-	if (node.$ === 'ElementNode') {
+	if (!node.$) {
 		var name = node.a;
 		var attributes = node.b;
 		return (name === 'img') ? $elm$core$Maybe$Just(
@@ -10507,17 +7091,17 @@ var $author$project$Page$SpecExtension$parseImageAttributes = function (node) {
 };
 var $author$project$Page$SpecExtension$htmlNodeToImage = F2(
 	function (def, node) {
-		if (node.$ === 'ElementNode') {
+		if (!node.$) {
 			var name = node.a;
 			var children = node.c;
 			if (name === 'figure') {
 				var _v1 = A2($elm$core$Array$get, 0, children);
-				if (_v1.$ === 'Nothing') {
+				if (_v1.$ === 1) {
 					return $elm$core$Maybe$Nothing;
 				} else {
 					var img = _v1.a;
 					var _v2 = $author$project$Page$SpecExtension$parseImageAttributes(img);
-					if (_v2.$ === 'Nothing') {
+					if (_v2.$ === 1) {
 						return $elm$core$Maybe$Nothing;
 					} else {
 						var attr = _v2.a;
@@ -10612,7 +7196,7 @@ var $author$project$Page$SpecExtension$imageToHtmlNode = F2(
 					])));
 	});
 var $author$project$Page$SpecExtension$captionedImage = $author$project$RichText$Config$ElementDefinition$elementDefinition(
-	{contentType: $author$project$RichText$Config$ElementDefinition$blockLeaf, fromHtmlNode: $author$project$Page$SpecExtension$htmlNodeToImage, group: 'block', name: 'captioned_image', selectable: true, toHtmlNode: $author$project$Page$SpecExtension$imageToHtmlNode});
+	{dp: $author$project$RichText$Config$ElementDefinition$blockLeaf, b9: $author$project$Page$SpecExtension$htmlNodeToImage, dG: 'block', ct: 'captioned_image', ei: true, c0: $author$project$Page$SpecExtension$imageToHtmlNode});
 var $author$project$Page$SpecExtension$initialCaptionedImage = A2(
 	$author$project$RichText$Model$Node$block,
 	A2(
@@ -10646,20 +7230,20 @@ var $author$project$Page$SpecExtension$init = function (session) {
 	var newEditor = _Utils_update(
 		editor,
 		{
-			styles: _List_fromArray(
-				[$author$project$Controls$Bold, $author$project$Controls$Italic, $author$project$Controls$Strikethrough, $author$project$Controls$Underline])
+			bI: _List_fromArray(
+				[0, 1, 3, 4])
 		});
 	return _Utils_Tuple2(
 		{
-			editor: newEditor,
-			insertCaptionedImageModal: {alt: '', caption: '', editorState: $elm$core$Maybe$Nothing, src: '', visible: false},
-			session: session
+			b: newEditor,
+			v: {bT: '', aC: '', b3: $elm$core$Maybe$Nothing, cW: '', bl: false},
+			bd: session
 		},
 		$elm$core$Platform$Cmd$none);
 };
 var $author$project$RichText$Model$Attribute$BoolAttribute = F2(
 	function (a, b) {
-		return {$: 'BoolAttribute', a: a, b: b};
+		return {$: 2, a: a, b: b};
 	});
 var $elm$core$List$any = F2(
 	function (isOkay, list) {
@@ -10688,14 +7272,14 @@ var $elm$core$Array$length = function (_v0) {
 };
 var $author$project$Page$SpecFromScratch$htmlToItem = F2(
 	function (def, node) {
-		if (node.$ === 'ElementNode') {
+		if (!node.$) {
 			var name = node.a;
 			var children = node.c;
 			if ((name === 'li') && ($elm$core$Array$length(children) === 2)) {
 				var _v1 = A2($elm$core$Array$get, 0, children);
-				if (_v1.$ === 'Just') {
+				if (!_v1.$) {
 					var n = _v1.a;
-					if (n.$ === 'ElementNode') {
+					if (!n.$) {
 						var childName = n.a;
 						var attributes = n.b;
 						if ((childName === 'input') && A2(
@@ -10715,9 +7299,9 @@ var $author$project$Page$SpecFromScratch$htmlToItem = F2(
 								},
 								attributes);
 							var _v4 = A2($elm$core$Array$get, 1, children);
-							if (_v4.$ === 'Just') {
+							if (!_v4.$) {
 								var n2 = _v4.a;
-								if (n2.$ === 'ElementNode') {
+								if (!n2.$) {
 									var c = n2.c;
 									var parameters = A2(
 										$author$project$RichText$Model$Element$element,
@@ -10759,7 +7343,7 @@ var $author$project$RichText$Model$Attribute$findBoolAttribute = F2(
 			} else {
 				var x = attributes.a;
 				var xs = attributes.b;
-				if (x.$ === 'BoolAttribute') {
+				if (x.$ === 2) {
 					var k = x.a;
 					var v = x.b;
 					if (_Utils_eq(k, name)) {
@@ -10832,17 +7416,17 @@ var $author$project$Page$SpecFromScratch$itemToHtml = F2(
 	});
 var $author$project$Page$SpecFromScratch$item = $author$project$RichText$Config$ElementDefinition$elementDefinition(
 	{
-		contentType: $author$project$RichText$Config$ElementDefinition$textBlock(
+		dp: $author$project$RichText$Config$ElementDefinition$textBlock(
 			{
-				allowedGroups: _List_fromArray(
+				da: _List_fromArray(
 					['inline']),
-				allowedMarks: _List_Nil
+				db: _List_Nil
 			}),
-		fromHtmlNode: $author$project$Page$SpecFromScratch$htmlToItem,
-		group: 'items',
-		name: 'todo_item',
-		selectable: false,
-		toHtmlNode: $author$project$Page$SpecFromScratch$itemToHtml
+		b9: $author$project$Page$SpecFromScratch$htmlToItem,
+		dG: 'items',
+		ct: 'todo_item',
+		ei: false,
+		c0: $author$project$Page$SpecFromScratch$itemToHtml
 	});
 var $author$project$Page$SpecFromScratch$initialTodoNode = function (s) {
 	return A2(
@@ -10857,7 +7441,7 @@ var $author$project$Page$SpecFromScratch$initialTodoNode = function (s) {
 };
 var $author$project$RichText$Config$ElementDefinition$defaultHtmlToElement = F3(
 	function (htmlTag, def, node) {
-		if (node.$ === 'ElementNode') {
+		if (!node.$) {
 			var name_ = node.a;
 			var children = node.c;
 			return _Utils_eq(name_, htmlTag) ? $elm$core$Maybe$Just(
@@ -10875,14 +7459,14 @@ var $author$project$Page$SpecFromScratch$todoListToHtml = F2(
 	});
 var $author$project$Page$SpecFromScratch$todoList = $author$project$RichText$Config$ElementDefinition$elementDefinition(
 	{
-		contentType: $author$project$RichText$Config$ElementDefinition$blockNode(
+		dp: $author$project$RichText$Config$ElementDefinition$blockNode(
 			_List_fromArray(
 				['items'])),
-		fromHtmlNode: $author$project$Page$SpecFromScratch$htmlToTodoList,
-		group: 'root',
-		name: 'todo_list',
-		selectable: false,
-		toHtmlNode: $author$project$Page$SpecFromScratch$todoListToHtml
+		b9: $author$project$Page$SpecFromScratch$htmlToTodoList,
+		dG: 'root',
+		ct: 'todo_list',
+		ei: false,
+		c0: $author$project$Page$SpecFromScratch$todoListToHtml
 	});
 var $author$project$Page$SpecFromScratch$todoInitNode = A2(
 	$author$project$RichText$Model$Node$block,
@@ -10898,50 +7482,50 @@ var $author$project$Page$SpecFromScratch$initialState = A2($author$project$RichT
 var $author$project$Page$SpecFromScratch$init = function (session) {
 	return _Utils_Tuple2(
 		{
-			editor: $author$project$RichText$Editor$init($author$project$Page$SpecFromScratch$initialState),
-			session: session
+			b: $author$project$RichText$Editor$init($author$project$Page$SpecFromScratch$initialState),
+			bd: session
 		},
 		$elm$core$Platform$Cmd$none);
 };
 var $author$project$Page$Basic$toSession = function (model) {
-	return model.session;
+	return model.bd;
 };
 var $author$project$Page$Examples$toSession = function (model) {
-	return model.session;
+	return model.bd;
 };
 var $author$project$Page$Home$toSession = function (model) {
-	return model.session;
+	return model.bd;
 };
 var $author$project$Page$Markdown$toSession = function (model) {
-	return model.session;
+	return model.bd;
 };
 var $author$project$Page$SpecExtension$toSession = function (model) {
-	return model.session;
+	return model.bd;
 };
 var $author$project$Page$SpecFromScratch$toSession = function (model) {
-	return model.session;
+	return model.bd;
 };
 var $author$project$Main$toSession = function (page) {
 	switch (page.$) {
-		case 'Redirect':
+		case 0:
 			var session = page.a;
 			return session;
-		case 'NotFound':
+		case 1:
 			var session = page.a;
 			return session;
-		case 'Home':
+		case 6:
 			var home = page.a;
 			return $author$project$Page$Home$toSession(home);
-		case 'Basic':
+		case 2:
 			var basic = page.a;
 			return $author$project$Page$Basic$toSession(basic);
-		case 'Markdown':
+		case 5:
 			var full = page.a;
 			return $author$project$Page$Markdown$toSession(full);
-		case 'SpecExtension':
+		case 3:
 			var e = page.a;
 			return $author$project$Page$SpecExtension$toSession(e);
-		case 'SpecFromScratch':
+		case 4:
 			var e = page.a;
 			return $author$project$Page$SpecFromScratch$toSession(e);
 		default:
@@ -10961,13 +7545,13 @@ var $author$project$Main$updateWith = F4(
 var $author$project$Main$changeRouteTo = F2(
 	function (maybeRoute, model) {
 		var session = $author$project$Main$toSession(model);
-		if (maybeRoute.$ === 'Nothing') {
+		if (maybeRoute.$ === 1) {
 			return _Utils_Tuple2(
 				$author$project$Main$NotFound(session),
 				$elm$core$Platform$Cmd$none);
 		} else {
-			switch (maybeRoute.a.$) {
-				case 'Basic':
+			switch (maybeRoute.a) {
+				case 0:
 					var _v1 = maybeRoute.a;
 					return A4(
 						$author$project$Main$updateWith,
@@ -10975,7 +7559,7 @@ var $author$project$Main$changeRouteTo = F2(
 						$author$project$Main$GotBasicMsg,
 						model,
 						$author$project$Page$Basic$init(session));
-				case 'Markdown':
+				case 1:
 					var _v2 = maybeRoute.a;
 					return A4(
 						$author$project$Main$updateWith,
@@ -10983,7 +7567,7 @@ var $author$project$Main$changeRouteTo = F2(
 						$author$project$Main$GotMarkdownMsg,
 						model,
 						$author$project$Page$Markdown$init(session));
-				case 'SpecExtension':
+				case 2:
 					var _v3 = maybeRoute.a;
 					return A4(
 						$author$project$Main$updateWith,
@@ -10991,7 +7575,7 @@ var $author$project$Main$changeRouteTo = F2(
 						$author$project$Main$GotSpecExtensionMsg,
 						model,
 						$author$project$Page$SpecExtension$init(session));
-				case 'SpecFromScratch':
+				case 3:
 					var _v4 = maybeRoute.a;
 					return A4(
 						$author$project$Main$updateWith,
@@ -10999,7 +7583,7 @@ var $author$project$Main$changeRouteTo = F2(
 						$author$project$Main$GotSpecFromScratchMsg,
 						model,
 						$author$project$Page$SpecFromScratch$init(session));
-				case 'Home':
+				case 4:
 					var _v5 = maybeRoute.a;
 					return A4(
 						$author$project$Main$updateWith,
@@ -11020,7 +7604,7 @@ var $author$project$Main$changeRouteTo = F2(
 	});
 var $elm$url$Url$Parser$State = F5(
 	function (visited, unvisited, params, frag, value) {
-		return {frag: frag, params: params, unvisited: unvisited, value: value, visited: visited};
+		return {ai: frag, an: params, ae: unvisited, T: value, ar: visited};
 	});
 var $elm$url$Url$Parser$getFirstMatch = function (states) {
 	getFirstMatch:
@@ -11030,12 +7614,12 @@ var $elm$url$Url$Parser$getFirstMatch = function (states) {
 		} else {
 			var state = states.a;
 			var rest = states.b;
-			var _v1 = state.unvisited;
+			var _v1 = state.ae;
 			if (!_v1.b) {
-				return $elm$core$Maybe$Just(state.value);
+				return $elm$core$Maybe$Just(state.T);
 			} else {
 				if ((_v1.a === '') && (!_v1.b.b)) {
-					return $elm$core$Maybe$Just(state.value);
+					return $elm$core$Maybe$Just(state.T);
 				} else {
 					var $temp$states = rest;
 					states = $temp$states;
@@ -11073,7 +7657,7 @@ var $elm$url$Url$Parser$preparePath = function (path) {
 };
 var $elm$url$Url$Parser$addToParametersHelp = F2(
 	function (value, maybeList) {
-		if (maybeList.$ === 'Nothing') {
+		if (maybeList.$ === 1) {
 			return $elm$core$Maybe$Just(
 				_List_fromArray(
 					[value]));
@@ -11088,7 +7672,7 @@ var $elm$core$Dict$get = F2(
 	function (targetKey, dict) {
 		get:
 		while (true) {
-			if (dict.$ === 'RBEmpty_elm_builtin') {
+			if (dict.$ === -2) {
 				return $elm$core$Maybe$Nothing;
 			} else {
 				var key = dict.b;
@@ -11096,14 +7680,14 @@ var $elm$core$Dict$get = F2(
 				var left = dict.d;
 				var right = dict.e;
 				var _v1 = A2($elm$core$Basics$compare, targetKey, key);
-				switch (_v1.$) {
-					case 'LT':
+				switch (_v1) {
+					case 0:
 						var $temp$targetKey = targetKey,
 							$temp$dict = left;
 						targetKey = $temp$targetKey;
 						dict = $temp$dict;
 						continue get;
-					case 'EQ':
+					case 1:
 						return $elm$core$Maybe$Just(value);
 					default:
 						var $temp$targetKey = targetKey,
@@ -11118,7 +7702,7 @@ var $elm$core$Dict$get = F2(
 var $elm$core$Dict$getMin = function (dict) {
 	getMin:
 	while (true) {
-		if ((dict.$ === 'RBNode_elm_builtin') && (dict.d.$ === 'RBNode_elm_builtin')) {
+		if ((dict.$ === -1) && (dict.d.$ === -1)) {
 			var left = dict.d;
 			var $temp$dict = left;
 			dict = $temp$dict;
@@ -11129,8 +7713,8 @@ var $elm$core$Dict$getMin = function (dict) {
 	}
 };
 var $elm$core$Dict$moveRedLeft = function (dict) {
-	if (((dict.$ === 'RBNode_elm_builtin') && (dict.d.$ === 'RBNode_elm_builtin')) && (dict.e.$ === 'RBNode_elm_builtin')) {
-		if ((dict.e.d.$ === 'RBNode_elm_builtin') && (dict.e.d.a.$ === 'Red')) {
+	if (((dict.$ === -1) && (dict.d.$ === -1)) && (dict.e.$ === -1)) {
+		if ((dict.e.d.$ === -1) && (!dict.e.d.a)) {
 			var clr = dict.a;
 			var k = dict.b;
 			var v = dict.c;
@@ -11153,17 +7737,17 @@ var $elm$core$Dict$moveRedLeft = function (dict) {
 			var rRight = _v2.e;
 			return A5(
 				$elm$core$Dict$RBNode_elm_builtin,
-				$elm$core$Dict$Red,
+				0,
 				rlK,
 				rlV,
 				A5(
 					$elm$core$Dict$RBNode_elm_builtin,
-					$elm$core$Dict$Black,
+					1,
 					k,
 					v,
-					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, lK, lV, lLeft, lRight),
+					A5($elm$core$Dict$RBNode_elm_builtin, 0, lK, lV, lLeft, lRight),
 					rlL),
-				A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Black, rK, rV, rlR, rRight));
+				A5($elm$core$Dict$RBNode_elm_builtin, 1, rK, rV, rlR, rRight));
 		} else {
 			var clr = dict.a;
 			var k = dict.b;
@@ -11180,22 +7764,22 @@ var $elm$core$Dict$moveRedLeft = function (dict) {
 			var rV = _v5.c;
 			var rLeft = _v5.d;
 			var rRight = _v5.e;
-			if (clr.$ === 'Black') {
+			if (clr === 1) {
 				return A5(
 					$elm$core$Dict$RBNode_elm_builtin,
-					$elm$core$Dict$Black,
+					1,
 					k,
 					v,
-					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, lK, lV, lLeft, lRight),
-					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, rK, rV, rLeft, rRight));
+					A5($elm$core$Dict$RBNode_elm_builtin, 0, lK, lV, lLeft, lRight),
+					A5($elm$core$Dict$RBNode_elm_builtin, 0, rK, rV, rLeft, rRight));
 			} else {
 				return A5(
 					$elm$core$Dict$RBNode_elm_builtin,
-					$elm$core$Dict$Black,
+					1,
 					k,
 					v,
-					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, lK, lV, lLeft, lRight),
-					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, rK, rV, rLeft, rRight));
+					A5($elm$core$Dict$RBNode_elm_builtin, 0, lK, lV, lLeft, lRight),
+					A5($elm$core$Dict$RBNode_elm_builtin, 0, rK, rV, rLeft, rRight));
 			}
 		}
 	} else {
@@ -11203,8 +7787,8 @@ var $elm$core$Dict$moveRedLeft = function (dict) {
 	}
 };
 var $elm$core$Dict$moveRedRight = function (dict) {
-	if (((dict.$ === 'RBNode_elm_builtin') && (dict.d.$ === 'RBNode_elm_builtin')) && (dict.e.$ === 'RBNode_elm_builtin')) {
-		if ((dict.d.d.$ === 'RBNode_elm_builtin') && (dict.d.d.a.$ === 'Red')) {
+	if (((dict.$ === -1) && (dict.d.$ === -1)) && (dict.e.$ === -1)) {
+		if ((dict.d.d.$ === -1) && (!dict.d.d.a)) {
 			var clr = dict.a;
 			var k = dict.b;
 			var v = dict.c;
@@ -11227,17 +7811,17 @@ var $elm$core$Dict$moveRedRight = function (dict) {
 			var rRight = _v4.e;
 			return A5(
 				$elm$core$Dict$RBNode_elm_builtin,
-				$elm$core$Dict$Red,
+				0,
 				lK,
 				lV,
-				A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Black, llK, llV, llLeft, llRight),
+				A5($elm$core$Dict$RBNode_elm_builtin, 1, llK, llV, llLeft, llRight),
 				A5(
 					$elm$core$Dict$RBNode_elm_builtin,
-					$elm$core$Dict$Black,
+					1,
 					k,
 					v,
 					lRight,
-					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, rK, rV, rLeft, rRight)));
+					A5($elm$core$Dict$RBNode_elm_builtin, 0, rK, rV, rLeft, rRight)));
 		} else {
 			var clr = dict.a;
 			var k = dict.b;
@@ -11254,22 +7838,22 @@ var $elm$core$Dict$moveRedRight = function (dict) {
 			var rV = _v6.c;
 			var rLeft = _v6.d;
 			var rRight = _v6.e;
-			if (clr.$ === 'Black') {
+			if (clr === 1) {
 				return A5(
 					$elm$core$Dict$RBNode_elm_builtin,
-					$elm$core$Dict$Black,
+					1,
 					k,
 					v,
-					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, lK, lV, lLeft, lRight),
-					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, rK, rV, rLeft, rRight));
+					A5($elm$core$Dict$RBNode_elm_builtin, 0, lK, lV, lLeft, lRight),
+					A5($elm$core$Dict$RBNode_elm_builtin, 0, rK, rV, rLeft, rRight));
 			} else {
 				return A5(
 					$elm$core$Dict$RBNode_elm_builtin,
-					$elm$core$Dict$Black,
+					1,
 					k,
 					v,
-					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, lK, lV, lLeft, lRight),
-					A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, rK, rV, rLeft, rRight));
+					A5($elm$core$Dict$RBNode_elm_builtin, 0, lK, lV, lLeft, lRight),
+					A5($elm$core$Dict$RBNode_elm_builtin, 0, rK, rV, rLeft, rRight));
 			}
 		}
 	} else {
@@ -11278,7 +7862,7 @@ var $elm$core$Dict$moveRedRight = function (dict) {
 };
 var $elm$core$Dict$removeHelpPrepEQGT = F7(
 	function (targetKey, dict, color, key, value, left, right) {
-		if ((left.$ === 'RBNode_elm_builtin') && (left.a.$ === 'Red')) {
+		if ((left.$ === -1) && (!left.a)) {
 			var _v1 = left.a;
 			var lK = left.b;
 			var lV = left.c;
@@ -11290,13 +7874,13 @@ var $elm$core$Dict$removeHelpPrepEQGT = F7(
 				lK,
 				lV,
 				lLeft,
-				A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Red, key, value, lRight, right));
+				A5($elm$core$Dict$RBNode_elm_builtin, 0, key, value, lRight, right));
 		} else {
 			_v2$2:
 			while (true) {
-				if ((right.$ === 'RBNode_elm_builtin') && (right.a.$ === 'Black')) {
-					if (right.d.$ === 'RBNode_elm_builtin') {
-						if (right.d.a.$ === 'Black') {
+				if ((right.$ === -1) && (right.a === 1)) {
+					if (right.d.$ === -1) {
+						if (right.d.a === 1) {
 							var _v3 = right.a;
 							var _v4 = right.d;
 							var _v5 = _v4.a;
@@ -11317,7 +7901,7 @@ var $elm$core$Dict$removeHelpPrepEQGT = F7(
 		}
 	});
 var $elm$core$Dict$removeMin = function (dict) {
-	if ((dict.$ === 'RBNode_elm_builtin') && (dict.d.$ === 'RBNode_elm_builtin')) {
+	if ((dict.$ === -1) && (dict.d.$ === -1)) {
 		var color = dict.a;
 		var key = dict.b;
 		var value = dict.c;
@@ -11325,8 +7909,8 @@ var $elm$core$Dict$removeMin = function (dict) {
 		var lColor = left.a;
 		var lLeft = left.d;
 		var right = dict.e;
-		if (lColor.$ === 'Black') {
-			if ((lLeft.$ === 'RBNode_elm_builtin') && (lLeft.a.$ === 'Red')) {
+		if (lColor === 1) {
+			if ((lLeft.$ === -1) && (!lLeft.a)) {
 				var _v3 = lLeft.a;
 				return A5(
 					$elm$core$Dict$RBNode_elm_builtin,
@@ -11337,7 +7921,7 @@ var $elm$core$Dict$removeMin = function (dict) {
 					right);
 			} else {
 				var _v4 = $elm$core$Dict$moveRedLeft(dict);
-				if (_v4.$ === 'RBNode_elm_builtin') {
+				if (_v4.$ === -1) {
 					var nColor = _v4.a;
 					var nKey = _v4.b;
 					var nValue = _v4.c;
@@ -11369,7 +7953,7 @@ var $elm$core$Dict$removeMin = function (dict) {
 };
 var $elm$core$Dict$removeHelp = F2(
 	function (targetKey, dict) {
-		if (dict.$ === 'RBEmpty_elm_builtin') {
+		if (dict.$ === -2) {
 			return $elm$core$Dict$RBEmpty_elm_builtin;
 		} else {
 			var color = dict.a;
@@ -11378,10 +7962,10 @@ var $elm$core$Dict$removeHelp = F2(
 			var left = dict.d;
 			var right = dict.e;
 			if (_Utils_cmp(targetKey, key) < 0) {
-				if ((left.$ === 'RBNode_elm_builtin') && (left.a.$ === 'Black')) {
+				if ((left.$ === -1) && (left.a === 1)) {
 					var _v4 = left.a;
 					var lLeft = left.d;
-					if ((lLeft.$ === 'RBNode_elm_builtin') && (lLeft.a.$ === 'Red')) {
+					if ((lLeft.$ === -1) && (!lLeft.a)) {
 						var _v6 = lLeft.a;
 						return A5(
 							$elm$core$Dict$RBNode_elm_builtin,
@@ -11392,7 +7976,7 @@ var $elm$core$Dict$removeHelp = F2(
 							right);
 					} else {
 						var _v7 = $elm$core$Dict$moveRedLeft(dict);
-						if (_v7.$ === 'RBNode_elm_builtin') {
+						if (_v7.$ === -1) {
 							var nColor = _v7.a;
 							var nKey = _v7.b;
 							var nValue = _v7.c;
@@ -11428,7 +8012,7 @@ var $elm$core$Dict$removeHelp = F2(
 	});
 var $elm$core$Dict$removeHelpEQGT = F2(
 	function (targetKey, dict) {
-		if (dict.$ === 'RBNode_elm_builtin') {
+		if (dict.$ === -1) {
 			var color = dict.a;
 			var key = dict.b;
 			var value = dict.c;
@@ -11436,7 +8020,7 @@ var $elm$core$Dict$removeHelpEQGT = F2(
 			var right = dict.e;
 			if (_Utils_eq(targetKey, key)) {
 				var _v1 = $elm$core$Dict$getMin(right);
-				if (_v1.$ === 'RBNode_elm_builtin') {
+				if (_v1.$ === -1) {
 					var minKey = _v1.b;
 					var minValue = _v1.c;
 					return A5(
@@ -11465,13 +8049,13 @@ var $elm$core$Dict$removeHelpEQGT = F2(
 var $elm$core$Dict$remove = F2(
 	function (key, dict) {
 		var _v0 = A2($elm$core$Dict$removeHelp, key, dict);
-		if ((_v0.$ === 'RBNode_elm_builtin') && (_v0.a.$ === 'Red')) {
+		if ((_v0.$ === -1) && (!_v0.a)) {
 			var _v1 = _v0.a;
 			var k = _v0.b;
 			var v = _v0.c;
 			var l = _v0.d;
 			var r = _v0.e;
-			return A5($elm$core$Dict$RBNode_elm_builtin, $elm$core$Dict$Black, k, v, l, r);
+			return A5($elm$core$Dict$RBNode_elm_builtin, 1, k, v, l, r);
 		} else {
 			var x = _v0;
 			return x;
@@ -11481,7 +8065,7 @@ var $elm$core$Dict$update = F3(
 	function (targetKey, alter, dictionary) {
 		var _v0 = alter(
 			A2($elm$core$Dict$get, targetKey, dictionary));
-		if (_v0.$ === 'Just') {
+		if (!_v0.$) {
 			var value = _v0.a;
 			return A3($elm$core$Dict$insert, targetKey, value, dictionary);
 		} else {
@@ -11496,12 +8080,12 @@ var $elm$url$Url$Parser$addParam = F2(
 			var _v1 = _v0.b;
 			var rawValue = _v1.a;
 			var _v2 = $elm$url$Url$percentDecode(rawKey);
-			if (_v2.$ === 'Nothing') {
+			if (_v2.$ === 1) {
 				return dict;
 			} else {
 				var key = _v2.a;
 				var _v3 = $elm$url$Url$percentDecode(rawValue);
-				if (_v3.$ === 'Nothing') {
+				if (_v3.$ === 1) {
 					return dict;
 				} else {
 					var value = _v3.a;
@@ -11517,7 +8101,7 @@ var $elm$url$Url$Parser$addParam = F2(
 		}
 	});
 var $elm$url$Url$Parser$prepareQuery = function (maybeQuery) {
-	if (maybeQuery.$ === 'Nothing') {
+	if (maybeQuery.$ === 1) {
 		return $elm$core$Dict$empty;
 	} else {
 		var qry = maybeQuery.a;
@@ -11530,33 +8114,31 @@ var $elm$url$Url$Parser$prepareQuery = function (maybeQuery) {
 };
 var $elm$url$Url$Parser$parse = F2(
 	function (_v0, url) {
-		var parser = _v0.a;
+		var parser = _v0;
 		return $elm$url$Url$Parser$getFirstMatch(
 			parser(
 				A5(
 					$elm$url$Url$Parser$State,
 					_List_Nil,
-					$elm$url$Url$Parser$preparePath(url.path),
-					$elm$url$Url$Parser$prepareQuery(url.query),
-					url.fragment,
+					$elm$url$Url$Parser$preparePath(url.d7),
+					$elm$url$Url$Parser$prepareQuery(url.cJ),
+					url.dF,
 					$elm$core$Basics$identity)));
 	});
-var $author$project$Route$Basic = {$: 'Basic'};
-var $author$project$Route$Examples = {$: 'Examples'};
-var $author$project$Route$Home = {$: 'Home'};
-var $author$project$Route$Markdown = {$: 'Markdown'};
-var $author$project$Route$SpecExtension = {$: 'SpecExtension'};
-var $author$project$Route$SpecFromScratch = {$: 'SpecFromScratch'};
-var $elm$url$Url$Parser$Parser = function (a) {
-	return {$: 'Parser', a: a};
-};
+var $author$project$Route$Basic = 0;
+var $author$project$Route$Examples = 5;
+var $author$project$Route$Home = 4;
+var $author$project$Route$Markdown = 1;
+var $author$project$Route$SpecExtension = 2;
+var $author$project$Route$SpecFromScratch = 3;
+var $elm$url$Url$Parser$Parser = $elm$core$Basics$identity;
 var $elm$url$Url$Parser$mapState = F2(
 	function (func, _v0) {
-		var visited = _v0.visited;
-		var unvisited = _v0.unvisited;
-		var params = _v0.params;
-		var frag = _v0.frag;
-		var value = _v0.value;
+		var visited = _v0.ar;
+		var unvisited = _v0.ae;
+		var params = _v0.an;
+		var frag = _v0.ai;
+		var value = _v0.T;
 		return A5(
 			$elm$url$Url$Parser$State,
 			visited,
@@ -11567,108 +8149,103 @@ var $elm$url$Url$Parser$mapState = F2(
 	});
 var $elm$url$Url$Parser$map = F2(
 	function (subValue, _v0) {
-		var parseArg = _v0.a;
-		return $elm$url$Url$Parser$Parser(
-			function (_v1) {
-				var visited = _v1.visited;
-				var unvisited = _v1.unvisited;
-				var params = _v1.params;
-				var frag = _v1.frag;
-				var value = _v1.value;
-				return A2(
-					$elm$core$List$map,
-					$elm$url$Url$Parser$mapState(value),
-					parseArg(
-						A5($elm$url$Url$Parser$State, visited, unvisited, params, frag, subValue)));
-			});
+		var parseArg = _v0;
+		return function (_v1) {
+			var visited = _v1.ar;
+			var unvisited = _v1.ae;
+			var params = _v1.an;
+			var frag = _v1.ai;
+			var value = _v1.T;
+			return A2(
+				$elm$core$List$map,
+				$elm$url$Url$Parser$mapState(value),
+				parseArg(
+					A5($elm$url$Url$Parser$State, visited, unvisited, params, frag, subValue)));
+		};
 	});
 var $elm$url$Url$Parser$oneOf = function (parsers) {
-	return $elm$url$Url$Parser$Parser(
-		function (state) {
-			return A2(
-				$elm$core$List$concatMap,
-				function (_v0) {
-					var parser = _v0.a;
-					return parser(state);
-				},
-				parsers);
-		});
+	return function (state) {
+		return A2(
+			$elm$core$List$concatMap,
+			function (_v0) {
+				var parser = _v0;
+				return parser(state);
+			},
+			parsers);
+	};
 };
 var $elm$url$Url$Parser$s = function (str) {
-	return $elm$url$Url$Parser$Parser(
-		function (_v0) {
-			var visited = _v0.visited;
-			var unvisited = _v0.unvisited;
-			var params = _v0.params;
-			var frag = _v0.frag;
-			var value = _v0.value;
-			if (!unvisited.b) {
-				return _List_Nil;
-			} else {
-				var next = unvisited.a;
-				var rest = unvisited.b;
-				return _Utils_eq(next, str) ? _List_fromArray(
-					[
-						A5(
-						$elm$url$Url$Parser$State,
-						A2($elm$core$List$cons, next, visited),
-						rest,
-						params,
-						frag,
-						value)
-					]) : _List_Nil;
-			}
-		});
+	return function (_v0) {
+		var visited = _v0.ar;
+		var unvisited = _v0.ae;
+		var params = _v0.an;
+		var frag = _v0.ai;
+		var value = _v0.T;
+		if (!unvisited.b) {
+			return _List_Nil;
+		} else {
+			var next = unvisited.a;
+			var rest = unvisited.b;
+			return _Utils_eq(next, str) ? _List_fromArray(
+				[
+					A5(
+					$elm$url$Url$Parser$State,
+					A2($elm$core$List$cons, next, visited),
+					rest,
+					params,
+					frag,
+					value)
+				]) : _List_Nil;
+		}
+	};
 };
 var $elm$url$Url$Parser$slash = F2(
 	function (_v0, _v1) {
-		var parseBefore = _v0.a;
-		var parseAfter = _v1.a;
-		return $elm$url$Url$Parser$Parser(
-			function (state) {
-				return A2(
-					$elm$core$List$concatMap,
-					parseAfter,
-					parseBefore(state));
-			});
+		var parseBefore = _v0;
+		var parseAfter = _v1;
+		return function (state) {
+			return A2(
+				$elm$core$List$concatMap,
+				parseAfter,
+				parseBefore(state));
+		};
 	});
-var $elm$url$Url$Parser$top = $elm$url$Url$Parser$Parser(
-	function (state) {
-		return _List_fromArray(
-			[state]);
-	});
+var $elm$url$Url$Parser$top = function (state) {
+	return _List_fromArray(
+		[state]);
+};
 var $author$project$Route$parser = $elm$url$Url$Parser$oneOf(
 	_List_fromArray(
 		[
-			A2($elm$url$Url$Parser$map, $author$project$Route$Home, $elm$url$Url$Parser$top),
+			A2($elm$url$Url$Parser$map, 4, $elm$url$Url$Parser$top),
 			A2(
 			$elm$url$Url$Parser$map,
-			$author$project$Route$Examples,
+			5,
 			$elm$url$Url$Parser$s('examples')),
 			A2(
 			$elm$url$Url$Parser$map,
-			$author$project$Route$Basic,
+			0,
 			A2(
 				$elm$url$Url$Parser$slash,
 				$elm$url$Url$Parser$s('examples'),
 				$elm$url$Url$Parser$s('basic'))),
 			A2(
 			$elm$url$Url$Parser$map,
-			$author$project$Route$Markdown,
+			1,
 			A2(
 				$elm$url$Url$Parser$slash,
 				$elm$url$Url$Parser$s('examples'),
 				$elm$url$Url$Parser$s('markdown'))),
 			A2(
 			$elm$url$Url$Parser$map,
-			$author$project$Route$SpecExtension,
+			2,
 			A2(
 				$elm$url$Url$Parser$slash,
 				$elm$url$Url$Parser$s('examples'),
 				$elm$url$Url$Parser$s('spec-extension'))),
 			A2(
 			$elm$url$Url$Parser$map,
-			$author$project$Route$SpecFromScratch,
+			3,
 			A2(
 				$elm$url$Url$Parser$slash,
 				$elm$url$Url$Parser$s('examples'),
@@ -11681,8 +8258,8 @@ var $author$project$Route$fromUrl = function (url) {
 		_Utils_update(
 			url,
 			{
-				fragment: $elm$core$Maybe$Nothing,
-				path: A2($elm$core$Maybe$withDefault, '', url.fragment)
+				dF: $elm$core$Maybe$Nothing,
+				d7: A2($elm$core$Maybe$withDefault, '', url.dF)
 			}));
 };
 var $author$project$Main$init = F3(
@@ -11690,11 +8267,10 @@ var $author$project$Main$init = F3(
 		return A2(
 			$author$project$Main$changeRouteTo,
 			$author$project$Route$fromUrl(url),
-			$author$project$Main$Redirect(
-				$author$project$Session$Session(navKey)));
+			$author$project$Main$Redirect(navKey));
 	});
 var $author$project$Main$GotSession = function (a) {
-	return {$: 'GotSession', a: a};
+	return {$: 8, a: a};
 };
 var $elm$json$Json$Decode$value = _Json_decodeValue;
 var $author$project$Session$onStoreChange = _Platform_incomingPort('onStoreChange', $elm$json$Json$Decode$value);
@@ -11702,106 +8278,103 @@ var $author$project$Session$changes = F2(
 	function (toMsg, key) {
 		return $author$project$Session$onStoreChange(
 			function (_v0) {
-				return toMsg(
-					$author$project$Session$Session(key));
+				return toMsg(key);
 			});
 	});
 var $elm$core$Platform$Sub$map = _Platform_map;
 var $author$project$Session$navKey = function (session) {
-	var key = session.a;
+	var key = session;
 	return key;
 };
 var $elm$core$Platform$Sub$batch = _Platform_batch;
 var $elm$core$Platform$Sub$none = $elm$core$Platform$Sub$batch(_List_Nil);
 var $author$project$Page$Basic$GotSession = function (a) {
-	return {$: 'GotSession', a: a};
+	return {$: 1, a: a};
 };
 var $author$project$Page$Basic$subscriptions = function (model) {
 	return A2(
 		$author$project$Session$changes,
 		$author$project$Page$Basic$GotSession,
-		$author$project$Session$navKey(model.session));
+		$author$project$Session$navKey(model.bd));
 };
-var $author$project$Page$Examples$GotSession = function (a) {
-	return {$: 'GotSession', a: a};
-};
+var $author$project$Page$Examples$GotSession = $elm$core$Basics$identity;
 var $author$project$Page$Examples$subscriptions = function (model) {
 	return A2(
 		$author$project$Session$changes,
-		$author$project$Page$Examples$GotSession,
-		$author$project$Session$navKey(model.session));
+		$elm$core$Basics$identity,
+		$author$project$Session$navKey(model.bd));
 };
 var $author$project$Page$Home$GotSession = function (a) {
-	return {$: 'GotSession', a: a};
+	return {$: 1, a: a};
 };
 var $author$project$Page$Home$subscriptions = function (model) {
 	return A2(
 		$author$project$Session$changes,
 		$author$project$Page$Home$GotSession,
-		$author$project$Session$navKey(model.session));
+		$author$project$Session$navKey(model.bd));
 };
 var $author$project$Page$Markdown$GotSession = function (a) {
-	return {$: 'GotSession', a: a};
+	return {$: 3, a: a};
 };
 var $author$project$Page$Markdown$subscriptions = function (model) {
 	return A2(
 		$author$project$Session$changes,
 		$author$project$Page$Markdown$GotSession,
-		$author$project$Session$navKey(model.session));
+		$author$project$Session$navKey(model.bd));
 };
 var $author$project$Page$SpecExtension$GotSession = function (a) {
-	return {$: 'GotSession', a: a};
+	return {$: 6, a: a};
 };
 var $author$project$Page$SpecExtension$subscriptions = function (model) {
 	return A2(
 		$author$project$Session$changes,
 		$author$project$Page$SpecExtension$GotSession,
-		$author$project$Session$navKey(model.session));
+		$author$project$Session$navKey(model.bd));
 };
 var $author$project$Page$SpecFromScratch$GotSession = function (a) {
-	return {$: 'GotSession', a: a};
+	return {$: 2, a: a};
 };
 var $author$project$Page$SpecFromScratch$subscriptions = function (model) {
 	return A2(
 		$author$project$Session$changes,
 		$author$project$Page$SpecFromScratch$GotSession,
-		$author$project$Session$navKey(model.session));
+		$author$project$Session$navKey(model.bd));
 };
 var $author$project$Main$subscriptions = function (model) {
 	switch (model.$) {
-		case 'NotFound':
+		case 1:
 			return $elm$core$Platform$Sub$none;
-		case 'Redirect':
+		case 0:
 			return A2(
 				$author$project$Session$changes,
 				$author$project$Main$GotSession,
 				$author$project$Session$navKey(
 					$author$project$Main$toSession(model)));
-		case 'Home':
+		case 6:
 			var m = model.a;
 			return A2(
 				$elm$core$Platform$Sub$map,
 				$author$project$Main$GotHomeMsg,
 				$author$project$Page$Home$subscriptions(m));
-		case 'Basic':
+		case 2:
 			var m = model.a;
 			return A2(
 				$elm$core$Platform$Sub$map,
 				$author$project$Main$GotBasicMsg,
 				$author$project$Page$Basic$subscriptions(m));
-		case 'Markdown':
+		case 5:
 			var m = model.a;
 			return A2(
 				$elm$core$Platform$Sub$map,
 				$author$project$Main$GotMarkdownMsg,
 				$author$project$Page$Markdown$subscriptions(m));
-		case 'Examples':
+		case 7:
 			var m = model.a;
 			return A2(
 				$elm$core$Platform$Sub$map,
 				$author$project$Main$GotExamplesMsg,
 				$author$project$Page$Examples$subscriptions(m));
-		case 'SpecExtension':
+		case 3:
 			var m = model.a;
 			return A2(
 				$elm$core$Platform$Sub$map,
@@ -11819,7 +8392,7 @@ var $elm$browser$Browser$Navigation$load = _Browser_load;
 var $elm$browser$Browser$Navigation$pushUrl = _Browser_pushUrl;
 var $elm$url$Url$addPort = F2(
 	function (maybePort, starter) {
-		if (maybePort.$ === 'Nothing') {
+		if (maybePort.$ === 1) {
 			return starter;
 		} else {
 			var port_ = maybePort.a;
@@ -11828,7 +8401,7 @@ var $elm$url$Url$addPort = F2(
 	});
 var $elm$url$Url$addPrefixed = F3(
 	function (prefix, maybeSegment, starter) {
-		if (maybeSegment.$ === 'Nothing') {
+		if (maybeSegment.$ === 1) {
 			return starter;
 		} else {
 			var segment = maybeSegment.a;
@@ -11839,8 +8412,8 @@ var $elm$url$Url$addPrefixed = F3(
 	});
 var $elm$url$Url$toString = function (url) {
 	var http = function () {
-		var _v0 = url.protocol;
-		if (_v0.$ === 'Http') {
+		var _v0 = url.cI;
+		if (!_v0) {
 			return 'http://';
 		} else {
 			return 'https://';
@@ -11849,36 +8422,34 @@ var $elm$url$Url$toString = function (url) {
 	return A3(
 		$elm$url$Url$addPrefixed,
 		'#',
-		url.fragment,
+		url.dF,
 		A3(
 			$elm$url$Url$addPrefixed,
 			'?',
-			url.query,
+			url.cJ,
 			_Utils_ap(
 				A2(
 					$elm$url$Url$addPort,
-					url.port_,
-					_Utils_ap(http, url.host)),
-				url.path)));
+					url.cB,
+					_Utils_ap(http, url.cg)),
+				url.d7)));
 };
 var $author$project$Controls$InternalMsg = function (a) {
-	return {$: 'InternalMsg', a: a};
+	return {$: 0, a: a};
 };
-var $author$project$RichText$Model$Mark$Flip = {$: 'Flip'};
+var $author$project$RichText$Model$Mark$Flip = 2;
 var $author$project$RichText$Definitions$boldToHtmlNode = F2(
 	function (_v0, children) {
 		return A3($author$project$RichText$Model$HtmlNode$ElementNode, 'b', _List_Nil, children);
 	});
 var $author$project$RichText$Definitions$htmlNodeToBold = $author$project$RichText$Config$MarkDefinition$defaultHtmlToMark('b');
 var $author$project$RichText$Definitions$bold = $author$project$RichText$Config$MarkDefinition$markDefinition(
-	{fromHtmlNode: $author$project$RichText$Definitions$htmlNodeToBold, name: 'bold', toHtmlNode: $author$project$RichText$Definitions$boldToHtmlNode});
-var $author$project$RichText$Config$Command$CommandMap = function (a) {
-	return {$: 'CommandMap', a: a};
-};
+	{b9: $author$project$RichText$Definitions$htmlNodeToBold, ct: 'bold', c0: $author$project$RichText$Definitions$boldToHtmlNode});
+var $author$project$RichText$Config$Command$CommandMap = $elm$core$Basics$identity;
 var $author$project$RichText$Config$Command$compose = F3(
 	function (k, commandList, d) {
 		var _v0 = A2($elm$core$Dict$get, k, d);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return A3($elm$core$Dict$insert, k, commandList, d);
 		} else {
 			var v = _v0.a;
@@ -11893,7 +8464,7 @@ var $elm$core$Dict$foldl = F3(
 	function (func, acc, dict) {
 		foldl:
 		while (true) {
-			if (dict.$ === 'RBEmpty_elm_builtin') {
+			if (dict.$ === -2) {
 				return acc;
 			} else {
 				var key = dict.b;
@@ -11916,64 +8487,62 @@ var $elm$core$Dict$foldl = F3(
 	});
 var $author$project$RichText$Config$Command$combine = F2(
 	function (m1, m2) {
-		var map1 = m1.a;
-		var map2 = m2.a;
-		return $author$project$RichText$Config$Command$CommandMap(
-			{
-				defaultInputEventCommand: function (e) {
-					return _Utils_ap(
-						map1.defaultInputEventCommand(e),
-						map2.defaultInputEventCommand(e));
-				},
-				defaultKeyCommand: function (e) {
-					return _Utils_ap(
-						map1.defaultKeyCommand(e),
-						map2.defaultKeyCommand(e));
-				},
-				inputEventTypeMap: A3($elm$core$Dict$foldl, $author$project$RichText$Config$Command$compose, map2.inputEventTypeMap, map1.inputEventTypeMap),
-				keyMap: A3($elm$core$Dict$foldl, $author$project$RichText$Config$Command$compose, map2.keyMap, map1.keyMap)
-			});
+		var map1 = m1;
+		var map2 = m2;
+		return {
+			W: function (e) {
+				return _Utils_ap(
+					map1.W(e),
+					map2.W(e));
+			},
+			X: function (e) {
+				return _Utils_ap(
+					map1.X(e),
+					map2.X(e));
+			},
+			_: A3($elm$core$Dict$foldl, $author$project$RichText$Config$Command$compose, map2._, map1._),
+			J: A3($elm$core$Dict$foldl, $author$project$RichText$Config$Command$compose, map2.J, map1.J)
+		};
 	});
-var $author$project$RichText$Config$Command$Redo = {$: 'Redo'};
-var $author$project$RichText$Config$Command$Undo = {$: 'Undo'};
+var $author$project$RichText$Config$Command$Redo = 1;
+var $author$project$RichText$Config$Command$Undo = 0;
 var $author$project$RichText$Config$Keys$alt = 'Alt';
 var $author$project$RichText$Config$Keys$backspace = 'Backspace';
 var $author$project$RichText$Node$BlockFragment = function (a) {
-	return {$: 'BlockFragment', a: a};
+	return {$: 0, a: a};
 };
 var $author$project$RichText$Model$Selection$anchorNode = function (selection) {
-	var c = selection.a;
-	return c.anchorNode;
+	var c = selection;
+	return c.af;
 };
 var $author$project$RichText$Model$Selection$anchorOffset = function (selection) {
-	var c = selection.a;
-	return c.anchorOffset;
+	var c = selection;
+	return c.P;
 };
 var $author$project$RichText$Node$Block = function (a) {
-	return {$: 'Block', a: a};
+	return {$: 0, a: a};
 };
 var $author$project$RichText$Node$Inline = function (a) {
-	return {$: 'Inline', a: a};
+	return {$: 1, a: a};
 };
 var $author$project$RichText$Model$Node$InlineElement = function (a) {
-	return {$: 'InlineElement', a: a};
+	return {$: 0, a: a};
 };
 var $author$project$RichText$Model$Text$annotations = function (parameters) {
-	var c = parameters.a;
-	return c.annotations;
+	var c = parameters;
+	return c.aU;
 };
 var $author$project$RichText$Internal$Definitions$annotationsFromElement = function (parameters) {
-	var c = parameters.a;
-	return c.annotations;
+	var c = parameters;
+	return c.aU;
 };
 var $author$project$RichText$Model$Element$annotations = $author$project$RichText$Internal$Definitions$annotationsFromElement;
 var $author$project$RichText$Internal$Definitions$elementWithAnnotations = F2(
 	function (annotations, parameters) {
-		var c = parameters.a;
-		return $author$project$RichText$Internal$Definitions$ElementParameters(
-			_Utils_update(
-				c,
-				{annotations: annotations}));
+		var c = parameters;
+		return _Utils_update(
+			c,
+			{aU: annotations});
 	});
 var $author$project$RichText$Model$Element$withAnnotations = $author$project$RichText$Internal$Definitions$elementWithAnnotations;
 var $author$project$RichText$Annotation$toggleElementParameters = F3(
@@ -11986,34 +8555,29 @@ var $author$project$RichText$Annotation$toggleElementParameters = F3(
 	});
 var $author$project$RichText$Model$Text$withAnnotations = F2(
 	function (ann, parameters) {
-		var c = parameters.a;
-		return $author$project$RichText$Model$Text$Text(
-			_Utils_update(
-				c,
-				{annotations: ann}));
+		var c = parameters;
+		return _Utils_update(
+			c,
+			{aU: ann});
 	});
-var $author$project$RichText$Model$InlineElement$InlineElement = function (a) {
-	return {$: 'InlineElement', a: a};
-};
+var $author$project$RichText$Model$InlineElement$InlineElement = $elm$core$Basics$identity;
 var $author$project$RichText$Model$InlineElement$withElement = F2(
 	function (eparams, iparams) {
-		var c = iparams.a;
-		return $author$project$RichText$Model$InlineElement$InlineElement(
-			_Utils_update(
-				c,
-				{element: eparams}));
+		var c = iparams;
+		return _Utils_update(
+			c,
+			{aZ: eparams});
 	});
 var $author$project$RichText$Model$Node$withElement = F2(
 	function (parameters, node) {
-		var c = node.a;
-		return $author$project$RichText$Model$Node$Block(
-			_Utils_update(
-				c,
-				{parameters: parameters}));
+		var c = node;
+		return _Utils_update(
+			c,
+			{a8: parameters});
 	});
 var $author$project$RichText$Annotation$toggle = F3(
 	function (func, annotation, node) {
-		if (node.$ === 'Block') {
+		if (!node.$) {
 			var bn = node.a;
 			var newParameters = A3(
 				$author$project$RichText$Annotation$toggleElementParameters,
@@ -12026,7 +8590,7 @@ var $author$project$RichText$Annotation$toggle = F3(
 			var il = node.a;
 			return $author$project$RichText$Node$Inline(
 				function () {
-					if (il.$ === 'InlineElement') {
+					if (!il.$) {
 						var l = il.a;
 						var newParameters = A3(
 							$author$project$RichText$Annotation$toggleElementParameters,
@@ -12062,13 +8626,13 @@ var $author$project$RichText$Node$nodeAt = F2(
 				var xs = path.b;
 				var _v1 = $author$project$RichText$Model$Node$childNodes(node);
 				switch (_v1.$) {
-					case 'BlockChildren':
+					case 0:
 						var arr = _v1.a;
 						var _v2 = A2(
 							$elm$core$Array$get,
 							x,
 							$author$project$RichText$Model$Node$toBlockArray(arr));
-						if (_v2.$ === 'Nothing') {
+						if (_v2.$ === 1) {
 							return $elm$core$Maybe$Nothing;
 						} else {
 							var childNode = _v2.a;
@@ -12078,13 +8642,13 @@ var $author$project$RichText$Node$nodeAt = F2(
 							node = $temp$node;
 							continue nodeAt;
 						}
-					case 'InlineChildren':
+					case 1:
 						var a = _v1.a;
 						var _v3 = A2(
 							$elm$core$Array$get,
 							x,
 							$author$project$RichText$Model$Node$toInlineArray(a));
-						if (_v3.$ === 'Nothing') {
+						if (_v3.$ === 1) {
 							return $elm$core$Maybe$Nothing;
 						} else {
 							var childLeafNode = _v3.a;
@@ -12098,30 +8662,30 @@ var $author$project$RichText$Node$nodeAt = F2(
 		}
 	});
 var $author$project$RichText$Node$InlineFragment = function (a) {
-	return {$: 'InlineFragment', a: a};
+	return {$: 1, a: a};
 };
 var $elm$core$Elm$JsArray$appendN = _JsArray_appendN;
 var $elm$core$Elm$JsArray$slice = _JsArray_slice;
 var $elm$core$Array$appendHelpBuilder = F2(
 	function (tail, builder) {
 		var tailLen = $elm$core$Elm$JsArray$length(tail);
-		var notAppended = ($elm$core$Array$branchFactor - $elm$core$Elm$JsArray$length(builder.tail)) - tailLen;
-		var appended = A3($elm$core$Elm$JsArray$appendN, $elm$core$Array$branchFactor, builder.tail, tail);
+		var notAppended = ($elm$core$Array$branchFactor - $elm$core$Elm$JsArray$length(builder.n)) - tailLen;
+		var appended = A3($elm$core$Elm$JsArray$appendN, $elm$core$Array$branchFactor, builder.n, tail);
 		return (notAppended < 0) ? {
-			nodeList: A2(
+			o: A2(
 				$elm$core$List$cons,
 				$elm$core$Array$Leaf(appended),
-				builder.nodeList),
-			nodeListSize: builder.nodeListSize + 1,
-			tail: A3($elm$core$Elm$JsArray$slice, notAppended, tailLen, tail)
+				builder.o),
+			l: builder.l + 1,
+			n: A3($elm$core$Elm$JsArray$slice, notAppended, tailLen, tail)
 		} : ((!notAppended) ? {
-			nodeList: A2(
+			o: A2(
 				$elm$core$List$cons,
 				$elm$core$Array$Leaf(appended),
-				builder.nodeList),
-			nodeListSize: builder.nodeListSize + 1,
-			tail: $elm$core$Elm$JsArray$empty
-		} : {nodeList: builder.nodeList, nodeListSize: builder.nodeListSize, tail: appended});
+				builder.o),
+			l: builder.l + 1,
+			n: $elm$core$Elm$JsArray$empty
+		} : {o: builder.o, l: builder.l, n: appended});
 	});
 var $elm$core$Elm$JsArray$push = _JsArray_push;
 var $elm$core$Elm$JsArray$singleton = _JsArray_singleton;
@@ -12144,7 +8708,7 @@ var $elm$core$Array$insertTailInTree = F4(
 			}
 		} else {
 			var value = A2($elm$core$Elm$JsArray$unsafeGet, pos, tree);
-			if (value.$ === 'SubTree') {
+			if (!value.$) {
 				var subTree = value.a;
 				var newSub = $elm$core$Array$SubTree(
 					A4($elm$core$Array$insertTailInTree, shift - $elm$core$Array$shiftStep, index, tail, subTree));
@@ -12217,7 +8781,7 @@ var $elm$core$Array$builderFromArray = function (_v0) {
 	var tail = _v0.d;
 	var helper = F2(
 		function (node, acc) {
-			if (node.$ === 'SubTree') {
+			if (!node.$) {
 				var subTree = node.a;
 				return A3($elm$core$Elm$JsArray$foldl, helper, acc, subTree);
 			} else {
@@ -12225,9 +8789,9 @@ var $elm$core$Array$builderFromArray = function (_v0) {
 			}
 		});
 	return {
-		nodeList: A3($elm$core$Elm$JsArray$foldl, helper, _List_Nil, tree),
-		nodeListSize: (len / $elm$core$Array$branchFactor) | 0,
-		tail: tail
+		o: A3($elm$core$Elm$JsArray$foldl, helper, _List_Nil, tree),
+		l: (len / $elm$core$Array$branchFactor) | 0,
+		n: tail
 	};
 };
 var $elm$core$Array$append = F2(
@@ -12239,7 +8803,7 @@ var $elm$core$Array$append = F2(
 		if (_Utils_cmp(bLen, $elm$core$Array$branchFactor * 4) < 1) {
 			var foldHelper = F2(
 				function (node, array) {
-					if (node.$ === 'SubTree') {
+					if (!node.$) {
 						var tree = node.a;
 						return A3($elm$core$Elm$JsArray$foldl, foldHelper, array, tree);
 					} else {
@@ -12254,7 +8818,7 @@ var $elm$core$Array$append = F2(
 		} else {
 			var foldHelper = F2(
 				function (node, builder) {
-					if (node.$ === 'SubTree') {
+					if (!node.$) {
 						var tree = node.a;
 						return A3($elm$core$Elm$JsArray$foldl, foldHelper, builder, tree);
 					} else {
@@ -12279,7 +8843,7 @@ var $elm$core$Array$setHelp = F4(
 	function (shift, index, value, tree) {
 		var pos = $elm$core$Array$bitMask & (index >>> shift);
 		var _v0 = A2($elm$core$Elm$JsArray$unsafeGet, pos, tree);
-		if (_v0.$ === 'SubTree') {
+		if (!_v0.$) {
 			var subTree = _v0.a;
 			var newSub = A4($elm$core$Array$setHelp, shift - $elm$core$Array$shiftStep, index, value, subTree);
 			return A3(
@@ -12342,7 +8906,7 @@ var $elm$core$Array$sliceLeft = F2(
 				var skipNodes = (from / $elm$core$Array$branchFactor) | 0;
 				var helper = F2(
 					function (node, acc) {
-						if (node.$ === 'SubTree') {
+						if (!node.$) {
 							var subTree = node.a;
 							return A3($elm$core$Elm$JsArray$foldr, helper, acc, subTree);
 						} else {
@@ -12364,9 +8928,9 @@ var $elm$core$Array$sliceLeft = F2(
 					var rest = nodesToInsert.b;
 					var firstSlice = from - (skipNodes * $elm$core$Array$branchFactor);
 					var initialBuilder = {
-						nodeList: _List_Nil,
-						nodeListSize: 0,
-						tail: A3(
+						o: _List_Nil,
+						l: 0,
+						n: A3(
 							$elm$core$Elm$JsArray$slice,
 							firstSlice,
 							$elm$core$Elm$JsArray$length(head),
@@ -12386,7 +8950,7 @@ var $elm$core$Array$fetchNewTail = F4(
 		while (true) {
 			var pos = $elm$core$Array$bitMask & (treeEnd >>> shift);
 			var _v0 = A2($elm$core$Elm$JsArray$unsafeGet, pos, tree);
-			if (_v0.$ === 'SubTree') {
+			if (!_v0.$) {
 				var sub = _v0.a;
 				var $temp$shift = shift - $elm$core$Array$shiftStep,
 					$temp$end = end,
@@ -12411,7 +8975,7 @@ var $elm$core$Array$hoistTree = F3(
 				return tree;
 			} else {
 				var _v0 = A2($elm$core$Elm$JsArray$unsafeGet, 0, tree);
-				if (_v0.$ === 'SubTree') {
+				if (!_v0.$) {
 					var sub = _v0.a;
 					var $temp$oldShift = oldShift - $elm$core$Array$shiftStep,
 						$temp$newShift = newShift,
@@ -12430,7 +8994,7 @@ var $elm$core$Array$sliceTree = F3(
 	function (shift, endIdx, tree) {
 		var lastPos = $elm$core$Array$bitMask & (endIdx >>> shift);
 		var _v0 = A2($elm$core$Elm$JsArray$unsafeGet, lastPos, tree);
-		if (_v0.$ === 'SubTree') {
+		if (!_v0.$) {
 			var sub = _v0.a;
 			var newSub = A3($elm$core$Array$sliceTree, shift - $elm$core$Array$shiftStep, endIdx, sub);
 			return (!$elm$core$Elm$JsArray$length(newSub)) ? A3($elm$core$Elm$JsArray$slice, 0, lastPos, tree) : A3(
@@ -12516,11 +9080,10 @@ var $elm_community$array_extra$Array$Extra$sliceUntil = function (lengthNew) {
 };
 var $author$project$RichText$Model$Node$withChildNodes = F2(
 	function (cn, node) {
-		var n = node.a;
-		return $author$project$RichText$Model$Node$Block(
-			_Utils_update(
-				n,
-				{childNodes: cn}));
+		var n = node;
+		return _Utils_update(
+			n,
+			{dl: cn});
 	});
 var $author$project$RichText$Node$replaceWithFragment = F3(
 	function (path, fragment, root) {
@@ -12531,9 +9094,9 @@ var $author$project$RichText$Node$replaceWithFragment = F3(
 				var x = path.a;
 				var _v1 = $author$project$RichText$Model$Node$childNodes(root);
 				switch (_v1.$) {
-					case 'BlockChildren':
+					case 0:
 						var a = _v1.a;
-						if (fragment.$ === 'BlockFragment') {
+						if (!fragment.$) {
 							var blocks = fragment.a;
 							var arr = $author$project$RichText$Model$Node$toBlockArray(a);
 							return $elm$core$Result$Ok(
@@ -12551,9 +9114,9 @@ var $author$project$RichText$Node$replaceWithFragment = F3(
 						} else {
 							return $elm$core$Result$Err('I cannot replace a block fragment with an inline leaf fragment');
 						}
-					case 'InlineChildren':
+					case 1:
 						var a = _v1.a;
-						if (fragment.$ === 'InlineFragment') {
+						if (fragment.$ === 1) {
 							var leaves = fragment.a;
 							var arr = $author$project$RichText$Model$Node$toInlineArray(a);
 							return $elm$core$Result$Ok(
@@ -12579,16 +9142,16 @@ var $author$project$RichText$Node$replaceWithFragment = F3(
 				var xs = path.b;
 				var _v4 = $author$project$RichText$Model$Node$childNodes(root);
 				switch (_v4.$) {
-					case 'BlockChildren':
+					case 0:
 						var a = _v4.a;
 						var arr = $author$project$RichText$Model$Node$toBlockArray(a);
 						var _v5 = A2($elm$core$Array$get, x, arr);
-						if (_v5.$ === 'Nothing') {
+						if (_v5.$ === 1) {
 							return $elm$core$Result$Err('I received an invalid path, I can\'t find a block node at the given index.');
 						} else {
 							var node = _v5.a;
 							var _v6 = A3($author$project$RichText$Node$replaceWithFragment, xs, fragment, node);
-							if (_v6.$ === 'Ok') {
+							if (!_v6.$) {
 								var n = _v6.a;
 								return $elm$core$Result$Ok(
 									A2(
@@ -12601,7 +9164,7 @@ var $author$project$RichText$Node$replaceWithFragment = F3(
 								return $elm$core$Result$Err(v);
 							}
 						}
-					case 'InlineChildren':
+					case 1:
 						return $elm$core$Result$Err('I received an invalid path, I reached an inline leaf array but I still have more path left.');
 					default:
 						return $elm$core$Result$Err('I received an invalid path, I am on a leaf node, but I still have more path left.');
@@ -12612,7 +9175,7 @@ var $author$project$RichText$Node$replaceWithFragment = F3(
 var $author$project$RichText$Node$replace = F3(
 	function (path, node, root) {
 		if (!path.b) {
-			if (node.$ === 'Block') {
+			if (!node.$) {
 				var n = node.a;
 				return $elm$core$Result$Ok(n);
 			} else {
@@ -12620,7 +9183,7 @@ var $author$project$RichText$Node$replace = F3(
 			}
 		} else {
 			var fragment = function () {
-				if (node.$ === 'Block') {
+				if (!node.$) {
 					var n = node.a;
 					return $author$project$RichText$Node$BlockFragment(
 						$elm$core$Array$fromList(
@@ -12640,7 +9203,7 @@ var $author$project$RichText$Node$replace = F3(
 var $author$project$RichText$Annotation$addAtPath = F3(
 	function (annotation, path, node) {
 		var _v0 = A2($author$project$RichText$Node$nodeAt, path, node);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('No block found at path');
 		} else {
 			var n = _v0.a;
@@ -12655,7 +9218,7 @@ var $author$project$RichText$Internal$Constants$selection = '__selection__';
 var $author$project$RichText$Annotation$selection = $author$project$RichText$Internal$Constants$selection;
 var $elm$core$Result$withDefault = F2(
 	function (def, result) {
-		if (result.$ === 'Ok') {
+		if (!result.$) {
 			var a = result.a;
 			return a;
 		} else {
@@ -12670,8 +9233,8 @@ var $author$project$RichText$Annotation$addSelectionAnnotationAtPath = F2(
 			A3($author$project$RichText$Annotation$addAtPath, $author$project$RichText$Annotation$selection, nodePath, node));
 	});
 var $author$project$RichText$Model$Selection$focusNode = function (selection) {
-	var c = selection.a;
-	return c.focusNode;
+	var c = selection;
+	return c.ah;
 };
 var $author$project$RichText$Annotation$annotateSelection = F2(
 	function (selection_, node) {
@@ -12686,7 +9249,7 @@ var $author$project$RichText$Annotation$annotateSelection = F2(
 var $author$project$RichText$Node$map = F2(
 	function (func, node) {
 		var applied = func(node);
-		if (applied.$ === 'Block') {
+		if (!applied.$) {
 			var blockNode = applied.a;
 			return $author$project$RichText$Node$Block(
 				A2(
@@ -12694,7 +9257,7 @@ var $author$project$RichText$Node$map = F2(
 					function () {
 						var _v1 = $author$project$RichText$Model$Node$childNodes(blockNode);
 						switch (_v1.$) {
-							case 'BlockChildren':
+							case 0:
 								var a = _v1.a;
 								return $author$project$RichText$Model$Node$blockChildren(
 									A2(
@@ -12704,7 +9267,7 @@ var $author$project$RichText$Node$map = F2(
 												$author$project$RichText$Node$map,
 												func,
 												$author$project$RichText$Node$Block(v));
-											if (_v2.$ === 'Block') {
+											if (!_v2.$) {
 												var b = _v2.a;
 												return b;
 											} else {
@@ -12712,7 +9275,7 @@ var $author$project$RichText$Node$map = F2(
 											}
 										},
 										$author$project$RichText$Model$Node$toBlockArray(a)));
-							case 'InlineChildren':
+							case 1:
 								var a = _v1.a;
 								return $author$project$RichText$Model$Node$inlineChildren(
 									A2(
@@ -12722,7 +9285,7 @@ var $author$project$RichText$Node$map = F2(
 												$author$project$RichText$Node$map,
 												func,
 												$author$project$RichText$Node$Inline(v));
-											if (_v3.$ === 'Inline') {
+											if (_v3.$ === 1) {
 												var b = _v3.a;
 												return b;
 											} else {
@@ -12742,9 +9305,8 @@ var $author$project$RichText$Node$map = F2(
 	});
 var $elm$core$Set$remove = F2(
 	function (key, _v0) {
-		var dict = _v0.a;
-		return $elm$core$Set$Set_elm_builtin(
-			A2($elm$core$Dict$remove, key, dict));
+		var dict = _v0;
+		return A2($elm$core$Dict$remove, key, dict);
 	});
 var $author$project$RichText$Annotation$remove = $author$project$RichText$Annotation$toggle($elm$core$Set$remove);
 var $author$project$RichText$Annotation$clear = F2(
@@ -12753,7 +9315,7 @@ var $author$project$RichText$Annotation$clear = F2(
 			$author$project$RichText$Node$map,
 			$author$project$RichText$Annotation$remove(annotation),
 			$author$project$RichText$Node$Block(root));
-		if (_v0.$ === 'Block') {
+		if (!_v0.$) {
 			var bn = _v0.a;
 			return bn;
 		} else {
@@ -12896,11 +9458,11 @@ var $author$project$RichText$Model$Node$parent = function (path) {
 var $author$project$RichText$Node$findClosestBlockPath = F2(
 	function (path, node) {
 		var _v0 = A2($author$project$RichText$Node$nodeAt, path, node);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return _List_Nil;
 		} else {
 			var n = _v0.a;
-			if (n.$ === 'Block') {
+			if (!n.$) {
 				return path;
 			} else {
 				return $author$project$RichText$Model$Node$parent(path);
@@ -12908,19 +9470,19 @@ var $author$project$RichText$Node$findClosestBlockPath = F2(
 		}
 	});
 var $author$project$RichText$Model$Selection$focusOffset = function (selection) {
-	var c = selection.a;
-	return c.focusOffset;
+	var c = selection;
+	return c.Q;
 };
 var $elm$core$Basics$not = _Basics_not;
 var $author$project$RichText$Node$last = function (node) {
 	var _v0 = $author$project$RichText$Model$Node$childNodes(node);
 	switch (_v0.$) {
-		case 'BlockChildren':
+		case 0:
 			var a = _v0.a;
 			var arr = $author$project$RichText$Model$Node$toBlockArray(a);
 			var lastIndex = $elm$core$Array$length(arr) - 1;
 			var _v1 = A2($elm$core$Array$get, lastIndex, arr);
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return _Utils_Tuple2(
 					_List_Nil,
 					$author$project$RichText$Node$Block(node));
@@ -12933,12 +9495,12 @@ var $author$project$RichText$Node$last = function (node) {
 					A2($elm$core$List$cons, lastIndex, p),
 					n);
 			}
-		case 'InlineChildren':
+		case 1:
 			var a = _v0.a;
 			var array = $author$project$RichText$Model$Node$toInlineArray(a);
 			var lastIndex = $elm$core$Array$length(array) - 1;
 			var _v3 = A2($elm$core$Array$get, lastIndex, array);
-			if (_v3.$ === 'Nothing') {
+			if (_v3.$ === 1) {
 				return _Utils_Tuple2(
 					_List_Nil,
 					$author$project$RichText$Node$Block(node));
@@ -12965,13 +9527,13 @@ var $author$project$RichText$Node$previous = F2(
 				var prevIndex = x - 1;
 				var _v1 = $author$project$RichText$Model$Node$childNodes(node);
 				switch (_v1.$) {
-					case 'BlockChildren':
+					case 0:
 						var a = _v1.a;
 						var _v2 = A2(
 							$elm$core$Array$get,
 							prevIndex,
 							$author$project$RichText$Model$Node$toBlockArray(a));
-						if (_v2.$ === 'Nothing') {
+						if (_v2.$ === 1) {
 							return $elm$core$Maybe$Just(
 								_Utils_Tuple2(
 									_List_Nil,
@@ -12986,13 +9548,13 @@ var $author$project$RichText$Node$previous = F2(
 									A2($elm$core$List$cons, prevIndex, p),
 									n));
 						}
-					case 'InlineChildren':
+					case 1:
 						var a = _v1.a;
 						var _v4 = A2(
 							$elm$core$Array$get,
 							prevIndex,
 							$author$project$RichText$Model$Node$toInlineArray(a));
-						if (_v4.$ === 'Nothing') {
+						if (_v4.$ === 1) {
 							return $elm$core$Maybe$Just(
 								_Utils_Tuple2(
 									_List_Nil,
@@ -13016,18 +9578,18 @@ var $author$project$RichText$Node$previous = F2(
 				var xs = path.b;
 				var _v5 = $author$project$RichText$Model$Node$childNodes(node);
 				switch (_v5.$) {
-					case 'BlockChildren':
+					case 0:
 						var a = _v5.a;
 						var _v6 = A2(
 							$elm$core$Array$get,
 							x,
 							$author$project$RichText$Model$Node$toBlockArray(a));
-						if (_v6.$ === 'Nothing') {
+						if (_v6.$ === 1) {
 							return $elm$core$Maybe$Nothing;
 						} else {
 							var b = _v6.a;
 							var _v7 = A2($author$project$RichText$Node$previous, xs, b);
-							if (_v7.$ === 'Nothing') {
+							if (_v7.$ === 1) {
 								return $elm$core$Maybe$Just(
 									_Utils_Tuple2(
 										_List_fromArray(
@@ -13043,13 +9605,13 @@ var $author$project$RichText$Node$previous = F2(
 										n));
 							}
 						}
-					case 'InlineChildren':
+					case 1:
 						var a = _v5.a;
 						var _v9 = A2(
 							$elm$core$Array$get,
 							x - 1,
 							$author$project$RichText$Model$Node$toInlineArray(a));
-						if (_v9.$ === 'Nothing') {
+						if (_v9.$ === 1) {
 							return $elm$core$Maybe$Just(
 								_Utils_Tuple2(
 									_List_Nil,
@@ -13069,17 +9631,17 @@ var $author$project$RichText$Node$previous = F2(
 		}
 	});
 var $author$project$RichText$Model$State$selection = function (st) {
-	var s = st.a;
-	return s.selection;
+	var s = st;
+	return s.cR;
 };
 var $author$project$RichText$Annotation$fromNode = function (node) {
-	if (node.$ === 'Block') {
+	if (!node.$) {
 		var blockNode = node.a;
 		return $author$project$RichText$Model$Element$annotations(
 			$author$project$RichText$Model$Node$element(blockNode));
 	} else {
 		var inlineLeaf = node.a;
-		if (inlineLeaf.$ === 'InlineElement') {
+		if (!inlineLeaf.$) {
 			var p = inlineLeaf.a;
 			return $author$project$RichText$Model$Element$annotations(
 				$author$project$RichText$Model$InlineElement$element(p));
@@ -13095,7 +9657,7 @@ var $elm$core$Array$foldl = F3(
 		var tail = _v0.d;
 		var helper = F2(
 			function (node, acc) {
-				if (node.$ === 'SubTree') {
+				if (!node.$) {
 					var subTree = node.a;
 					return A3($elm$core$Elm$JsArray$foldl, helper, acc, subTree);
 				} else {
@@ -13116,9 +9678,9 @@ var $elm$core$Array$indexedMap = F2(
 		var tree = _v0.c;
 		var tail = _v0.d;
 		var initialBuilder = {
-			nodeList: _List_Nil,
-			nodeListSize: 0,
-			tail: A3(
+			o: _List_Nil,
+			l: 0,
+			n: A3(
 				$elm$core$Elm$JsArray$indexedMap,
 				func,
 				$elm$core$Array$tailIndex(len),
@@ -13126,18 +9688,18 @@ var $elm$core$Array$indexedMap = F2(
 		};
 		var helper = F2(
 			function (node, builder) {
-				if (node.$ === 'SubTree') {
+				if (!node.$) {
 					var subTree = node.a;
 					return A3($elm$core$Elm$JsArray$foldl, helper, builder, subTree);
 				} else {
 					var leaf = node.a;
-					var offset = builder.nodeListSize * $elm$core$Array$branchFactor;
+					var offset = builder.l * $elm$core$Array$branchFactor;
 					var mappedLeaf = $elm$core$Array$Leaf(
 						A3($elm$core$Elm$JsArray$indexedMap, func, offset, leaf));
 					return {
-						nodeList: A2($elm$core$List$cons, mappedLeaf, builder.nodeList),
-						nodeListSize: builder.nodeListSize + 1,
-						tail: builder.tail
+						o: A2($elm$core$List$cons, mappedLeaf, builder.o),
+						l: builder.l + 1,
+						n: builder.n
 					};
 				}
 			});
@@ -13148,7 +9710,7 @@ var $elm$core$Array$indexedMap = F2(
 	});
 var $author$project$RichText$Node$indexedFoldlRec = F4(
 	function (path, func, acc, node) {
-		if (node.$ === 'Block') {
+		if (!node.$) {
 			var blockNode = node.a;
 			var children = A2(
 				$elm$core$Array$indexedMap,
@@ -13156,9 +9718,9 @@ var $author$project$RichText$Node$indexedFoldlRec = F4(
 				function () {
 					var _v2 = $author$project$RichText$Model$Node$childNodes(blockNode);
 					switch (_v2.$) {
-						case 'Leaf':
+						case 2:
 							return $elm$core$Array$empty;
-						case 'InlineChildren':
+						case 1:
 							var a = _v2.a;
 							return A2(
 								$elm$core$Array$map,
@@ -13198,7 +9760,7 @@ var $author$project$RichText$Node$indexedFoldl = $author$project$RichText$Node$i
 var $elm$core$Dict$member = F2(
 	function (key, dict) {
 		var _v0 = A2($elm$core$Dict$get, key, dict);
-		if (_v0.$ === 'Just') {
+		if (!_v0.$) {
 			return true;
 		} else {
 			return false;
@@ -13206,7 +9768,7 @@ var $elm$core$Dict$member = F2(
 	});
 var $elm$core$Set$member = F2(
 	function (key, _v0) {
-		var dict = _v0.a;
+		var dict = _v0;
 		return A2($elm$core$Dict$member, key, dict);
 	});
 var $author$project$RichText$Annotation$findPathsWithAnnotation = F2(
@@ -13241,18 +9803,15 @@ var $author$project$RichText$Annotation$findNodeRangeFromSelectionAnnotations = 
 		}
 	}
 };
-var $author$project$RichText$Model$Selection$Selection = function (a) {
-	return {$: 'Selection', a: a};
-};
+var $author$project$RichText$Model$Selection$Selection = $elm$core$Basics$identity;
 var $author$project$RichText$Model$Selection$range = F4(
 	function (aNode, aOffset, fNode, fOffset) {
-		return $author$project$RichText$Model$Selection$Selection(
-			{anchorNode: aNode, anchorOffset: aOffset, focusNode: fNode, focusOffset: fOffset});
+		return {af: aNode, P: aOffset, ah: fNode, Q: fOffset};
 	});
 var $author$project$RichText$Annotation$selectionFromAnnotations = F3(
 	function (node, anchorOffset, focusOffset) {
 		var _v0 = $author$project$RichText$Annotation$findNodeRangeFromSelectionAnnotations(node);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Maybe$Nothing;
 		} else {
 			var _v1 = _v0.a;
@@ -13270,18 +9829,18 @@ var $author$project$RichText$Node$findAncestor = F3(
 			var x = path.a;
 			var xs = path.b;
 			var _v1 = $author$project$RichText$Model$Node$childNodes(node);
-			if (_v1.$ === 'BlockChildren') {
+			if (!_v1.$) {
 				var a = _v1.a;
 				var _v2 = A2(
 					$elm$core$Array$get,
 					x,
 					$author$project$RichText$Model$Node$toBlockArray(a));
-				if (_v2.$ === 'Nothing') {
+				if (_v2.$ === 1) {
 					return $elm$core$Maybe$Nothing;
 				} else {
 					var childNode = _v2.a;
 					var _v3 = A3($author$project$RichText$Node$findAncestor, pred, xs, childNode);
-					if (_v3.$ === 'Nothing') {
+					if (_v3.$ === 1) {
 						return pred(node) ? $elm$core$Maybe$Just(
 							_Utils_Tuple2(_List_Nil, node)) : $elm$core$Maybe$Nothing;
 					} else {
@@ -13303,15 +9862,15 @@ var $author$project$RichText$Node$findAncestor = F3(
 var $author$project$RichText$Node$findTextBlockNodeAncestor = $author$project$RichText$Node$findAncestor(
 	function (n) {
 		var _v0 = $author$project$RichText$Model$Node$childNodes(n);
-		if (_v0.$ === 'InlineChildren') {
+		if (_v0.$ === 1) {
 			return true;
 		} else {
 			return false;
 		}
 	});
 var $author$project$RichText$Model$Selection$isCollapsed = function (selection) {
-	var c = selection.a;
-	return _Utils_eq(c.anchorOffset, c.focusOffset) && _Utils_eq(c.anchorNode, c.focusNode);
+	var c = selection;
+	return _Utils_eq(c.P, c.Q) && _Utils_eq(c.af, c.ah);
 };
 var $elm$core$Array$isEmpty = function (_v0) {
 	var len = _v0.a;
@@ -13345,17 +9904,17 @@ var $author$project$RichText$Node$selectionIsBeginningOfTextBlock = F2(
 				$author$project$RichText$Node$findTextBlockNodeAncestor,
 				$author$project$RichText$Model$Selection$anchorNode(selection),
 				root);
-			if (_v0.$ === 'Nothing') {
+			if (_v0.$ === 1) {
 				return false;
 			} else {
 				var _v1 = _v0.a;
 				var n = _v1.b;
 				var _v2 = $author$project$RichText$Model$Node$childNodes(n);
-				if (_v2.$ === 'InlineChildren') {
+				if (_v2.$ === 1) {
 					var a = _v2.a;
 					var _v3 = $elm_community$list_extra$List$Extra$last(
 						$author$project$RichText$Model$Selection$anchorNode(selection));
-					if (_v3.$ === 'Nothing') {
+					if (_v3.$ === 1) {
 						return false;
 					} else {
 						var i = _v3.a;
@@ -13370,23 +9929,21 @@ var $author$project$RichText$Node$selectionIsBeginningOfTextBlock = F2(
 	});
 var $author$project$RichText$Model$State$withRoot = F2(
 	function (node, st) {
-		var s = st.a;
-		return $author$project$RichText$Model$State$State(
-			_Utils_update(
-				s,
-				{root: node}));
+		var s = st;
+		return _Utils_update(
+			s,
+			{eg: node});
 	});
 var $author$project$RichText$Model$State$withSelection = F2(
 	function (sel, st) {
-		var s = st.a;
-		return $author$project$RichText$Model$State$State(
-			_Utils_update(
-				s,
-				{selection: sel}));
+		var s = st;
+		return _Utils_update(
+			s,
+			{cR: sel});
 	});
 var $author$project$RichText$Commands$backspaceBlock = function (editorState) {
 	var _v0 = $author$project$RichText$Model$State$selection(editorState);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return $elm$core$Result$Err('Nothing is selected');
 	} else {
 		var selection = _v0.a;
@@ -13404,16 +9961,16 @@ var $author$project$RichText$Commands$backspaceBlock = function (editorState) {
 				$author$project$RichText$Node$previous,
 				blockPath,
 				$author$project$RichText$Model$State$root(editorState));
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return $elm$core$Result$Err('There is no previous element to backspace');
 			} else {
 				var _v2 = _v1.a;
 				var path = _v2.a;
 				var node = _v2.b;
-				if (node.$ === 'Block') {
+				if (!node.$) {
 					var bn = node.a;
 					var _v4 = $author$project$RichText$Model$Node$childNodes(bn);
-					if (_v4.$ === 'Leaf') {
+					if (_v4.$ === 2) {
 						var markedRoot = A2(
 							$author$project$RichText$Annotation$annotateSelection,
 							selection,
@@ -13423,7 +9980,7 @@ var $author$project$RichText$Commands$backspaceBlock = function (editorState) {
 							path,
 							$author$project$RichText$Node$BlockFragment($elm$core$Array$empty),
 							markedRoot);
-						if (_v5.$ === 'Err') {
+						if (_v5.$ === 1) {
 							var s = _v5.a;
 							return $elm$core$Result$Err(s);
 						} else {
@@ -13461,7 +10018,7 @@ var $author$project$RichText$Model$Selection$caret = F2(
 	});
 var $author$project$RichText$Model$Node$decrement = function (np) {
 	var _v0 = $elm_community$list_extra$List$Extra$last(np);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return _List_Nil;
 	} else {
 		var i = _v0.a;
@@ -13476,7 +10033,7 @@ var $author$project$RichText$Model$Node$decrement = function (np) {
 };
 var $author$project$RichText$Commands$backspaceInlineElement = function (editorState) {
 	var _v0 = $author$project$RichText$Model$State$selection(editorState);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return $elm$core$Result$Err('Nothing is selected');
 	} else {
 		var selection = _v0.a;
@@ -13492,19 +10049,19 @@ var $author$project$RichText$Commands$backspaceInlineElement = function (editorS
 					$author$project$RichText$Node$nodeAt,
 					decrementedPath,
 					$author$project$RichText$Model$State$root(editorState));
-				if (_v1.$ === 'Nothing') {
+				if (_v1.$ === 1) {
 					return $elm$core$Result$Err('There is no previous inline element');
 				} else {
 					var node = _v1.a;
-					if (node.$ === 'Inline') {
+					if (node.$ === 1) {
 						var il = node.a;
-						if (il.$ === 'InlineElement') {
+						if (!il.$) {
 							var _v4 = A3(
 								$author$project$RichText$Node$replaceWithFragment,
 								decrementedPath,
 								$author$project$RichText$Node$InlineFragment($elm$core$Array$empty),
 								$author$project$RichText$Model$State$root(editorState));
-							if (_v4.$ === 'Err') {
+							if (_v4.$ === 1) {
 								var s = _v4.a;
 								return $elm$core$Result$Err(s);
 							} else {
@@ -13533,7 +10090,7 @@ var $author$project$RichText$Commands$backspaceInlineElement = function (editorS
 var $author$project$RichText$Node$findNodeFrom = F4(
 	function (iterator, pred, path, node) {
 		var _v2 = A2($author$project$RichText$Node$nodeAt, path, node);
-		if (_v2.$ === 'Just') {
+		if (!_v2.$) {
 			var n = _v2.a;
 			return A2(pred, path, n) ? $elm$core$Maybe$Just(
 				_Utils_Tuple2(path, n)) : A4($author$project$RichText$Node$findNodeFromExclusive, iterator, pred, path, node);
@@ -13544,7 +10101,7 @@ var $author$project$RichText$Node$findNodeFrom = F4(
 var $author$project$RichText$Node$findNodeFromExclusive = F4(
 	function (iterator, pred, path, node) {
 		var _v0 = A2(iterator, path, node);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Maybe$Nothing;
 		} else {
 			var _v1 = _v0.a;
@@ -13555,10 +10112,10 @@ var $author$project$RichText$Node$findNodeFromExclusive = F4(
 var $author$project$RichText$Node$findBackwardFromExclusive = $author$project$RichText$Node$findNodeFromExclusive($author$project$RichText$Node$previous);
 var $author$project$RichText$Commands$isTextBlock = F2(
 	function (_v0, node) {
-		if (node.$ === 'Block') {
+		if (!node.$) {
 			var bn = node.a;
 			var _v2 = $author$project$RichText$Model$Node$childNodes(bn);
-			if (_v2.$ === 'InlineChildren') {
+			if (_v2.$ === 1) {
 				return true;
 			} else {
 				return false;
@@ -13570,13 +10127,13 @@ var $author$project$RichText$Commands$isTextBlock = F2(
 var $author$project$RichText$Commands$findTextBlock = F3(
 	function (findFunc, path, node) {
 		var _v0 = A3(findFunc, $author$project$RichText$Commands$isTextBlock, path, node);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Maybe$Nothing;
 		} else {
 			var _v1 = _v0.a;
 			var p = _v1.a;
 			var n = _v1.b;
-			if (n.$ === 'Block') {
+			if (!n.$) {
 				var bn = n.a;
 				return $elm$core$Maybe$Just(
 					_Utils_Tuple2(p, bn));
@@ -13591,13 +10148,13 @@ var $author$project$RichText$Node$next = F2(
 		if (!path.b) {
 			var _v1 = $author$project$RichText$Model$Node$childNodes(node);
 			switch (_v1.$) {
-				case 'BlockChildren':
+				case 0:
 					var a = _v1.a;
 					var _v2 = A2(
 						$elm$core$Array$get,
 						0,
 						$author$project$RichText$Model$Node$toBlockArray(a));
-					if (_v2.$ === 'Nothing') {
+					if (_v2.$ === 1) {
 						return $elm$core$Maybe$Nothing;
 					} else {
 						var b = _v2.a;
@@ -13607,13 +10164,13 @@ var $author$project$RichText$Node$next = F2(
 									[0]),
 								$author$project$RichText$Node$Block(b)));
 					}
-				case 'InlineChildren':
+				case 1:
 					var a = _v1.a;
 					var _v3 = A2(
 						$elm$core$Array$get,
 						0,
 						$author$project$RichText$Model$Node$toInlineArray(a));
-					if (_v3.$ === 'Nothing') {
+					if (_v3.$ === 1) {
 						return $elm$core$Maybe$Nothing;
 					} else {
 						var b = _v3.a;
@@ -13631,18 +10188,18 @@ var $author$project$RichText$Node$next = F2(
 			var xs = path.b;
 			var _v4 = $author$project$RichText$Model$Node$childNodes(node);
 			switch (_v4.$) {
-				case 'BlockChildren':
+				case 0:
 					var a = _v4.a;
 					var arr = $author$project$RichText$Model$Node$toBlockArray(a);
 					var _v5 = A2($elm$core$Array$get, x, arr);
-					if (_v5.$ === 'Nothing') {
+					if (_v5.$ === 1) {
 						return $elm$core$Maybe$Nothing;
 					} else {
 						var b = _v5.a;
 						var _v6 = A2($author$project$RichText$Node$next, xs, b);
-						if (_v6.$ === 'Nothing') {
+						if (_v6.$ === 1) {
 							var _v7 = A2($elm$core$Array$get, x + 1, arr);
-							if (_v7.$ === 'Nothing') {
+							if (_v7.$ === 1) {
 								return $elm$core$Maybe$Nothing;
 							} else {
 								var bNext = _v7.a;
@@ -13662,13 +10219,13 @@ var $author$project$RichText$Node$next = F2(
 									n));
 						}
 					}
-				case 'InlineChildren':
+				case 1:
 					var a = _v4.a;
 					var _v9 = A2(
 						$elm$core$Array$get,
 						x + 1,
 						$author$project$RichText$Model$Node$toInlineArray(a));
-					if (_v9.$ === 'Nothing') {
+					if (_v9.$ === 1) {
 						return $elm$core$Maybe$Nothing;
 					} else {
 						var b = _v9.a;
@@ -13689,10 +10246,10 @@ var $author$project$RichText$Node$joinBlocks = F2(
 	function (b1, b2) {
 		var _v0 = $author$project$RichText$Model$Node$childNodes(b1);
 		switch (_v0.$) {
-			case 'BlockChildren':
+			case 0:
 				var a1 = _v0.a;
 				var _v1 = $author$project$RichText$Model$Node$childNodes(b2);
-				if (_v1.$ === 'BlockChildren') {
+				if (!_v1.$) {
 					var a2 = _v1.a;
 					return $elm$core$Maybe$Just(
 						A2(
@@ -13706,10 +10263,10 @@ var $author$project$RichText$Node$joinBlocks = F2(
 				} else {
 					return $elm$core$Maybe$Nothing;
 				}
-			case 'InlineChildren':
+			case 1:
 				var a1 = _v0.a;
 				var _v2 = $author$project$RichText$Model$Node$childNodes(b2);
-				if (_v2.$ === 'InlineChildren') {
+				if (_v2.$ === 1) {
 					var a2 = _v2.a;
 					return $elm$core$Maybe$Just(
 						A2(
@@ -13759,7 +10316,7 @@ var $author$project$RichText$Node$removeNodeAndEmptyParents = F2(
 				var x = path.a;
 				var _v1 = $author$project$RichText$Model$Node$childNodes(node);
 				switch (_v1.$) {
-					case 'BlockChildren':
+					case 0:
 						var a = _v1.a;
 						return A2(
 							$author$project$RichText$Model$Node$withChildNodes,
@@ -13769,7 +10326,7 @@ var $author$project$RichText$Node$removeNodeAndEmptyParents = F2(
 									x,
 									$author$project$RichText$Model$Node$toBlockArray(a))),
 							node);
-					case 'InlineChildren':
+					case 1:
 						var a = _v1.a;
 						return A2(
 							$author$project$RichText$Model$Node$withChildNodes,
@@ -13787,18 +10344,18 @@ var $author$project$RichText$Node$removeNodeAndEmptyParents = F2(
 				var xs = path.b;
 				var _v2 = $author$project$RichText$Model$Node$childNodes(node);
 				switch (_v2.$) {
-					case 'BlockChildren':
+					case 0:
 						var a = _v2.a;
 						var arr = $author$project$RichText$Model$Node$toBlockArray(a);
 						var _v3 = A2($elm$core$Array$get, x, arr);
-						if (_v3.$ === 'Nothing') {
+						if (_v3.$ === 1) {
 							return node;
 						} else {
 							var n = _v3.a;
 							var newNode = A2($author$project$RichText$Node$removeNodeAndEmptyParents, xs, n);
 							var _v4 = $author$project$RichText$Model$Node$childNodes(newNode);
 							switch (_v4.$) {
-								case 'BlockChildren':
+								case 0:
 									var newNodeChildren = _v4.a;
 									var newChildNodes = $author$project$RichText$Model$Node$toBlockArray(newNodeChildren);
 									return $elm$core$Array$isEmpty(newChildNodes) ? A2(
@@ -13810,7 +10367,7 @@ var $author$project$RichText$Node$removeNodeAndEmptyParents = F2(
 										$author$project$RichText$Model$Node$blockChildren(
 											A3($elm$core$Array$set, x, newNode, arr)),
 										node);
-								case 'InlineChildren':
+								case 1:
 									var newNodeChildren = _v4.a;
 									var newChildNodes = $author$project$RichText$Model$Node$toInlineArray(newNodeChildren);
 									return $elm$core$Array$isEmpty(newChildNodes) ? A2(
@@ -13830,7 +10387,7 @@ var $author$project$RichText$Node$removeNodeAndEmptyParents = F2(
 										node);
 							}
 						}
-					case 'InlineChildren':
+					case 1:
 						return node;
 					default:
 						return node;
@@ -13847,17 +10404,17 @@ var $author$project$RichText$Node$selectionIsEndOfTextBlock = F2(
 				$author$project$RichText$Node$findTextBlockNodeAncestor,
 				$author$project$RichText$Model$Selection$anchorNode(selection),
 				root);
-			if (_v0.$ === 'Nothing') {
+			if (_v0.$ === 1) {
 				return false;
 			} else {
 				var _v1 = _v0.a;
 				var n = _v1.b;
 				var _v2 = $author$project$RichText$Model$Node$childNodes(n);
-				if (_v2.$ === 'InlineChildren') {
+				if (_v2.$ === 1) {
 					var a = _v2.a;
 					var _v3 = $elm_community$list_extra$List$Extra$last(
 						$author$project$RichText$Model$Selection$anchorNode(selection));
-					if (_v3.$ === 'Nothing') {
+					if (_v3.$ === 1) {
 						return false;
 					} else {
 						var i = _v3.a;
@@ -13871,11 +10428,11 @@ var $author$project$RichText$Node$selectionIsEndOfTextBlock = F2(
 								$elm$core$Array$get,
 								i,
 								$author$project$RichText$Model$Node$toInlineArray(a));
-							if (_v4.$ === 'Nothing') {
+							if (_v4.$ === 1) {
 								return false;
 							} else {
 								var leaf = _v4.a;
-								if (leaf.$ === 'Text') {
+								if (leaf.$ === 1) {
 									var tl = leaf.a;
 									return _Utils_eq(
 										$elm$core$String$length(
@@ -13901,7 +10458,7 @@ var $author$project$RichText$Model$Node$toString = function (nodePath) {
 };
 var $author$project$RichText$Commands$joinForward = function (editorState) {
 	var _v0 = $author$project$RichText$Model$State$selection(editorState);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return $elm$core$Result$Err('Nothing is selected');
 	} else {
 		var selection = _v0.a;
@@ -13915,7 +10472,7 @@ var $author$project$RichText$Commands$joinForward = function (editorState) {
 				$author$project$RichText$Node$findTextBlockNodeAncestor,
 				$author$project$RichText$Model$Selection$anchorNode(selection),
 				$author$project$RichText$Model$State$root(editorState));
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return $elm$core$Result$Err('The selection has no text block ancestor');
 			} else {
 				var _v2 = _v1.a;
@@ -13925,14 +10482,14 @@ var $author$project$RichText$Commands$joinForward = function (editorState) {
 					$author$project$RichText$Commands$findNextTextBlock,
 					$author$project$RichText$Model$Selection$anchorNode(selection),
 					$author$project$RichText$Model$State$root(editorState));
-				if (_v3.$ === 'Nothing') {
+				if (_v3.$ === 1) {
 					return $elm$core$Result$Err('There is no text block I can join forward with');
 				} else {
 					var _v4 = _v3.a;
 					var p2 = _v4.a;
 					var n2 = _v4.b;
 					var _v5 = A2($author$project$RichText$Node$joinBlocks, n1, n2);
-					if (_v5.$ === 'Nothing') {
+					if (_v5.$ === 1) {
 						return $elm$core$Result$Err(
 							'I could not join these two blocks at' + ($author$project$RichText$Model$Node$toString(p1) + (' ,' + $author$project$RichText$Model$Node$toString(p2))));
 					} else {
@@ -13946,7 +10503,7 @@ var $author$project$RichText$Commands$joinForward = function (editorState) {
 							p1,
 							$author$project$RichText$Node$Block(newBlock),
 							removed);
-						if (_v6.$ === 'Err') {
+						if (_v6.$ === 1) {
 							var e = _v6.a;
 							return $elm$core$Result$Err(e);
 						} else {
@@ -13962,7 +10519,7 @@ var $author$project$RichText$Commands$joinForward = function (editorState) {
 };
 var $author$project$RichText$Commands$joinBackward = function (editorState) {
 	var _v0 = $author$project$RichText$Model$State$selection(editorState);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return $elm$core$Result$Err('Nothing is selected');
 	} else {
 		var selection = _v0.a;
@@ -13976,7 +10533,7 @@ var $author$project$RichText$Commands$joinBackward = function (editorState) {
 				$author$project$RichText$Node$findTextBlockNodeAncestor,
 				$author$project$RichText$Model$Selection$anchorNode(selection),
 				$author$project$RichText$Model$State$root(editorState));
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return $elm$core$Result$Err('There is no text block at the selection');
 			} else {
 				var _v2 = _v1.a;
@@ -13985,26 +10542,26 @@ var $author$project$RichText$Commands$joinBackward = function (editorState) {
 					$author$project$RichText$Commands$findPreviousTextBlock,
 					textBlockPath,
 					$author$project$RichText$Model$State$root(editorState));
-				if (_v3.$ === 'Nothing') {
+				if (_v3.$ === 1) {
 					return $elm$core$Result$Err('There is no text block I can join backward with');
 				} else {
 					var _v4 = _v3.a;
 					var p = _v4.a;
 					var n = _v4.b;
 					var _v5 = $author$project$RichText$Model$Node$childNodes(n);
-					if (_v5.$ === 'InlineChildren') {
+					if (_v5.$ === 1) {
 						var a = _v5.a;
 						var array = $author$project$RichText$Model$Node$toInlineArray(a);
 						var _v6 = A2(
 							$elm$core$Array$get,
 							$elm$core$Array$length(array) - 1,
 							array);
-						if (_v6.$ === 'Nothing') {
+						if (_v6.$ === 1) {
 							return $elm$core$Result$Err('There must be at least one element in the inline node to join with');
 						} else {
 							var leaf = _v6.a;
 							var newSelection = function () {
-								if (leaf.$ === 'Text') {
+								if (leaf.$ === 1) {
 									var tl = leaf.a;
 									return A2(
 										$author$project$RichText$Model$Selection$caret,
@@ -14045,7 +10602,7 @@ var $author$project$RichText$Commands$joinBackward = function (editorState) {
 var $author$project$RichText$Node$findForwardFrom = $author$project$RichText$Node$findNodeFrom($author$project$RichText$Node$next);
 var $author$project$RichText$Model$Node$increment = function (np) {
 	var _v0 = $elm_community$list_extra$List$Extra$last(np);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return _List_Nil;
 	} else {
 		var i = _v0.a;
@@ -14060,7 +10617,7 @@ var $author$project$RichText$Model$Node$increment = function (np) {
 };
 var $author$project$RichText$Annotation$selectable = $author$project$RichText$Internal$Constants$selectable;
 var $author$project$RichText$Annotation$isSelectable = function (node) {
-	if (node.$ === 'Block') {
+	if (!node.$) {
 		var bn = node.a;
 		return A2(
 			$elm$core$Set$member,
@@ -14069,7 +10626,7 @@ var $author$project$RichText$Annotation$isSelectable = function (node) {
 				$author$project$RichText$Model$Node$element(bn)));
 	} else {
 		var ln = node.a;
-		if (ln.$ === 'Text') {
+		if (ln.$ === 1) {
 			return true;
 		} else {
 			var l = ln.a;
@@ -14086,26 +10643,23 @@ var $elm$core$Basics$min = F2(
 		return (_Utils_cmp(x, y) < 0) ? x : y;
 	});
 var $author$project$RichText$Model$Selection$normalize = function (selection) {
-	var c = selection.a;
-	return $author$project$RichText$Model$Selection$Selection(
-		function () {
-			var _v1 = A2($elm$core$Basics$compare, c.anchorNode, c.focusNode);
-			switch (_v1.$) {
-				case 'EQ':
-					return _Utils_update(
-						c,
-						{
-							anchorOffset: A2($elm$core$Basics$min, c.focusOffset, c.anchorOffset),
-							focusOffset: A2($elm$core$Basics$max, c.focusOffset, c.anchorOffset)
-						});
-				case 'LT':
-					return c;
-				default:
-					return _Utils_update(
-						c,
-						{anchorNode: c.focusNode, anchorOffset: c.focusOffset, focusNode: c.anchorNode, focusOffset: c.anchorOffset});
-			}
-		}());
+	var c = selection;
+	var _v1 = A2($elm$core$Basics$compare, c.af, c.ah);
+	switch (_v1) {
+		case 1:
+			return _Utils_update(
+				c,
+				{
+					P: A2($elm$core$Basics$min, c.Q, c.P),
+					Q: A2($elm$core$Basics$max, c.Q, c.P)
+				});
+		case 0:
+			return c;
+		default:
+			return _Utils_update(
+				c,
+				{af: c.ah, P: c.Q, ah: c.af, Q: c.P});
+	}
 };
 var $elm$core$List$tail = function (list) {
 	if (list.b) {
@@ -14127,11 +10681,11 @@ var $author$project$RichText$Node$removeInRange = F3(
 			function () {
 				var _v5 = $author$project$RichText$Model$Node$childNodes(node);
 				switch (_v5.$) {
-					case 'BlockChildren':
+					case 0:
 						var a = _v5.a;
 						return $elm$core$Array$length(
 							$author$project$RichText$Model$Node$toBlockArray(a));
-					case 'InlineChildren':
+					case 1:
 						var a = _v5.a;
 						return $elm$core$Array$length(
 							$author$project$RichText$Model$Node$toInlineArray(a));
@@ -14154,7 +10708,7 @@ var $author$project$RichText$Node$removeInRange = F3(
 			if (_Utils_eq(startIndex, endIndex)) {
 				var _v0 = $author$project$RichText$Model$Node$childNodes(node);
 				switch (_v0.$) {
-					case 'BlockChildren':
+					case 0:
 						var a = _v0.a;
 						var array = $author$project$RichText$Model$Node$toBlockArray(a);
 						if ($elm$core$List$isEmpty(startRest) && $elm$core$List$isEmpty(endRest)) {
@@ -14165,7 +10719,7 @@ var $author$project$RichText$Node$removeInRange = F3(
 								node);
 						} else {
 							var _v1 = A2($elm$core$Array$get, startIndex, array);
-							if (_v1.$ === 'Nothing') {
+							if (_v1.$ === 1) {
 								return node;
 							} else {
 								var b = _v1.a;
@@ -14180,7 +10734,7 @@ var $author$project$RichText$Node$removeInRange = F3(
 									node);
 							}
 						}
-					case 'InlineChildren':
+					case 1:
 						var a = _v0.a;
 						return ($elm$core$List$isEmpty(startRest) && $elm$core$List$isEmpty(endRest)) ? A2(
 							$author$project$RichText$Model$Node$withChildNodes,
@@ -14196,7 +10750,7 @@ var $author$project$RichText$Node$removeInRange = F3(
 			} else {
 				var _v2 = $author$project$RichText$Model$Node$childNodes(node);
 				switch (_v2.$) {
-					case 'BlockChildren':
+					case 0:
 						var a = _v2.a;
 						var arr = $author$project$RichText$Model$Node$toBlockArray(a);
 						var left = A2($elm_community$array_extra$Array$Extra$sliceUntil, startIndex, arr);
@@ -14205,7 +10759,7 @@ var $author$project$RichText$Node$removeInRange = F3(
 								return $elm$core$Array$empty;
 							} else {
 								var _v4 = A2($elm$core$Array$get, startIndex, arr);
-								if (_v4.$ === 'Nothing') {
+								if (_v4.$ === 1) {
 									return $elm$core$Array$empty;
 								} else {
 									var b = _v4.a;
@@ -14227,7 +10781,7 @@ var $author$project$RichText$Node$removeInRange = F3(
 								return $elm$core$Array$empty;
 							} else {
 								var _v3 = A2($elm$core$Array$get, endIndex, arr);
-								if (_v3.$ === 'Nothing') {
+								if (_v3.$ === 1) {
 									return $elm$core$Array$empty;
 								} else {
 									var b = _v3.a;
@@ -14249,7 +10803,7 @@ var $author$project$RichText$Node$removeInRange = F3(
 									_List_fromArray(
 										[left, leftRest, rightRest, right]))),
 							node);
-					case 'InlineChildren':
+					case 1:
 						var a = _v2.a;
 						var arr = $author$project$RichText$Model$Node$toInlineArray(a);
 						var left = A2(
@@ -14274,9 +10828,9 @@ var $author$project$RichText$Node$removeInRange = F3(
 var $author$project$RichText$Commands$removeNodeOrTextWithRange = F4(
 	function (nodePath, start, maybeEnd, root) {
 		var _v0 = A2($author$project$RichText$Node$nodeAt, nodePath, root);
-		if (_v0.$ === 'Just') {
+		if (!_v0.$) {
 			var node = _v0.a;
-			if (node.$ === 'Block') {
+			if (!node.$) {
 				var previouslySelectablePathAndNode = A3(
 					$author$project$RichText$Node$findBackwardFromExclusive,
 					F2(
@@ -14290,7 +10844,7 @@ var $author$project$RichText$Commands$removeNodeOrTextWithRange = F4(
 					_Utils_Tuple2(newRoot, previouslySelectablePathAndNode));
 			} else {
 				var leaf = node.a;
-				if (leaf.$ === 'InlineElement') {
+				if (!leaf.$) {
 					var previouslySelectablePath = A3(
 						$author$project$RichText$Node$findBackwardFromExclusive,
 						F2(
@@ -14305,7 +10859,7 @@ var $author$project$RichText$Commands$removeNodeOrTextWithRange = F4(
 				} else {
 					var v = leaf.a;
 					var textNode = function () {
-						if (maybeEnd.$ === 'Nothing') {
+						if (maybeEnd.$ === 1) {
 							return $author$project$RichText$Model$Node$Text(
 								A2(
 									$author$project$RichText$Model$Text$withText,
@@ -14355,7 +10909,7 @@ var $author$project$RichText$Commands$removeNodeOrTextWithRange = F4(
 	});
 var $author$project$RichText$Commands$removeRange = function (editorState) {
 	var _v0 = $author$project$RichText$Model$State$selection(editorState);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return $elm$core$Result$Err('Nothing is selected');
 	} else {
 		var selection = _v0.a;
@@ -14373,7 +10927,7 @@ var $author$project$RichText$Commands$removeRange = function (editorState) {
 					$elm$core$Maybe$Just(
 						$author$project$RichText$Model$Selection$focusOffset(normalizedSelection)),
 					$author$project$RichText$Model$State$root(editorState));
-				if (_v1.$ === 'Ok') {
+				if (!_v1.$) {
 					var _v2 = _v1.a;
 					var newRoot = _v2.a;
 					var newSelection = A2(
@@ -14397,7 +10951,7 @@ var $author$project$RichText$Commands$removeRange = function (editorState) {
 					$elm$core$Maybe$Just(
 						$author$project$RichText$Model$Selection$focusOffset(normalizedSelection)),
 					$author$project$RichText$Model$State$root(editorState));
-				if (_v3.$ === 'Err') {
+				if (_v3.$ === 1) {
 					var s = _v3.a;
 					return $elm$core$Result$Err(s);
 				} else {
@@ -14416,7 +10970,7 @@ var $author$project$RichText$Commands$removeRange = function (editorState) {
 						$author$project$RichText$Model$Selection$anchorOffset(normalizedSelection),
 						$elm$core$Maybe$Nothing,
 						removedNodes);
-					if (_v5.$ === 'Err') {
+					if (_v5.$ === 1) {
 						var s = _v5.a;
 						return $elm$core$Result$Err(s);
 					} else {
@@ -14429,9 +10983,9 @@ var $author$project$RichText$Commands$removeRange = function (editorState) {
 								var p = _v14.a;
 								var n = _v14.b;
 								var offset = function () {
-									if (n.$ === 'Inline') {
+									if (n.$ === 1) {
 										var i = n.a;
-										if (i.$ === 'Text') {
+										if (i.$ === 1) {
 											var t = i.a;
 											return $elm$core$String$length(
 												$author$project$RichText$Model$Text$text(t));
@@ -14446,7 +11000,7 @@ var $author$project$RichText$Commands$removeRange = function (editorState) {
 							},
 							maybePath);
 						var defaultedSelection = function () {
-							if (newSelection.$ === 'Nothing') {
+							if (newSelection.$ === 1) {
 								return A2(
 									$elm$core$Maybe$map,
 									function (_v12) {
@@ -14473,7 +11027,7 @@ var $author$project$RichText$Commands$removeRange = function (editorState) {
 							$author$project$RichText$Node$findTextBlockNodeAncestor,
 							$author$project$RichText$Model$Selection$anchorNode(normalizedSelection),
 							$author$project$RichText$Model$State$root(editorState));
-						if (anchorTextBlock.$ === 'Nothing') {
+						if (anchorTextBlock.$ === 1) {
 							return $elm$core$Result$Ok(newEditorState);
 						} else {
 							var _v8 = anchorTextBlock.a;
@@ -14482,7 +11036,7 @@ var $author$project$RichText$Commands$removeRange = function (editorState) {
 								$author$project$RichText$Node$findTextBlockNodeAncestor,
 								$author$project$RichText$Model$Selection$focusNode(normalizedSelection),
 								$author$project$RichText$Model$State$root(editorState));
-							if (focusTextBlock.$ === 'Nothing') {
+							if (focusTextBlock.$ === 1) {
 								return $elm$core$Result$Ok(newEditorState);
 							} else {
 								var _v10 = focusTextBlock.a;
@@ -14503,21 +11057,21 @@ var $author$project$RichText$Commands$removeRange = function (editorState) {
 var $author$project$RichText$Commands$isLeafNode = F2(
 	function (path, root) {
 		var _v0 = A2($author$project$RichText$Node$nodeAt, path, root);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return false;
 		} else {
 			var node = _v0.a;
-			if (node.$ === 'Block') {
+			if (!node.$) {
 				var bn = node.a;
 				var _v2 = $author$project$RichText$Model$Node$childNodes(bn);
-				if (_v2.$ === 'Leaf') {
+				if (_v2.$ === 2) {
 					return true;
 				} else {
 					return false;
 				}
 			} else {
 				var l = node.a;
-				if (l.$ === 'InlineElement') {
+				if (!l.$) {
 					return true;
 				} else {
 					return false;
@@ -14527,7 +11081,7 @@ var $author$project$RichText$Commands$isLeafNode = F2(
 	});
 var $author$project$RichText$Commands$removeSelectedLeafElement = function (editorState) {
 	var _v0 = $author$project$RichText$Model$State$selection(editorState);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return $elm$core$Result$Err('Nothing is selected');
 	} else {
 		var selection = _v0.a;
@@ -14547,16 +11101,16 @@ var $author$project$RichText$Commands$removeSelectedLeafElement = function (edit
 							}),
 						$author$project$RichText$Model$Selection$anchorNode(selection),
 						$author$project$RichText$Model$State$root(editorState));
-					if (_v1.$ === 'Nothing') {
+					if (_v1.$ === 1) {
 						return $elm$core$Maybe$Nothing;
 					} else {
 						var _v3 = _v1.a;
 						var p = _v3.a;
 						var n = _v3.b;
 						var offset = function () {
-							if (n.$ === 'Inline') {
+							if (n.$ === 1) {
 								var il = n.a;
-								if (il.$ === 'Text') {
+								if (il.$ === 1) {
 									var t = il.a;
 									return $elm$core$String$length(
 										$author$project$RichText$Model$Text$text(t));
@@ -14590,7 +11144,7 @@ var $author$project$RichText$Commands$removeSelectedLeafElement = function (edit
 };
 var $author$project$RichText$Commands$selectBackward = function (state) {
 	var _v0 = $author$project$RichText$Model$State$selection(state);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return $elm$core$Result$Err('There is no selection to move forward');
 	} else {
 		var selection = _v0.a;
@@ -14606,16 +11160,16 @@ var $author$project$RichText$Commands$selectBackward = function (state) {
 					}),
 				$author$project$RichText$Model$Selection$anchorNode(selection),
 				root);
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return $elm$core$Result$Err('I could not find a selectable node prior to the selected one');
 			} else {
 				var _v3 = _v1.a;
 				var newAnchor = _v3.a;
 				var n = _v3.b;
 				var offset = function () {
-					if (n.$ === 'Inline') {
+					if (n.$ === 1) {
 						var i = n.a;
-						if (i.$ === 'Text') {
+						if (i.$ === 1) {
 							var t = i.a;
 							return $elm$core$String$length(
 								$author$project$RichText$Model$Text$text(t));
@@ -14637,7 +11191,7 @@ var $author$project$RichText$Commands$selectBackward = function (state) {
 	}
 };
 var $author$project$RichText$Config$Command$TransformCommand = function (a) {
-	return {$: 'TransformCommand', a: a};
+	return {$: 0, a: a};
 };
 var $author$project$RichText$Config$Command$transform = function (t) {
 	return $author$project$RichText$Config$Command$TransformCommand(t);
@@ -14665,7 +11219,7 @@ var $author$project$RichText$Commands$backspaceCommands = _List_fromArray(
 	]);
 var $author$project$RichText$Commands$backspaceText = function (editorState) {
 	var _v0 = $author$project$RichText$Model$State$selection(editorState);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return $elm$core$Result$Err('Nothing is selected');
 	} else {
 		var selection = _v0.a;
@@ -14679,15 +11233,15 @@ var $author$project$RichText$Commands$backspaceText = function (editorState) {
 					$author$project$RichText$Node$nodeAt,
 					$author$project$RichText$Model$Selection$anchorNode(selection),
 					$author$project$RichText$Model$State$root(editorState));
-				if (_v1.$ === 'Nothing') {
+				if (_v1.$ === 1) {
 					return $elm$core$Result$Err('Invalid selection');
 				} else {
 					var node = _v1.a;
-					if (node.$ === 'Block') {
+					if (!node.$) {
 						return $elm$core$Result$Err('I cannot backspace a block node');
 					} else {
 						var il = node.a;
-						if (il.$ === 'InlineElement') {
+						if (!il.$) {
 							return $elm$core$Result$Err('I cannot backspace text of an inline leaf');
 						} else {
 							var tl = il.a;
@@ -14705,7 +11259,7 @@ var $author$project$RichText$Commands$backspaceText = function (editorState) {
 													$author$project$RichText$Model$Text$text(tl)),
 												tl))),
 									$author$project$RichText$Model$State$root(editorState));
-								if (_v4.$ === 'Err') {
+								if (_v4.$ === 1) {
 									var s = _v4.a;
 									return $elm$core$Result$Err(s);
 								} else {
@@ -14725,15 +11279,15 @@ var $author$project$RichText$Commands$backspaceText = function (editorState) {
 									$author$project$RichText$Node$previous,
 									$author$project$RichText$Model$Selection$anchorNode(selection),
 									$author$project$RichText$Model$State$root(editorState));
-								if (_v5.$ === 'Nothing') {
+								if (_v5.$ === 1) {
 									return $elm$core$Result$Err('No previous node to backspace text');
 								} else {
 									var _v6 = _v5.a;
 									var previousPath = _v6.a;
 									var previousNode = _v6.b;
-									if (previousNode.$ === 'Inline') {
+									if (previousNode.$ === 1) {
 										var previousInlineLeafWrapper = previousNode.a;
-										if (previousInlineLeafWrapper.$ === 'Text') {
+										if (previousInlineLeafWrapper.$ === 1) {
 											var previousTextLeaf = previousInlineLeafWrapper.a;
 											var l = $elm$core$String$length(
 												$author$project$RichText$Model$Text$text(previousTextLeaf));
@@ -14768,13 +11322,13 @@ var $author$project$RichText$Internal$DeleteWord$whitespaceAndPunctuationRegexSt
 var $author$project$RichText$Internal$DeleteWord$backspaceWordRegexString = '(?:(?!' + ($author$project$RichText$Internal$DeleteWord$whitespaceAndPunctuationRegexString + (').)' + ('(?:' + ($author$project$RichText$Internal$DeleteWord$chameleonCharactersRegexString + ('|(?!' + ($author$project$RichText$Internal$DeleteWord$whitespaceAndPunctuationRegexString + (').)*' + ('(?:' + ($author$project$RichText$Internal$DeleteWord$whitespaceAndPunctuationRegexString + (')*' + '$'))))))))));
 var $elm$regex$Regex$Match = F4(
 	function (match, index, number, submatches) {
-		return {index: index, match: match, number: number, submatches: submatches};
+		return {cj: index, dS: match, d2: number, en: submatches};
 	});
 var $elm$regex$Regex$fromStringWith = _Regex_fromStringWith;
 var $elm$regex$Regex$fromString = function (string) {
 	return A2(
 		$elm$regex$Regex$fromStringWith,
-		{caseInsensitive: false, multiline: false},
+		{di: false, dW: false},
 		string);
 };
 var $elm$regex$Regex$never = _Regex_never;
@@ -14785,14 +11339,14 @@ var $author$project$RichText$Internal$DeleteWord$backspaceWordRegex = A2(
 var $elm$regex$Regex$findAtMost = _Regex_findAtMost;
 var $author$project$RichText$Commands$groupSameTypeInlineLeaf = F2(
 	function (a, b) {
-		if (a.$ === 'InlineElement') {
-			if (b.$ === 'InlineElement') {
+		if (!a.$) {
+			if (!b.$) {
 				return true;
 			} else {
 				return false;
 			}
 		} else {
-			if (b.$ === 'Text') {
+			if (b.$ === 1) {
 				return true;
 			} else {
 				return false;
@@ -14803,7 +11357,7 @@ var $author$project$RichText$Commands$lengthsFromGroup = function (leaves) {
 	return A2(
 		$elm$core$List$map,
 		function (il) {
-			if (il.$ === 'Text') {
+			if (il.$ === 1) {
 				var tl = il.a;
 				return $elm$core$String$length(
 					$author$project$RichText$Model$Text$text(tl));
@@ -14824,7 +11378,7 @@ var $author$project$RichText$Commands$textFromGroup = function (leaves) {
 		A2(
 			$elm$core$List$map,
 			function (leaf) {
-				if (leaf.$ === 'Text') {
+				if (leaf.$ === 1) {
 					var t = leaf.a;
 					return $author$project$RichText$Model$Text$text(t);
 				} else {
@@ -14835,7 +11389,7 @@ var $author$project$RichText$Commands$textFromGroup = function (leaves) {
 };
 var $author$project$RichText$Commands$backspaceWord = function (editorState) {
 	var _v0 = $author$project$RichText$Model$State$selection(editorState);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return $elm$core$Result$Err('Nothing is selected');
 	} else {
 		var selection = _v0.a;
@@ -14846,18 +11400,18 @@ var $author$project$RichText$Commands$backspaceWord = function (editorState) {
 				$author$project$RichText$Node$findTextBlockNodeAncestor,
 				$author$project$RichText$Model$Selection$anchorNode(selection),
 				$author$project$RichText$Model$State$root(editorState));
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return $elm$core$Result$Err('I can only remove a word on a text leaf');
 			} else {
 				var _v2 = _v1.a;
 				var p = _v2.a;
 				var n = _v2.b;
 				var _v3 = $author$project$RichText$Model$Node$childNodes(n);
-				if (_v3.$ === 'InlineChildren') {
+				if (_v3.$ === 1) {
 					var arr = _v3.a;
 					var _v4 = $elm_community$list_extra$List$Extra$last(
 						$author$project$RichText$Model$Selection$anchorNode(selection));
-					if (_v4.$ === 'Nothing') {
+					if (_v4.$ === 1) {
 						return $elm$core$Result$Err('Somehow the anchor node is the root node');
 					} else {
 						var lastIndex = _v4.a;
@@ -14900,11 +11454,11 @@ var $author$project$RichText$Commands$backspaceWord = function (editorState) {
 							var matches = A3($elm$regex$Regex$findAtMost, 1, $author$project$RichText$Internal$DeleteWord$backspaceWordRegex, stringFrom);
 							var matchOffset = function () {
 								var _v10 = $elm$core$List$head(matches);
-								if (_v10.$ === 'Nothing') {
+								if (_v10.$ === 1) {
 									return 0;
 								} else {
 									var match = _v10.a;
-									return match.index;
+									return match.cj;
 								}
 							}();
 							var _v8 = A3(
@@ -14959,7 +11513,7 @@ var $author$project$RichText$Commands$insertAt = F3(
 var $author$project$RichText$Commands$insertText = F2(
 	function (s, editorState) {
 		var _v0 = $author$project$RichText$Model$State$selection(editorState);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('Nothing is selected');
 		} else {
 			var selection = _v0.a;
@@ -14973,15 +11527,15 @@ var $author$project$RichText$Commands$insertText = F2(
 					$author$project$RichText$Node$nodeAt,
 					$author$project$RichText$Model$Selection$anchorNode(selection),
 					$author$project$RichText$Model$State$root(editorState));
-				if (_v1.$ === 'Nothing') {
+				if (_v1.$ === 1) {
 					return $elm$core$Result$Err('Invalid selection after remove range');
 				} else {
 					var node = _v1.a;
-					if (node.$ === 'Block') {
+					if (!node.$) {
 						return $elm$core$Result$Err('I was expecting a text leaf, but instead I found a block node');
 					} else {
 						var il = node.a;
-						if (il.$ === 'InlineElement') {
+						if (!il.$) {
 							return $elm$core$Result$Err('I was expecting a text leaf, but instead found an inline element');
 						} else {
 							var tl = il.a;
@@ -14997,7 +11551,7 @@ var $author$project$RichText$Commands$insertText = F2(
 								$author$project$RichText$Model$Selection$anchorNode(selection),
 								$author$project$RichText$Node$Inline(newTextLeaf),
 								$author$project$RichText$Model$State$root(editorState));
-							if (_v4.$ === 'Err') {
+							if (_v4.$ === 1) {
 								var e = _v4.a;
 								return $elm$core$Result$Err(e);
 							} else {
@@ -15031,9 +11585,9 @@ var $author$project$RichText$Commands$removeRangeAndInsert = F2(
 			$author$project$RichText$Commands$removeRange(editorState));
 	});
 var $author$project$RichText$Commands$defaultInputEventCommand = function (event) {
-	if (event.inputType === 'insertText') {
-		var _v0 = event.data;
-		if (_v0.$ === 'Nothing') {
+	if (event.dL === 'insertText') {
+		var _v0 = event.ds;
+		if (_v0.$ === 1) {
 			return _List_Nil;
 		} else {
 			var data = _v0.a;
@@ -15050,18 +11604,18 @@ var $author$project$RichText$Commands$defaultInputEventCommand = function (event
 	}
 };
 var $author$project$RichText$Commands$defaultKeyCommand = function (event) {
-	return ((!event.altKey) && ((!event.metaKey) && ((!event.ctrlKey) && ($elm$core$String$length(event.key) === 1)))) ? _List_fromArray(
+	return ((!event.dc) && ((!event.dT) && ((!event.dr) && ($elm$core$String$length(event.co) === 1)))) ? _List_fromArray(
 		[
 			_Utils_Tuple2(
 			'removeRangeAndInsert',
 			$author$project$RichText$Config$Command$transform(
-				$author$project$RichText$Commands$removeRangeAndInsert(event.key)))
+				$author$project$RichText$Commands$removeRangeAndInsert(event.co)))
 		]) : _List_Nil;
 };
 var $author$project$RichText$Config$Keys$delete = 'Delete';
 var $author$project$RichText$Commands$deleteBlock = function (editorState) {
 	var _v0 = $author$project$RichText$Model$State$selection(editorState);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return $elm$core$Result$Err('Nothing is selected');
 	} else {
 		var selection = _v0.a;
@@ -15075,22 +11629,22 @@ var $author$project$RichText$Commands$deleteBlock = function (editorState) {
 				$author$project$RichText$Node$next,
 				$author$project$RichText$Model$Selection$anchorNode(selection),
 				$author$project$RichText$Model$State$root(editorState));
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return $elm$core$Result$Err('There is no next node to delete');
 			} else {
 				var _v2 = _v1.a;
 				var path = _v2.a;
 				var node = _v2.b;
-				if (node.$ === 'Block') {
+				if (!node.$) {
 					var bn = node.a;
 					var _v4 = $author$project$RichText$Model$Node$childNodes(bn);
-					if (_v4.$ === 'Leaf') {
+					if (_v4.$ === 2) {
 						var _v5 = A3(
 							$author$project$RichText$Node$replaceWithFragment,
 							path,
 							$author$project$RichText$Node$BlockFragment($elm$core$Array$empty),
 							$author$project$RichText$Model$State$root(editorState));
-						if (_v5.$ === 'Err') {
+						if (_v5.$ === 1) {
 							var s = _v5.a;
 							return $elm$core$Result$Err(s);
 						} else {
@@ -15113,7 +11667,7 @@ var $author$project$RichText$Commands$deleteBlock = function (editorState) {
 };
 var $author$project$RichText$Commands$deleteInlineElement = function (editorState) {
 	var _v0 = $author$project$RichText$Model$State$selection(editorState);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return $elm$core$Result$Err('Nothing is selected');
 	} else {
 		var selection = _v0.a;
@@ -15124,16 +11678,16 @@ var $author$project$RichText$Commands$deleteInlineElement = function (editorStat
 				$author$project$RichText$Node$nodeAt,
 				$author$project$RichText$Model$Selection$anchorNode(selection),
 				$author$project$RichText$Model$State$root(editorState));
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return $elm$core$Result$Err('I was given an invalid path to delete text');
 			} else {
 				var node = _v1.a;
-				if (node.$ === 'Block') {
+				if (!node.$) {
 					return $elm$core$Result$Err('I cannot delete text if the selection a block node');
 				} else {
 					var il = node.a;
 					var length = function () {
-						if (il.$ === 'Text') {
+						if (il.$ === 1) {
 							var t = il.a;
 							return $elm$core$String$length(
 								$author$project$RichText$Model$Text$text(t));
@@ -15152,19 +11706,19 @@ var $author$project$RichText$Commands$deleteInlineElement = function (editorStat
 							$author$project$RichText$Node$nodeAt,
 							incrementedPath,
 							$author$project$RichText$Model$State$root(editorState));
-						if (_v3.$ === 'Nothing') {
+						if (_v3.$ === 1) {
 							return $elm$core$Result$Err('There is no next inline leaf to delete');
 						} else {
 							var incrementedNode = _v3.a;
-							if (incrementedNode.$ === 'Inline') {
+							if (incrementedNode.$ === 1) {
 								var nil = incrementedNode.a;
-								if (nil.$ === 'InlineElement') {
+								if (!nil.$) {
 									var _v6 = A3(
 										$author$project$RichText$Node$replaceWithFragment,
 										incrementedPath,
 										$author$project$RichText$Node$InlineFragment($elm$core$Array$empty),
 										$author$project$RichText$Model$State$root(editorState));
-									if (_v6.$ === 'Err') {
+									if (_v6.$ === 1) {
 										var s = _v6.a;
 										return $elm$core$Result$Err(s);
 									} else {
@@ -15187,7 +11741,7 @@ var $author$project$RichText$Commands$deleteInlineElement = function (editorStat
 };
 var $author$project$RichText$Commands$selectForward = function (state) {
 	var _v0 = $author$project$RichText$Model$State$selection(state);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return $elm$core$Result$Err('There is no selection to move forward');
 	} else {
 		var selection = _v0.a;
@@ -15203,7 +11757,7 @@ var $author$project$RichText$Commands$selectForward = function (state) {
 					}),
 				$author$project$RichText$Model$Selection$anchorNode(selection),
 				root);
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return $elm$core$Result$Err('I could not find a selectable node after the selected one');
 			} else {
 				var _v3 = _v1.a;
@@ -15248,7 +11802,7 @@ var $elm$core$String$dropRight = F2(
 	});
 var $author$project$RichText$Commands$deleteText = function (editorState) {
 	var _v0 = $author$project$RichText$Model$State$selection(editorState);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return $elm$core$Result$Err('Nothing is selected');
 	} else {
 		var selection = _v0.a;
@@ -15259,15 +11813,15 @@ var $author$project$RichText$Commands$deleteText = function (editorState) {
 				$author$project$RichText$Node$nodeAt,
 				$author$project$RichText$Model$Selection$anchorNode(selection),
 				$author$project$RichText$Model$State$root(editorState));
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return $elm$core$Result$Err('I was given an invalid path to delete text');
 			} else {
 				var node = _v1.a;
-				if (node.$ === 'Block') {
+				if (!node.$) {
 					return $elm$core$Result$Err('I cannot delete text if the selection a block node');
 				} else {
 					var il = node.a;
-					if (il.$ === 'InlineElement') {
+					if (!il.$) {
 						return $elm$core$Result$Err('I cannot delete text if the selection an inline leaf');
 					} else {
 						var tl = il.a;
@@ -15294,7 +11848,7 @@ var $author$project$RichText$Commands$deleteText = function (editorState) {
 													$author$project$RichText$Model$Text$text(tl)),
 												tl))),
 									$author$project$RichText$Model$State$root(editorState));
-								if (_v4.$ === 'Err') {
+								if (_v4.$ === 1) {
 									var s = _v4.a;
 									return $elm$core$Result$Err(s);
 								} else {
@@ -15307,17 +11861,17 @@ var $author$project$RichText$Commands$deleteText = function (editorState) {
 									$author$project$RichText$Node$next,
 									$author$project$RichText$Model$Selection$anchorNode(selection),
 									$author$project$RichText$Model$State$root(editorState));
-								if (_v5.$ === 'Nothing') {
+								if (_v5.$ === 1) {
 									return $elm$core$Result$Err('I cannot do delete because there is no neighboring text node');
 								} else {
 									var _v6 = _v5.a;
 									var nextPath = _v6.a;
 									var nextNode = _v6.b;
-									if (nextNode.$ === 'Block') {
+									if (!nextNode.$) {
 										return $elm$core$Result$Err('Cannot delete the text of a block node');
 									} else {
 										var nextInlineLeafWrapper = nextNode.a;
-										if (nextInlineLeafWrapper.$ === 'Text') {
+										if (nextInlineLeafWrapper.$ === 1) {
 											var newSelection = A3($author$project$RichText$Model$Selection$singleNodeRange, nextPath, 0, 1);
 											return $author$project$RichText$Commands$removeRange(
 												A2(
@@ -15344,7 +11898,7 @@ var $author$project$RichText$Internal$DeleteWord$deleteWordRegex = A2(
 	$elm$regex$Regex$fromString($author$project$RichText$Internal$DeleteWord$deleteWordRegexString));
 var $author$project$RichText$Commands$deleteWord = function (editorState) {
 	var _v0 = $author$project$RichText$Model$State$selection(editorState);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return $elm$core$Result$Err('Nothing is selected');
 	} else {
 		var selection = _v0.a;
@@ -15355,18 +11909,18 @@ var $author$project$RichText$Commands$deleteWord = function (editorState) {
 				$author$project$RichText$Node$findTextBlockNodeAncestor,
 				$author$project$RichText$Model$Selection$anchorNode(selection),
 				$author$project$RichText$Model$State$root(editorState));
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return $elm$core$Result$Err('I can only remove a word on a text leaf');
 			} else {
 				var _v2 = _v1.a;
 				var p = _v2.a;
 				var n = _v2.b;
 				var _v3 = $author$project$RichText$Model$Node$childNodes(n);
-				if (_v3.$ === 'InlineChildren') {
+				if (_v3.$ === 1) {
 					var arr = _v3.a;
 					var _v4 = $elm_community$list_extra$List$Extra$last(
 						$author$project$RichText$Model$Selection$anchorNode(selection));
-					if (_v4.$ === 'Nothing') {
+					if (_v4.$ === 1) {
 						return $elm$core$Result$Err('Somehow the anchor node is the root node');
 					} else {
 						var lastIndex = _v4.a;
@@ -15409,11 +11963,11 @@ var $author$project$RichText$Commands$deleteWord = function (editorState) {
 							var matches = A3($elm$regex$Regex$findAtMost, 1, $author$project$RichText$Internal$DeleteWord$deleteWordRegex, stringTo);
 							var matchOffset = function () {
 								var _v10 = $elm$core$List$head(matches);
-								if (_v10.$ === 'Nothing') {
+								if (_v10.$ === 1) {
 									return 0;
 								} else {
 									var match = _v10.a;
-									return match.index + $elm$core$String$length(match.match);
+									return match.cj + $elm$core$String$length(match.dS);
 								}
 							}();
 							var _v8 = A3(
@@ -15453,20 +12007,19 @@ var $author$project$RichText$Commands$deleteWord = function (editorState) {
 		}
 	}
 };
-var $author$project$RichText$Config$Command$emptyCommandMap = $author$project$RichText$Config$Command$CommandMap(
-	{
-		defaultInputEventCommand: function (_v0) {
-			return _List_Nil;
-		},
-		defaultKeyCommand: function (_v1) {
-			return _List_Nil;
-		},
-		inputEventTypeMap: $elm$core$Dict$empty,
-		keyMap: $elm$core$Dict$empty
-	});
+var $author$project$RichText$Config$Command$emptyCommandMap = {
+	W: function (_v0) {
+		return _List_Nil;
+	},
+	X: function (_v1) {
+		return _List_Nil;
+	},
+	_: $elm$core$Dict$empty,
+	J: $elm$core$Dict$empty
+};
 var $author$project$RichText$Config$Keys$enter = 'Enter';
 var $author$project$RichText$Config$Command$InputEventType = function (a) {
-	return {$: 'InputEventType', a: a};
+	return {$: 1, a: a};
 };
 var $author$project$RichText$Config$Command$inputEvent = function (type_) {
 	return $author$project$RichText$Config$Command$InputEventType(type_);
@@ -15479,7 +12032,7 @@ var $author$project$RichText$Config$ElementDefinition$defaultElementToHtml = F3(
 			A2(
 				$elm$core$List$filterMap,
 				function (attr) {
-					if (attr.$ === 'StringAttribute') {
+					if (!attr.$) {
 						var k = attr.a;
 						var v = attr.b;
 						return $elm$core$Maybe$Just(
@@ -15493,14 +12046,13 @@ var $author$project$RichText$Config$ElementDefinition$defaultElementToHtml = F3(
 	});
 var $author$project$RichText$Definitions$hardBreakToHtml = $author$project$RichText$Config$ElementDefinition$defaultElementToHtml('br');
 var $author$project$RichText$Definitions$htmlToHardBreak = $author$project$RichText$Config$ElementDefinition$defaultHtmlToElement('br');
-var $author$project$RichText$Internal$Definitions$InlineLeafNodeType = {$: 'InlineLeafNodeType'};
+var $author$project$RichText$Internal$Definitions$InlineLeafNodeType = {$: 3};
 var $author$project$RichText$Config$ElementDefinition$inlineLeaf = $author$project$RichText$Internal$Definitions$InlineLeafNodeType;
 var $author$project$RichText$Definitions$hardBreak = $author$project$RichText$Config$ElementDefinition$elementDefinition(
-	{contentType: $author$project$RichText$Config$ElementDefinition$inlineLeaf, fromHtmlNode: $author$project$RichText$Definitions$htmlToHardBreak, group: 'inline', name: 'hard_break', selectable: false, toHtmlNode: $author$project$RichText$Definitions$hardBreakToHtml});
+	{dp: $author$project$RichText$Config$ElementDefinition$inlineLeaf, b9: $author$project$RichText$Definitions$htmlToHardBreak, dG: 'inline', ct: 'hard_break', ei: false, c0: $author$project$RichText$Definitions$hardBreakToHtml});
 var $author$project$RichText$Model$InlineElement$inlineElement = F2(
 	function (parameters, m) {
-		return $author$project$RichText$Model$InlineElement$InlineElement(
-			{element: parameters, marks: m});
+		return {aZ: parameters, am: m};
 	});
 var $author$project$RichText$Model$Node$inlineElement = F2(
 	function (parameters, mark) {
@@ -15523,7 +12075,7 @@ var $author$project$RichText$Node$splitTextLeaf = F2(
 var $author$project$RichText$Commands$insertInline = F2(
 	function (leaf, editorState) {
 		var _v0 = $author$project$RichText$Model$State$selection(editorState);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('Nothing is selected');
 		} else {
 			var selection = _v0.a;
@@ -15537,19 +12089,19 @@ var $author$project$RichText$Commands$insertInline = F2(
 					$author$project$RichText$Node$nodeAt,
 					$author$project$RichText$Model$Selection$anchorNode(selection),
 					$author$project$RichText$Model$State$root(editorState));
-				if (_v1.$ === 'Nothing') {
+				if (_v1.$ === 1) {
 					return $elm$core$Result$Err('Invalid selection');
 				} else {
 					var node = _v1.a;
-					if (node.$ === 'Inline') {
+					if (node.$ === 1) {
 						var il = node.a;
-						if (il.$ === 'InlineElement') {
+						if (!il.$) {
 							var _v4 = A3(
 								$author$project$RichText$Node$replace,
 								$author$project$RichText$Model$Selection$anchorNode(selection),
 								$author$project$RichText$Node$Inline(leaf),
 								$author$project$RichText$Model$State$root(editorState));
-							if (_v4.$ === 'Err') {
+							if (_v4.$ === 1) {
 								var e = _v4.a;
 								return $elm$core$Result$Err(e);
 							} else {
@@ -15563,7 +12115,7 @@ var $author$project$RichText$Commands$insertInline = F2(
 											}),
 										$author$project$RichText$Model$Selection$anchorNode(selection),
 										newRoot);
-									if (_v5.$ === 'Nothing') {
+									if (_v5.$ === 1) {
 										return $elm$core$Maybe$Nothing;
 									} else {
 										var _v7 = _v5.a;
@@ -15598,7 +12150,7 @@ var $author$project$RichText$Commands$insertInline = F2(
 												$author$project$RichText$Model$Node$Text(after)
 											]))),
 								$author$project$RichText$Model$State$root(editorState));
-							if (_v9.$ === 'Err') {
+							if (_v9.$ === 1) {
 								var e = _v9.a;
 								return $elm$core$Result$Err(e);
 							} else {
@@ -15612,7 +12164,7 @@ var $author$project$RichText$Commands$insertInline = F2(
 											}),
 										$author$project$RichText$Model$Selection$anchorNode(selection),
 										newRoot);
-									if (_v10.$ === 'Nothing') {
+									if (_v10.$ === 1) {
 										return $elm$core$Maybe$Nothing;
 									} else {
 										var _v12 = _v10.a;
@@ -15641,13 +12193,13 @@ var $author$project$RichText$Commands$insertLineBreak = $author$project$RichText
 		A2($author$project$RichText$Model$Element$element, $author$project$RichText$Definitions$hardBreak, _List_Nil),
 		_List_Nil));
 var $author$project$RichText$Config$Command$InternalCommand = function (a) {
-	return {$: 'InternalCommand', a: a};
+	return {$: 1, a: a};
 };
 var $author$project$RichText$Config$Command$internal = function (i) {
 	return $author$project$RichText$Config$Command$InternalCommand(i);
 };
 var $author$project$RichText$Config$Command$Key = function (a) {
-	return {$: 'Key', a: a};
+	return {$: 0, a: a};
 };
 var $elm$core$List$sortBy = _List_sortBy;
 var $elm$core$List$sort = function (xs) {
@@ -15705,19 +12257,19 @@ var $author$project$RichText$Config$Command$key = function (keys) {
 			$elm_community$list_extra$List$Extra$unique(keys)));
 };
 var $author$project$RichText$Node$isEmptyTextBlock = function (node) {
-	if (node.$ === 'Block') {
+	if (!node.$) {
 		var bn = node.a;
 		var _v1 = $author$project$RichText$Model$Node$childNodes(bn);
-		if (_v1.$ === 'InlineChildren') {
+		if (_v1.$ === 1) {
 			var a = _v1.a;
 			var array = $author$project$RichText$Model$Node$toInlineArray(a);
 			var _v2 = A2($elm$core$Array$get, 0, array);
-			if (_v2.$ === 'Nothing') {
+			if (_v2.$ === 1) {
 				return $elm$core$Array$isEmpty(array);
 			} else {
 				var n = _v2.a;
 				return ($elm$core$Array$length(array) === 1) && function () {
-					if (n.$ === 'Text') {
+					if (n.$ === 1) {
 						var t = n.a;
 						return $elm$core$String$isEmpty(
 							$author$project$RichText$Model$Text$text(t));
@@ -15736,12 +12288,12 @@ var $author$project$RichText$Node$isEmptyTextBlock = function (node) {
 var $author$project$RichText$Node$indexedMapRec = F3(
 	function (path, func, node) {
 		var applied = A2(func, path, node);
-		if (applied.$ === 'Block') {
+		if (!applied.$) {
 			var blockNode = applied.a;
 			var cn = function () {
 				var _v1 = $author$project$RichText$Model$Node$childNodes(blockNode);
 				switch (_v1.$) {
-					case 'BlockChildren':
+					case 0:
 						var a = _v1.a;
 						return $author$project$RichText$Model$Node$blockChildren(
 							A2(
@@ -15756,7 +12308,7 @@ var $author$project$RichText$Node$indexedMapRec = F3(
 													[i])),
 											func,
 											$author$project$RichText$Node$Block(v));
-										if (_v2.$ === 'Block') {
+										if (!_v2.$) {
 											var b = _v2.a;
 											return b;
 										} else {
@@ -15764,7 +12316,7 @@ var $author$project$RichText$Node$indexedMapRec = F3(
 										}
 									}),
 								$author$project$RichText$Model$Node$toBlockArray(a)));
-					case 'InlineChildren':
+					case 1:
 						var a = _v1.a;
 						return $author$project$RichText$Model$Node$inlineChildren(
 							A2(
@@ -15779,7 +12331,7 @@ var $author$project$RichText$Node$indexedMapRec = F3(
 													[i])),
 											func,
 											$author$project$RichText$Node$Inline(v));
-										if (_v3.$ === 'Inline') {
+										if (_v3.$ === 1) {
 											var b = _v3.a;
 											return b;
 										} else {
@@ -15818,14 +12370,14 @@ var $author$project$RichText$Commands$addLiftMarkToBlocksInSelection = F2(
 					if ((_Utils_cmp(path, start) < 0) || (_Utils_cmp(path, end) > 0)) {
 						return node;
 					} else {
-						if (node.$ === 'Block') {
+						if (!node.$) {
 							var bn = node.a;
 							var addMarker = function () {
 								var _v2 = $author$project$RichText$Model$Node$childNodes(bn);
 								switch (_v2.$) {
-									case 'Leaf':
+									case 2:
 										return true;
-									case 'InlineChildren':
+									case 1:
 										return true;
 									default:
 										return false;
@@ -15841,7 +12393,7 @@ var $author$project$RichText$Commands$addLiftMarkToBlocksInSelection = F2(
 					}
 				}),
 			$author$project$RichText$Node$Block(root));
-		if (_v0.$ === 'Block') {
+		if (!_v0.$) {
 			var bn = _v0.a;
 			return bn;
 		} else {
@@ -15853,14 +12405,14 @@ var $author$project$RichText$Node$concatMap = F2(
 		var newChildren = function () {
 			var _v0 = $author$project$RichText$Model$Node$childNodes(node);
 			switch (_v0.$) {
-				case 'Leaf':
+				case 2:
 					return $author$project$RichText$Model$Node$Leaf;
-				case 'BlockChildren':
+				case 0:
 					var a = _v0.a;
 					var c = A2(
 						$elm$core$List$concatMap,
 						function (x) {
-							if (x.$ === 'Block') {
+							if (!x.$) {
 								var v = x.a;
 								return _List_fromArray(
 									[v]);
@@ -15889,7 +12441,7 @@ var $author$project$RichText$Node$concatMap = F2(
 							A2(
 								$elm$core$List$concatMap,
 								function (x) {
-									if (x.$ === 'Block') {
+									if (!x.$) {
 										return _List_Nil;
 									} else {
 										var v = x.a;
@@ -15914,14 +12466,14 @@ var $author$project$RichText$Annotation$annotationsFromBlockNode = function (nod
 		$author$project$RichText$Model$Node$element(node));
 };
 var $author$project$RichText$Annotation$liftConcatMapFunc = function (node) {
-	if (node.$ === 'Block') {
+	if (!node.$) {
 		var bn = node.a;
 		var _v1 = $author$project$RichText$Model$Node$childNodes(bn);
 		switch (_v1.$) {
-			case 'Leaf':
+			case 2:
 				return _List_fromArray(
 					[node]);
-			case 'InlineChildren':
+			case 1:
 				return _List_fromArray(
 					[node]);
 			default:
@@ -15975,7 +12527,7 @@ var $author$project$RichText$Annotation$doLift = function (root) {
 };
 var $author$project$RichText$Commands$lift = function (editorState) {
 	var _v0 = $author$project$RichText$Model$State$selection(editorState);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return $elm$core$Result$Err('Nothing is selected');
 	} else {
 		var selection = _v0.a;
@@ -16005,7 +12557,7 @@ var $author$project$RichText$Commands$lift = function (editorState) {
 };
 var $author$project$RichText$Commands$liftEmpty = function (editorState) {
 	var _v0 = $author$project$RichText$Model$State$selection(editorState);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return $elm$core$Result$Err('Nothing is selected');
 	} else {
 		var selection = _v0.a;
@@ -16020,7 +12572,7 @@ var $author$project$RichText$Commands$liftEmpty = function (editorState) {
 				$author$project$RichText$Node$nodeAt,
 				p,
 				$author$project$RichText$Model$State$root(editorState));
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return $elm$core$Result$Err('Invalid root path');
 			} else {
 				var node = _v1.a;
@@ -16039,9 +12591,9 @@ var $author$project$RichText$Commands$selectAll = function (editorState) {
 				var offset = _v1.b;
 				if ($author$project$RichText$Annotation$isSelectable(node)) {
 					var newOffset = function () {
-						if (node.$ === 'Inline') {
+						if (node.$ === 1) {
 							var il = node.a;
-							if (il.$ === 'Text') {
+							if (il.$ === 1) {
 								var tl = il.a;
 								return $elm$core$String$length(
 									$author$project$RichText$Model$Text$text(tl));
@@ -16052,7 +12604,7 @@ var $author$project$RichText$Commands$selectAll = function (editorState) {
 							return 0;
 						}
 					}();
-					if (firstAndLast.$ === 'Nothing') {
+					if (firstAndLast.$ === 1) {
 						return _Utils_Tuple2(
 							$elm$core$Maybe$Just(
 								_Utils_Tuple2(path, path)),
@@ -16074,7 +12626,7 @@ var $author$project$RichText$Commands$selectAll = function (editorState) {
 			$author$project$RichText$Model$State$root(editorState)));
 	var fl = _v0.a;
 	var lastOffset = _v0.b;
-	if (fl.$ === 'Nothing') {
+	if (fl.$ === 1) {
 		return $elm$core$Result$Err('Nothing is selectable');
 	} else {
 		var _v7 = fl.a;
@@ -16094,23 +12646,21 @@ var $author$project$RichText$Config$Command$set = F3(
 			$elm$core$List$foldl,
 			F2(
 				function (binding, accMap) {
-					var m = accMap.a;
-					if (binding.$ === 'Key') {
+					var m = accMap;
+					if (!binding.$) {
 						var keys = binding.a;
-						return $author$project$RichText$Config$Command$CommandMap(
-							_Utils_update(
-								m,
-								{
-									keyMap: A3($elm$core$Dict$insert, keys, func, m.keyMap)
-								}));
+						return _Utils_update(
+							m,
+							{
+								J: A3($elm$core$Dict$insert, keys, func, m.J)
+							});
 					} else {
 						var type_ = binding.a;
-						return $author$project$RichText$Config$Command$CommandMap(
-							_Utils_update(
-								m,
-								{
-									inputEventTypeMap: A3($elm$core$Dict$insert, type_, func, m.inputEventTypeMap)
-								}));
+						return _Utils_update(
+							m,
+							{
+								_: A3($elm$core$Dict$insert, type_, func, m._)
+							});
 					}
 				}),
 			map,
@@ -16144,7 +12694,7 @@ var $author$project$RichText$Node$splitBlockAtPathAndOffset = F3(
 		if (!path.b) {
 			var _v1 = $author$project$RichText$Model$Node$childNodes(node);
 			switch (_v1.$) {
-				case 'BlockChildren':
+				case 0:
 					var a = _v1.a;
 					var arr = $author$project$RichText$Model$Node$toBlockArray(a);
 					return $elm$core$Maybe$Just(
@@ -16159,7 +12709,7 @@ var $author$project$RichText$Node$splitBlockAtPathAndOffset = F3(
 								$author$project$RichText$Model$Node$blockChildren(
 									A2($elm_community$array_extra$Array$Extra$sliceFrom, offset, arr)),
 								node)));
-				case 'InlineChildren':
+				case 1:
 					var a = _v1.a;
 					var arr = $author$project$RichText$Model$Node$toInlineArray(a);
 					return $elm$core$Maybe$Just(
@@ -16183,16 +12733,16 @@ var $author$project$RichText$Node$splitBlockAtPathAndOffset = F3(
 			var xs = path.b;
 			var _v2 = $author$project$RichText$Model$Node$childNodes(node);
 			switch (_v2.$) {
-				case 'BlockChildren':
+				case 0:
 					var a = _v2.a;
 					var arr = $author$project$RichText$Model$Node$toBlockArray(a);
 					var _v3 = A2($elm$core$Array$get, x, arr);
-					if (_v3.$ === 'Nothing') {
+					if (_v3.$ === 1) {
 						return $elm$core$Maybe$Nothing;
 					} else {
 						var n = _v3.a;
 						var _v4 = A3($author$project$RichText$Node$splitBlockAtPathAndOffset, xs, offset, n);
-						if (_v4.$ === 'Nothing') {
+						if (_v4.$ === 1) {
 							return $elm$core$Maybe$Nothing;
 						} else {
 							var _v5 = _v4.a;
@@ -16222,15 +12772,15 @@ var $author$project$RichText$Node$splitBlockAtPathAndOffset = F3(
 										node)));
 						}
 					}
-				case 'InlineChildren':
+				case 1:
 					var a = _v2.a;
 					var arr = $author$project$RichText$Model$Node$toInlineArray(a);
 					var _v6 = A2($elm$core$Array$get, x, arr);
-					if (_v6.$ === 'Nothing') {
+					if (_v6.$ === 1) {
 						return $elm$core$Maybe$Nothing;
 					} else {
 						var n = _v6.a;
-						if (n.$ === 'Text') {
+						if (n.$ === 1) {
 							var tl = n.a;
 							var _v8 = A2($author$project$RichText$Node$splitTextLeaf, offset, tl);
 							var before = _v8.a;
@@ -16278,7 +12828,7 @@ var $author$project$RichText$Node$splitBlockAtPathAndOffset = F3(
 var $author$project$RichText$Commands$splitBlock = F2(
 	function (ancestorFunc, editorState) {
 		var _v0 = $author$project$RichText$Model$State$selection(editorState);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('Nothing is selected');
 		} else {
 			var selection = _v0.a;
@@ -16292,7 +12842,7 @@ var $author$project$RichText$Commands$splitBlock = F2(
 					ancestorFunc,
 					$author$project$RichText$Model$Selection$anchorNode(selection),
 					$author$project$RichText$Model$State$root(editorState));
-				if (_v1.$ === 'Nothing') {
+				if (_v1.$ === 1) {
 					return $elm$core$Result$Err('I cannot find a proper ancestor to split');
 				} else {
 					var _v2 = _v1.a;
@@ -16307,7 +12857,7 @@ var $author$project$RichText$Commands$splitBlock = F2(
 						relativePath,
 						$author$project$RichText$Model$Selection$anchorOffset(selection),
 						ancestorNode);
-					if (_v3.$ === 'Nothing') {
+					if (_v3.$ === 1) {
 						return $elm$core$Result$Err(
 							'Can not split block at path ' + $author$project$RichText$Model$Node$toString(
 								$author$project$RichText$Model$Selection$anchorNode(selection)));
@@ -16323,7 +12873,7 @@ var $author$project$RichText$Commands$splitBlock = F2(
 									_List_fromArray(
 										[before, after]))),
 							$author$project$RichText$Model$State$root(editorState));
-						if (_v5.$ === 'Err') {
+						if (_v5.$ === 1) {
 							var s = _v5.a;
 							return $elm$core$Result$Err(s);
 						} else {
@@ -16350,19 +12900,17 @@ var $author$project$RichText$Commands$splitBlock = F2(
 var $author$project$RichText$Commands$splitTextBlock = $author$project$RichText$Commands$splitBlock($author$project$RichText$Node$findTextBlockNodeAncestor);
 var $author$project$RichText$Config$Command$withDefaultInputEventCommand = F2(
 	function (func, map) {
-		var m = map.a;
-		return $author$project$RichText$Config$Command$CommandMap(
-			_Utils_update(
-				m,
-				{defaultInputEventCommand: func}));
+		var m = map;
+		return _Utils_update(
+			m,
+			{W: func});
 	});
 var $author$project$RichText$Config$Command$withDefaultKeyCommand = F2(
 	function (func, map) {
-		var m = map.a;
-		return $author$project$RichText$Config$Command$CommandMap(
-			_Utils_update(
-				m,
-				{defaultKeyCommand: func}));
+		var m = map;
+		return _Utils_update(
+			m,
+			{X: func});
 	});
 var $author$project$RichText$Commands$defaultCommandMap = A2(
 	$author$project$RichText$Config$Command$withDefaultInputEventCommand,
@@ -16383,7 +12931,7 @@ var $author$project$RichText$Commands$defaultCommandMap = A2(
 				[
 					_Utils_Tuple2(
 					'redo',
-					$author$project$RichText$Config$Command$internal($author$project$RichText$Config$Command$Redo))
+					$author$project$RichText$Config$Command$internal(1))
 				]),
 			A3(
 				$author$project$RichText$Config$Command$set,
@@ -16398,7 +12946,7 @@ var $author$project$RichText$Commands$defaultCommandMap = A2(
 					[
 						_Utils_Tuple2(
 						'undo',
-						$author$project$RichText$Config$Command$internal($author$project$RichText$Config$Command$Undo))
+						$author$project$RichText$Config$Command$internal(0))
 					]),
 				A3(
 					$author$project$RichText$Config$Command$set,
@@ -16540,7 +13088,7 @@ var $author$project$RichText$Commands$firstSelectablePath = function (block) {
 			}),
 		_List_Nil,
 		block);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return $elm$core$Maybe$Nothing;
 	} else {
 		var _v2 = _v0.a;
@@ -16551,13 +13099,13 @@ var $author$project$RichText$Commands$firstSelectablePath = function (block) {
 var $author$project$RichText$Node$insertAfter = F3(
 	function (path, fragment, root) {
 		var _v0 = A2($author$project$RichText$Node$nodeAt, path, root);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('There is no node at this path');
 		} else {
 			var node = _v0.a;
-			if (node.$ === 'Inline') {
+			if (node.$ === 1) {
 				var il = node.a;
-				if (fragment.$ === 'InlineFragment') {
+				if (fragment.$ === 1) {
 					var a = fragment.a;
 					var newFragment = $author$project$RichText$Node$InlineFragment(
 						$elm$core$Array$fromList(
@@ -16571,7 +13119,7 @@ var $author$project$RichText$Node$insertAfter = F3(
 				}
 			} else {
 				var bn = node.a;
-				if (fragment.$ === 'BlockFragment') {
+				if (!fragment.$) {
 					var a = fragment.a;
 					var newFragment = $author$project$RichText$Node$BlockFragment(
 						$elm$core$Array$fromList(
@@ -16592,14 +13140,14 @@ var $author$project$RichText$Commands$isBlockLeaf = F2(
 			$author$project$RichText$Node$nodeAt,
 			$author$project$RichText$Model$Selection$anchorNode(selection),
 			root);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return false;
 		} else {
 			var n = _v0.a;
-			if (n.$ === 'Block') {
+			if (!n.$) {
 				var b = n.a;
 				var _v2 = $author$project$RichText$Model$Node$childNodes(b);
-				if (_v2.$ === 'Leaf') {
+				if (_v2.$ === 2) {
 					return true;
 				} else {
 					return false;
@@ -16612,7 +13160,7 @@ var $author$project$RichText$Commands$isBlockLeaf = F2(
 var $author$project$RichText$Commands$insertAfterBlockLeaf = F2(
 	function (blockToInsert, state) {
 		var _v0 = $author$project$RichText$Model$State$selection(state);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('Nothing is selected');
 		} else {
 			var selection = _v0.a;
@@ -16633,7 +13181,7 @@ var $author$project$RichText$Commands$insertAfterBlockLeaf = F2(
 								_List_fromArray(
 									[blockToInsert]))),
 						$author$project$RichText$Model$State$root(state));
-					if (_v1.$ === 'Err') {
+					if (_v1.$ === 1) {
 						var s = _v1.a;
 						return $elm$core$Result$Err(s);
 					} else {
@@ -16664,7 +13212,7 @@ var $author$project$RichText$Commands$insertNewline = F2(
 			editorState,
 			$author$project$RichText$Commands$removeRange(editorState));
 		var _v0 = $author$project$RichText$Model$State$selection(removedRangeEditorState);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('Invalid selection');
 		} else {
 			var selection = _v0.a;
@@ -16675,7 +13223,7 @@ var $author$project$RichText$Commands$insertNewline = F2(
 					$author$project$RichText$Node$findTextBlockNodeAncestor,
 					$author$project$RichText$Model$Selection$anchorNode(selection),
 					$author$project$RichText$Model$State$root(removedRangeEditorState));
-				if (_v1.$ === 'Nothing') {
+				if (_v1.$ === 1) {
 					return $elm$core$Result$Err('No textblock node ancestor found');
 				} else {
 					var _v2 = _v1.a;
@@ -16695,7 +13243,7 @@ var $author$project$RichText$Definitions$italicToHtmlNode = F2(
 		return A3($author$project$RichText$Model$HtmlNode$ElementNode, 'i', _List_Nil, children);
 	});
 var $author$project$RichText$Definitions$italic = $author$project$RichText$Config$MarkDefinition$markDefinition(
-	{fromHtmlNode: $author$project$RichText$Definitions$htmlNodeToItalic, name: 'italic', toHtmlNode: $author$project$RichText$Definitions$italicToHtmlNode});
+	{b9: $author$project$RichText$Definitions$htmlNodeToItalic, ct: 'italic', c0: $author$project$RichText$Definitions$italicToHtmlNode});
 var $author$project$RichText$List$findListItemAncestor = function (parameters) {
 	return $author$project$RichText$Node$findAncestor(
 		function (n) {
@@ -16718,8 +13266,8 @@ var $elm$core$List$all = F2(
 			list);
 	});
 var $author$project$RichText$List$item = function (definition) {
-	var c = definition.a;
-	return c.item;
+	var c = definition;
+	return c.bs;
 };
 var $author$project$RichText$List$isBeginningOfListItem = F3(
 	function (definition, selection, root) {
@@ -16734,7 +13282,7 @@ var $author$project$RichText$List$isBeginningOfListItem = F3(
 					$author$project$RichText$List$item(definition),
 					$author$project$RichText$Model$Selection$anchorNode(selection),
 					root);
-				if (_v0.$ === 'Nothing') {
+				if (_v0.$ === 1) {
 					return false;
 				} else {
 					var _v1 = _v0.a;
@@ -16756,26 +13304,26 @@ var $author$project$RichText$List$isBeginningOfListItem = F3(
 var $author$project$RichText$List$addLiftAnnotationAtPathAndChildren = F2(
 	function (path, root) {
 		var _v0 = A3($author$project$RichText$Annotation$addAtPath, $author$project$RichText$Annotation$lift, path, root);
-		if (_v0.$ === 'Err') {
+		if (_v0.$ === 1) {
 			var s = _v0.a;
 			return $elm$core$Result$Err(s);
 		} else {
 			var newRoot = _v0.a;
 			var _v1 = A2($author$project$RichText$Node$nodeAt, path, newRoot);
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return $elm$core$Result$Err('Invalid path');
 			} else {
 				var node = _v1.a;
-				if (node.$ === 'Block') {
+				if (!node.$) {
 					var bn = node.a;
 					var _v3 = $author$project$RichText$Model$Node$childNodes(bn);
-					if (_v3.$ === 'BlockChildren') {
+					if (!_v3.$) {
 						var ba = _v3.a;
 						return A3(
 							$elm$core$List$foldl,
 							F2(
 								function (i, result) {
-									if (result.$ === 'Err') {
+									if (result.$ === 1) {
 										return result;
 									} else {
 										var n = result.a;
@@ -16829,16 +13377,16 @@ var $elm_community$list_extra$List$Extra$getAt = F2(
 			A2($elm$core$List$drop, idx, xs));
 	});
 var $author$project$RichText$List$ordered = function (definition) {
-	var c = definition.a;
-	return c.ordered;
+	var c = definition;
+	return c.bA;
 };
 var $author$project$RichText$List$unordered = function (definition) {
-	var c = definition.a;
-	return c.unordered;
+	var c = definition;
+	return c.bN;
 };
 var $author$project$RichText$List$isListNode = F2(
 	function (definition, node) {
-		if (node.$ === 'Inline') {
+		if (node.$ === 1) {
 			return false;
 		} else {
 			var bn = node.a;
@@ -16860,7 +13408,7 @@ var $author$project$RichText$List$addLiftMarkToListItems = F3(
 			$author$project$RichText$List$item(definition),
 			$author$project$RichText$Model$Selection$anchorNode(selection),
 			root);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('There is no list item ancestor at anchor path');
 		} else {
 			var _v1 = _v0.a;
@@ -16870,7 +13418,7 @@ var $author$project$RichText$List$addLiftMarkToListItems = F3(
 				$author$project$RichText$List$item(definition),
 				$author$project$RichText$Model$Selection$focusNode(selection),
 				root);
-			if (_v2.$ === 'Nothing') {
+			if (_v2.$ === 1) {
 				return $elm$core$Result$Err('There is no list item ancestor at focus path');
 			} else {
 				var _v3 = _v2.a;
@@ -16880,7 +13428,7 @@ var $author$project$RichText$List$addLiftMarkToListItems = F3(
 				} else {
 					var ancestor = A2($author$project$RichText$Model$Node$commonAncestor, start, end);
 					var _v4 = A2($author$project$RichText$Node$nodeAt, ancestor, root);
-					if (_v4.$ === 'Nothing') {
+					if (_v4.$ === 1) {
 						return $elm$core$Result$Err('Invalid ancestor path');
 					} else {
 						var ancestorNode = _v4.a;
@@ -16891,7 +13439,7 @@ var $author$project$RichText$List$addLiftMarkToListItems = F3(
 								$elm_community$list_extra$List$Extra$getAt,
 								$elm$core$List$length(ancestor),
 								start);
-							if (_v5.$ === 'Nothing') {
+							if (_v5.$ === 1) {
 								return $elm$core$Result$Err('Invalid start index');
 							} else {
 								var startIndex = _v5.a;
@@ -16899,7 +13447,7 @@ var $author$project$RichText$List$addLiftMarkToListItems = F3(
 									$elm_community$list_extra$List$Extra$getAt,
 									$elm$core$List$length(ancestor),
 									end);
-								if (_v6.$ === 'Nothing') {
+								if (_v6.$ === 1) {
 									return $elm$core$Result$Err('Invalid end index');
 								} else {
 									var endIndex = _v6.a;
@@ -16907,7 +13455,7 @@ var $author$project$RichText$List$addLiftMarkToListItems = F3(
 										$elm$core$List$foldl,
 										F2(
 											function (i, result) {
-												if (result.$ === 'Err') {
+												if (result.$ === 1) {
 													return result;
 												} else {
 													var node = result.a;
@@ -16933,7 +13481,7 @@ var $author$project$RichText$List$addLiftMarkToListItems = F3(
 var $author$project$RichText$List$lift = F2(
 	function (definition, editorState) {
 		var _v0 = $author$project$RichText$Model$State$selection(editorState);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('Nothing is selected');
 		} else {
 			var selection = _v0.a;
@@ -16946,7 +13494,7 @@ var $author$project$RichText$List$lift = F2(
 					$author$project$RichText$Annotation$annotateSelection,
 					normalizedSelection,
 					$author$project$RichText$Model$State$root(editorState)));
-			if (_v1.$ === 'Err') {
+			if (_v1.$ === 1) {
 				var s = _v1.a;
 				return $elm$core$Result$Err(s);
 			} else {
@@ -16972,7 +13520,7 @@ var $author$project$RichText$List$lift = F2(
 var $author$project$RichText$List$joinBackward = F2(
 	function (definition, editorState) {
 		var _v0 = $author$project$RichText$Model$State$selection(editorState);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('Nothing is selected');
 		} else {
 			var selection = _v0.a;
@@ -16993,7 +13541,7 @@ var $author$project$RichText$List$joinBackward = F2(
 					$author$project$RichText$List$item(definition),
 					$author$project$RichText$Model$Selection$anchorNode(selection),
 					markedRoot);
-				if (_v1.$ === 'Nothing') {
+				if (_v1.$ === 1) {
 					return $elm$core$Result$Err('There is no list item selected');
 				} else {
 					var _v2 = _v1.a;
@@ -17006,16 +13554,16 @@ var $author$project$RichText$List$joinBackward = F2(
 					} else {
 						var prevLiPath = $author$project$RichText$Model$Node$decrement(liPath);
 						var _v3 = A2($author$project$RichText$Node$nodeAt, prevLiPath, markedRoot);
-						if (_v3.$ === 'Nothing') {
+						if (_v3.$ === 1) {
 							return $elm$core$Result$Err('Invalid list item path');
 						} else {
 							var prevLiNode = _v3.a;
-							if (prevLiNode.$ === 'Inline') {
+							if (prevLiNode.$ === 1) {
 								return $elm$core$Result$Err('There is no list item at path');
 							} else {
 								var prevBn = prevLiNode.a;
 								var _v5 = A2($author$project$RichText$Node$joinBlocks, prevBn, liNode);
-								if (_v5.$ === 'Nothing') {
+								if (_v5.$ === 1) {
 									return $elm$core$Result$Err('Could not join list items');
 								} else {
 									var joinedLi = _v5.a;
@@ -17030,7 +13578,7 @@ var $author$project$RichText$List$joinBackward = F2(
 											prevLiPath,
 											$author$project$RichText$Node$Block(joinedLi),
 											markedRoot));
-									if (joinedNodes.$ === 'Err') {
+									if (joinedNodes.$ === 1) {
 										var s = joinedNodes.a;
 										return $elm$core$Result$Err(s);
 									} else {
@@ -17066,7 +13614,7 @@ var $author$project$RichText$List$isEndOfListItem = F3(
 				$author$project$RichText$List$item(definition),
 				$author$project$RichText$Model$Selection$anchorNode(selection),
 				root);
-			if (_v0.$ === 'Nothing') {
+			if (_v0.$ === 1) {
 				return false;
 			} else {
 				var _v1 = _v0.a;
@@ -17080,9 +13628,9 @@ var $author$project$RichText$List$isEndOfListItem = F3(
 					_Utils_ap(path, lastPath))) {
 					return false;
 				} else {
-					if (lastNode.$ === 'Inline') {
+					if (lastNode.$ === 1) {
 						var il = lastNode.a;
-						if (il.$ === 'Text') {
+						if (il.$ === 1) {
 							var tl = il.a;
 							return _Utils_eq(
 								$elm$core$String$length(
@@ -17101,7 +13649,7 @@ var $author$project$RichText$List$isEndOfListItem = F3(
 var $author$project$RichText$List$joinForward = F2(
 	function (definition, editorState) {
 		var _v0 = $author$project$RichText$Model$State$selection(editorState);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('Nothing is selected');
 		} else {
 			var selection = _v0.a;
@@ -17122,7 +13670,7 @@ var $author$project$RichText$List$joinForward = F2(
 					$author$project$RichText$List$item(definition),
 					$author$project$RichText$Model$Selection$anchorNode(selection),
 					markedRoot);
-				if (_v1.$ === 'Nothing') {
+				if (_v1.$ === 1) {
 					return $elm$core$Result$Err('There is no list item selected');
 				} else {
 					var _v2 = _v1.a;
@@ -17130,16 +13678,16 @@ var $author$project$RichText$List$joinForward = F2(
 					var liNode = _v2.b;
 					var nextLiPath = $author$project$RichText$Model$Node$increment(liPath);
 					var _v3 = A2($author$project$RichText$Node$nodeAt, nextLiPath, markedRoot);
-					if (_v3.$ === 'Nothing') {
+					if (_v3.$ === 1) {
 						return $elm$core$Result$Err('I cannot join forward a list item if there is no subsequent list item');
 					} else {
 						var nextLi = _v3.a;
-						if (nextLi.$ === 'Inline') {
+						if (nextLi.$ === 1) {
 							return $elm$core$Result$Err('There is no list item at path');
 						} else {
 							var nextBn = nextLi.a;
 							var _v5 = A2($author$project$RichText$Node$joinBlocks, liNode, nextBn);
-							if (_v5.$ === 'Nothing') {
+							if (_v5.$ === 1) {
 								return $elm$core$Result$Err('I could not join these list items');
 							} else {
 								var joinedLi = _v5.a;
@@ -17154,7 +13702,7 @@ var $author$project$RichText$List$joinForward = F2(
 										liPath,
 										$author$project$RichText$Node$Block(joinedLi),
 										markedRoot));
-								if (joinedNodes.$ === 'Err') {
+								if (joinedNodes.$ === 1) {
 									var s = joinedNodes.a;
 									return $elm$core$Result$Err(s);
 								} else {
@@ -17182,7 +13730,7 @@ var $author$project$RichText$List$joinForward = F2(
 var $author$project$RichText$List$liftEmpty = F2(
 	function (definition, editorState) {
 		var _v0 = $author$project$RichText$Model$State$selection(editorState);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('Nothing is selected');
 		} else {
 			var selection = _v0.a;
@@ -17194,19 +13742,19 @@ var $author$project$RichText$List$liftEmpty = F2(
 					$author$project$RichText$List$item(definition),
 					$author$project$RichText$Model$Selection$anchorNode(selection),
 					$author$project$RichText$Model$State$root(editorState));
-				if (_v1.$ === 'Nothing') {
+				if (_v1.$ === 1) {
 					return $elm$core$Result$Err('No list item ancestor to lift');
 				} else {
 					var _v2 = _v1.a;
 					var node = _v2.b;
 					var _v3 = $author$project$RichText$Model$Node$childNodes(node);
-					if (_v3.$ === 'BlockChildren') {
+					if (!_v3.$) {
 						var a = _v3.a;
 						var _v4 = A2(
 							$elm$core$Array$get,
 							0,
 							$author$project$RichText$Model$Node$toBlockArray(a));
-						if (_v4.$ === 'Nothing') {
+						if (_v4.$ === 1) {
 							return $elm$core$Result$Err('Cannot lift a list item with no children');
 						} else {
 							var firstNode = _v4.a;
@@ -17313,11 +13861,9 @@ var $author$project$RichText$List$defaultCommandMap = function (definition) {
 							]),
 						$author$project$RichText$Config$Command$emptyCommandMap)))));
 };
-var $author$project$RichText$List$ListDefinition = function (a) {
-	return {$: 'ListDefinition', a: a};
-};
+var $author$project$RichText$List$ListDefinition = $elm$core$Basics$identity;
 var $author$project$RichText$List$listDefinition = function (contents) {
-	return $author$project$RichText$List$ListDefinition(contents);
+	return contents;
 };
 var $author$project$RichText$Definitions$htmlToListItem = $author$project$RichText$Config$ElementDefinition$defaultHtmlToElement('li');
 var $author$project$RichText$Definitions$listItemToHtml = F2(
@@ -17326,14 +13872,14 @@ var $author$project$RichText$Definitions$listItemToHtml = F2(
 	});
 var $author$project$RichText$Definitions$listItem = $author$project$RichText$Config$ElementDefinition$elementDefinition(
 	{
-		contentType: $author$project$RichText$Config$ElementDefinition$blockNode(
+		dp: $author$project$RichText$Config$ElementDefinition$blockNode(
 			_List_fromArray(
 				['block'])),
-		fromHtmlNode: $author$project$RichText$Definitions$htmlToListItem,
-		group: 'list_item',
-		name: 'list_item',
-		selectable: false,
-		toHtmlNode: $author$project$RichText$Definitions$listItemToHtml
+		b9: $author$project$RichText$Definitions$htmlToListItem,
+		dG: 'list_item',
+		ct: 'list_item',
+		ei: false,
+		c0: $author$project$RichText$Definitions$listItemToHtml
 	});
 var $author$project$RichText$Definitions$htmlToOrderedList = $author$project$RichText$Config$ElementDefinition$defaultHtmlToElement('ol');
 var $author$project$RichText$Definitions$orderedListToHtml = F2(
@@ -17342,14 +13888,14 @@ var $author$project$RichText$Definitions$orderedListToHtml = F2(
 	});
 var $author$project$RichText$Definitions$orderedList = $author$project$RichText$Config$ElementDefinition$elementDefinition(
 	{
-		contentType: $author$project$RichText$Config$ElementDefinition$blockNode(
+		dp: $author$project$RichText$Config$ElementDefinition$blockNode(
 			_List_fromArray(
 				['list_item'])),
-		fromHtmlNode: $author$project$RichText$Definitions$htmlToOrderedList,
-		group: 'block',
-		name: 'ordered_list',
-		selectable: false,
-		toHtmlNode: $author$project$RichText$Definitions$orderedListToHtml
+		b9: $author$project$RichText$Definitions$htmlToOrderedList,
+		dG: 'block',
+		ct: 'ordered_list',
+		ei: false,
+		c0: $author$project$RichText$Definitions$orderedListToHtml
 	});
 var $author$project$RichText$Definitions$htmlToUnorderedList = $author$project$RichText$Config$ElementDefinition$defaultHtmlToElement('ul');
 var $author$project$RichText$Definitions$unorderedListToHtml = F2(
@@ -17358,25 +13904,23 @@ var $author$project$RichText$Definitions$unorderedListToHtml = F2(
 	});
 var $author$project$RichText$Definitions$unorderedList = $author$project$RichText$Config$ElementDefinition$elementDefinition(
 	{
-		contentType: $author$project$RichText$Config$ElementDefinition$blockNode(
+		dp: $author$project$RichText$Config$ElementDefinition$blockNode(
 			_List_fromArray(
 				['list_item'])),
-		fromHtmlNode: $author$project$RichText$Definitions$htmlToUnorderedList,
-		group: 'block',
-		name: 'unordered_list',
-		selectable: false,
-		toHtmlNode: $author$project$RichText$Definitions$unorderedListToHtml
+		b9: $author$project$RichText$Definitions$htmlToUnorderedList,
+		dG: 'block',
+		ct: 'unordered_list',
+		ei: false,
+		c0: $author$project$RichText$Definitions$unorderedListToHtml
 	});
 var $author$project$RichText$List$defaultListDefinition = $author$project$RichText$List$listDefinition(
 	{
-		item: A2($author$project$RichText$Model$Element$element, $author$project$RichText$Definitions$listItem, _List_Nil),
-		ordered: A2($author$project$RichText$Model$Element$element, $author$project$RichText$Definitions$orderedList, _List_Nil),
-		unordered: A2($author$project$RichText$Model$Element$element, $author$project$RichText$Definitions$unorderedList, _List_Nil)
+		bs: A2($author$project$RichText$Model$Element$element, $author$project$RichText$Definitions$listItem, _List_Nil),
+		bA: A2($author$project$RichText$Model$Element$element, $author$project$RichText$Definitions$orderedList, _List_Nil),
+		bN: A2($author$project$RichText$Model$Element$element, $author$project$RichText$Definitions$unorderedList, _List_Nil)
 	});
 var $author$project$Editor$listCommandBindings = $author$project$RichText$List$defaultCommandMap($author$project$RichText$List$defaultListDefinition);
-var $author$project$RichText$Model$Mark$MarkOrder = function (a) {
-	return {$: 'MarkOrder', a: a};
-};
+var $author$project$RichText$Model$Mark$MarkOrder = $elm$core$Basics$identity;
 var $elm$core$Dict$fromList = function (assocs) {
 	return A3(
 		$elm$core$List$foldl,
@@ -17390,31 +13934,30 @@ var $elm$core$Dict$fromList = function (assocs) {
 		assocs);
 };
 var $author$project$RichText$Config$Spec$markDefinitions = function (spec) {
-	var c = spec.a;
-	return c.marks;
+	var c = spec;
+	return c.am;
 };
 var $author$project$RichText$Model$Mark$markOrderFromSpec = function (spec) {
-	return $author$project$RichText$Model$Mark$MarkOrder(
-		$elm$core$Dict$fromList(
-			A2(
-				$elm$core$List$indexedMap,
-				F2(
-					function (i, m) {
-						var md = m.a;
-						return _Utils_Tuple2(md.name, i);
-					}),
-				$author$project$RichText$Config$Spec$markDefinitions(spec))));
+	return $elm$core$Dict$fromList(
+		A2(
+			$elm$core$List$indexedMap,
+			F2(
+				function (i, m) {
+					var md = m;
+					return _Utils_Tuple2(md.ct, i);
+				}),
+			$author$project$RichText$Config$Spec$markDefinitions(spec)));
 };
 var $author$project$RichText$Commands$splitBlockHeaderToNewParagraph = F3(
 	function (headerElements, paragraphElement, editorState) {
 		var _v0 = $author$project$RichText$Commands$splitTextBlock(editorState);
-		if (_v0.$ === 'Err') {
+		if (_v0.$ === 1) {
 			var s = _v0.a;
 			return $elm$core$Result$Err(s);
 		} else {
 			var splitEditorState = _v0.a;
 			var _v1 = $author$project$RichText$Model$State$selection(splitEditorState);
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return $elm$core$Result$Ok(splitEditorState);
 			} else {
 				var selection = _v1.a;
@@ -17429,11 +13972,11 @@ var $author$project$RichText$Commands$splitBlockHeaderToNewParagraph = F3(
 						$author$project$RichText$Node$nodeAt,
 						p,
 						$author$project$RichText$Model$State$root(splitEditorState));
-					if (_v2.$ === 'Nothing') {
+					if (_v2.$ === 1) {
 						return $elm$core$Result$Ok(splitEditorState);
 					} else {
 						var node = _v2.a;
-						if (node.$ === 'Block') {
+						if (!node.$) {
 							var bn = node.a;
 							var parameters = $author$project$RichText$Model$Node$element(bn);
 							if (A2(
@@ -17446,7 +13989,7 @@ var $author$project$RichText$Commands$splitBlockHeaderToNewParagraph = F3(
 									$author$project$RichText$Node$Block(
 										A2($author$project$RichText$Model$Node$withElement, paragraphElement, bn)),
 									$author$project$RichText$Model$State$root(splitEditorState));
-								if (_v4.$ === 'Err') {
+								if (_v4.$ === 1) {
 									return $elm$core$Result$Ok(splitEditorState);
 								} else {
 									var newRoot = _v4.a;
@@ -17466,7 +14009,7 @@ var $author$project$RichText$Commands$splitBlockHeaderToNewParagraph = F3(
 	});
 var $author$project$RichText$Commands$hugLeft = function (state) {
 	var _v0 = $author$project$RichText$Model$State$selection(state);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return state;
 	} else {
 		var selection = _v0.a;
@@ -17477,13 +14020,13 @@ var $author$project$RichText$Commands$hugLeft = function (state) {
 			var normalizedSelection = $author$project$RichText$Model$Selection$normalize(selection);
 			var anchorPath = $author$project$RichText$Model$Selection$anchorNode(normalizedSelection);
 			var _v1 = A2($author$project$RichText$Node$nodeAt, anchorPath, root);
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return state;
 			} else {
 				var n = _v1.a;
-				if (n.$ === 'Inline') {
+				if (n.$ === 1) {
 					var il = n.a;
-					if (il.$ === 'Text') {
+					if (il.$ === 1) {
 						var t = il.a;
 						if (_Utils_eq(
 							$elm$core$String$length(
@@ -17493,13 +14036,13 @@ var $author$project$RichText$Commands$hugLeft = function (state) {
 								$author$project$RichText$Node$nodeAt,
 								$author$project$RichText$Model$Node$increment(anchorPath),
 								root);
-							if (_v4.$ === 'Nothing') {
+							if (_v4.$ === 1) {
 								return state;
 							} else {
 								var n2 = _v4.a;
-								if (n2.$ === 'Inline') {
+								if (n2.$ === 1) {
 									var il2 = n2.a;
-									if (il2.$ === 'Text') {
+									if (il2.$ === 1) {
 										return A2(
 											$author$project$RichText$Model$State$withSelection,
 											$elm$core$Maybe$Just(
@@ -17532,7 +14075,7 @@ var $author$project$RichText$Commands$hugLeft = function (state) {
 };
 var $author$project$RichText$Commands$hugRight = function (state) {
 	var _v0 = $author$project$RichText$Model$State$selection(state);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return state;
 	} else {
 		var selection = _v0.a;
@@ -17543,25 +14086,25 @@ var $author$project$RichText$Commands$hugRight = function (state) {
 			var normalizedSelection = $author$project$RichText$Model$Selection$normalize(selection);
 			var focusPath = $author$project$RichText$Model$Selection$focusNode(normalizedSelection);
 			var _v1 = A2($author$project$RichText$Node$nodeAt, focusPath, root);
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return state;
 			} else {
 				var n = _v1.a;
-				if (n.$ === 'Inline') {
+				if (n.$ === 1) {
 					var il = n.a;
-					if (il.$ === 'Text') {
+					if (il.$ === 1) {
 						if (!$author$project$RichText$Model$Selection$focusOffset(normalizedSelection)) {
 							var _v4 = A2(
 								$author$project$RichText$Node$nodeAt,
 								$author$project$RichText$Model$Node$decrement(focusPath),
 								root);
-							if (_v4.$ === 'Nothing') {
+							if (_v4.$ === 1) {
 								return state;
 							} else {
 								var n2 = _v4.a;
-								if (n2.$ === 'Inline') {
+								if (n2.$ === 1) {
 									var il2 = n2.a;
-									if (il2.$ === 'Text') {
+									if (il2.$ === 1) {
 										var t = il2.a;
 										return A2(
 											$author$project$RichText$Model$State$withSelection,
@@ -17598,8 +14141,8 @@ var $author$project$RichText$Commands$hug = function (state) {
 	return $author$project$RichText$Commands$hugRight(
 		$author$project$RichText$Commands$hugLeft(state));
 };
-var $author$project$RichText$Model$Mark$Add = {$: 'Add'};
-var $author$project$RichText$Model$Mark$Remove = {$: 'Remove'};
+var $author$project$RichText$Model$Mark$Add = 0;
+var $author$project$RichText$Model$Mark$Remove = 1;
 var $author$project$RichText$Node$allRange = F4(
 	function (pred, start, end, root) {
 		allRange:
@@ -17608,13 +14151,13 @@ var $author$project$RichText$Node$allRange = F4(
 				return true;
 			} else {
 				var _v0 = A2($author$project$RichText$Node$nodeAt, start, root);
-				if (_v0.$ === 'Nothing') {
+				if (_v0.$ === 1) {
 					return true;
 				} else {
 					var node = _v0.a;
 					if (pred(node)) {
 						var _v1 = A2($author$project$RichText$Node$next, start, root);
-						if (_v1.$ === 'Nothing') {
+						if (_v1.$ === 1) {
 							return true;
 						} else {
 							var _v2 = _v1.a;
@@ -17649,7 +14192,7 @@ var $author$project$RichText$Model$Mark$hasMarkWithName = F2(
 	});
 var $author$project$RichText$Commands$isBlockOrInlineNodeWithMark = F2(
 	function (markName, node) {
-		if (node.$ === 'Inline') {
+		if (node.$ === 1) {
 			var il = node.a;
 			return A2(
 				$author$project$RichText$Model$Mark$hasMarkWithName,
@@ -17672,7 +14215,7 @@ var $elm$core$List$filter = F2(
 	});
 var $author$project$RichText$Model$Mark$sort = F2(
 	function (order, marks) {
-		var o = order.a;
+		var o = order;
 		return A2(
 			$elm$core$List$sortBy,
 			function (m) {
@@ -17698,7 +14241,7 @@ var $author$project$RichText$Model$Mark$toggle = F4(
 					$author$project$RichText$Model$Mark$name(mark_));
 			},
 			marks);
-		return (_Utils_eq(toggleAction, $author$project$RichText$Model$Mark$Remove) || (_Utils_eq(toggleAction, $author$project$RichText$Model$Mark$Flip) && isMember)) ? A2(
+		return ((toggleAction === 1) || ((toggleAction === 2) && isMember)) ? A2(
 			$elm$core$List$filter,
 			function (x) {
 				return !_Utils_eq(
@@ -17719,21 +14262,20 @@ var $author$project$RichText$Model$Mark$toggle = F4(
 	});
 var $author$project$RichText$Model$InlineElement$withMarks = F2(
 	function (m, iparams) {
-		var c = iparams.a;
-		return $author$project$RichText$Model$InlineElement$InlineElement(
-			_Utils_update(
-				c,
-				{marks: m}));
+		var c = iparams;
+		return _Utils_update(
+			c,
+			{am: m});
 	});
 var $author$project$RichText$Node$toggleMark = F4(
 	function (action, markOrder, mark, node) {
-		if (node.$ === 'Block') {
+		if (!node.$) {
 			return node;
 		} else {
 			var il = node.a;
 			return $author$project$RichText$Node$Inline(
 				function () {
-					if (il.$ === 'Text') {
+					if (il.$ === 1) {
 						var leaf = il.a;
 						return $author$project$RichText$Model$Node$Text(
 							A2(
@@ -17764,7 +14306,7 @@ var $author$project$RichText$Node$toggleMark = F4(
 var $author$project$RichText$Commands$toggleMarkSingleInlineNode = F4(
 	function (markOrder, mark, action, editorState) {
 		var _v0 = $author$project$RichText$Model$State$selection(editorState);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('Nothing is selected');
 		} else {
 			var selection = _v0.a;
@@ -17778,11 +14320,11 @@ var $author$project$RichText$Commands$toggleMarkSingleInlineNode = F4(
 					$author$project$RichText$Node$nodeAt,
 					$author$project$RichText$Model$Selection$anchorNode(normalizedSelection),
 					$author$project$RichText$Model$State$root(editorState));
-				if (_v1.$ === 'Nothing') {
+				if (_v1.$ === 1) {
 					return $elm$core$Result$Err('No node at selection');
 				} else {
 					var node = _v1.a;
-					if (node.$ === 'Block') {
+					if (!node.$) {
 						return $elm$core$Result$Err('Cannot toggle a block node');
 					} else {
 						var il = node.a;
@@ -17793,7 +14335,7 @@ var $author$project$RichText$Commands$toggleMarkSingleInlineNode = F4(
 							mark,
 							$author$project$RichText$Model$Node$marks(il));
 						var leaves = function () {
-							if (il.$ === 'InlineElement') {
+							if (!il.$) {
 								var leaf = il.a;
 								return _List_fromArray(
 									[
@@ -17857,7 +14399,7 @@ var $author$project$RichText$Commands$toggleMarkSingleInlineNode = F4(
 							$author$project$RichText$Node$InlineFragment(
 								$elm$core$Array$fromList(leaves)),
 							$author$project$RichText$Model$State$root(editorState));
-						if (_v3.$ === 'Err') {
+						if (_v3.$ === 1) {
 							var s = _v3.a;
 							return $elm$core$Result$Err(s);
 						} else {
@@ -17886,7 +14428,7 @@ var $author$project$RichText$Commands$toggleMarkSingleInlineNode = F4(
 var $author$project$RichText$Commands$toggleMarkFull = F4(
 	function (markOrder, mark, action, editorState) {
 		var _v0 = $author$project$RichText$Model$State$selection(editorState);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('Nothing is selected');
 		} else {
 			var selection = _v0.a;
@@ -17896,20 +14438,20 @@ var $author$project$RichText$Commands$toggleMarkFull = F4(
 				return A4($author$project$RichText$Commands$toggleMarkSingleInlineNode, markOrder, mark, action, editorState);
 			} else {
 				var normalizedSelection = $author$project$RichText$Model$Selection$normalize(selection);
-				var toggleAction = (!_Utils_eq(action, $author$project$RichText$Model$Mark$Flip)) ? action : (A4(
+				var toggleAction = (action !== 2) ? action : (A4(
 					$author$project$RichText$Node$allRange,
 					$author$project$RichText$Commands$isBlockOrInlineNodeWithMark(
 						$author$project$RichText$Model$Mark$name(mark)),
 					$author$project$RichText$Model$Selection$anchorNode(normalizedSelection),
 					$author$project$RichText$Model$Selection$focusNode(normalizedSelection),
-					$author$project$RichText$Model$State$root(editorState)) ? $author$project$RichText$Model$Mark$Remove : $author$project$RichText$Model$Mark$Add);
+					$author$project$RichText$Model$State$root(editorState)) ? 1 : 0);
 				var incrementAnchorOffset = !(!$author$project$RichText$Model$Selection$anchorOffset(normalizedSelection));
 				var betweenRoot = function () {
 					var _v4 = A2(
 						$author$project$RichText$Node$next,
 						$author$project$RichText$Model$Selection$anchorNode(normalizedSelection),
 						$author$project$RichText$Model$State$root(editorState));
-					if (_v4.$ === 'Nothing') {
+					if (_v4.$ === 1) {
 						return $author$project$RichText$Model$State$root(editorState);
 					} else {
 						var _v5 = _v4.a;
@@ -17918,7 +14460,7 @@ var $author$project$RichText$Commands$toggleMarkFull = F4(
 							$author$project$RichText$Node$previous,
 							$author$project$RichText$Model$Selection$focusNode(normalizedSelection),
 							$author$project$RichText$Model$State$root(editorState));
-						if (_v6.$ === 'Nothing') {
+						if (_v6.$ === 1) {
 							return $author$project$RichText$Model$State$root(editorState);
 						} else {
 							var _v7 = _v6.a;
@@ -17930,7 +14472,7 @@ var $author$project$RichText$Commands$toggleMarkFull = F4(
 										if ((_Utils_cmp(path, afterAnchor) < 0) || (_Utils_cmp(path, beforeFocus) > 0)) {
 											return node;
 										} else {
-											if (node.$ === 'Block') {
+											if (!node.$) {
 												return node;
 											} else {
 												return A4($author$project$RichText$Node$toggleMark, toggleAction, markOrder, mark, node);
@@ -17939,7 +14481,7 @@ var $author$project$RichText$Commands$toggleMarkFull = F4(
 									}),
 								$author$project$RichText$Node$Block(
 									$author$project$RichText$Model$State$root(editorState)));
-							if (_v8.$ === 'Block') {
+							if (!_v8.$) {
 								var bn = _v8.a;
 								return bn;
 							} else {
@@ -17970,14 +14512,14 @@ var $author$project$RichText$Commands$toggleMarkFull = F4(
 						$author$project$RichText$Node$nodeAt,
 						$author$project$RichText$Model$Selection$anchorNode(normalizedSelection),
 						$author$project$RichText$Model$State$root(editorState));
-					if (_v1.$ === 'Nothing') {
+					if (_v1.$ === 1) {
 						return modifiedEndNodeEditorState;
 					} else {
 						var node = _v1.a;
-						if (node.$ === 'Inline') {
+						if (node.$ === 1) {
 							var il = node.a;
 							var focusOffset = function () {
-								if (il.$ === 'Text') {
+								if (il.$ === 1) {
 									var leaf = il.a;
 									return $elm$core$String$length(
 										$author$project$RichText$Model$Text$text(leaf));
@@ -18060,7 +14602,7 @@ var $author$project$Editor$commandBindings = function (spec) {
 							$author$project$RichText$Commands$toggleMark,
 							markOrder,
 							A2($author$project$RichText$Model$Mark$mark, $author$project$RichText$Definitions$italic, _List_Nil),
-							$author$project$RichText$Model$Mark$Flip)))
+							2)))
 				]),
 			A3(
 				$author$project$RichText$Config$Command$set,
@@ -18080,7 +14622,7 @@ var $author$project$Editor$commandBindings = function (spec) {
 								$author$project$RichText$Commands$toggleMark,
 								markOrder,
 								A2($author$project$RichText$Model$Mark$mark, $author$project$RichText$Definitions$bold, _List_Nil),
-								$author$project$RichText$Model$Mark$Flip)))
+								2)))
 					]),
 				A3(
 					$author$project$RichText$Config$Command$set,
@@ -18120,30 +14662,25 @@ var $author$project$Editor$commandBindings = function (spec) {
 						]),
 					$author$project$RichText$Commands$defaultCommandMap))));
 };
-var $author$project$RichText$Editor$Config = function (a) {
-	return {$: 'Config', a: a};
-};
+var $author$project$RichText$Editor$Config = $elm$core$Basics$identity;
 var $author$project$RichText$Editor$config = function (cfg) {
-	return $author$project$RichText$Editor$Config(cfg);
+	return cfg;
 };
 var $author$project$RichText$Config$Decorations$elementDecorations = function (d) {
-	var c = d.a;
-	return c.elements;
+	var c = d;
+	return c.a_;
 };
 var $author$project$RichText$Config$ElementDefinition$name = function (definition_) {
-	var c = definition_.a;
-	return c.name;
+	var c = definition_;
+	return c.ct;
 };
-var $author$project$RichText$Config$Decorations$Decorations = function (a) {
-	return {$: 'Decorations', a: a};
-};
+var $author$project$RichText$Config$Decorations$Decorations = $elm$core$Basics$identity;
 var $author$project$RichText$Config$Decorations$withElementDecorations = F2(
 	function (elements, d) {
-		var c = d.a;
-		return $author$project$RichText$Config$Decorations$Decorations(
-			_Utils_update(
-				c,
-				{elements: elements}));
+		var c = d;
+		return _Utils_update(
+			c,
+			{a_: elements});
 	});
 var $author$project$RichText$Config$Decorations$addElementDecoration = F3(
 	function (definition, decorator, decorations) {
@@ -18170,12 +14707,11 @@ var $elm$virtual_dom$VirtualDom$attribute = F2(
 			_VirtualDom_noJavaScriptOrHtmlUri(value));
 	});
 var $elm$html$Html$Attributes$attribute = $elm$virtual_dom$VirtualDom$attribute;
-var $author$project$RichText$Config$Decorations$emptyDecorations = $author$project$RichText$Config$Decorations$Decorations(
-	{elements: $elm$core$Dict$empty, marks: $elm$core$Dict$empty, topLevelAttributes: _List_Nil});
+var $author$project$RichText$Config$Decorations$emptyDecorations = {a_: $elm$core$Dict$empty, am: $elm$core$Dict$empty, bh: _List_Nil};
 var $author$project$RichText$Definitions$horizontalRuleToHtml = $author$project$RichText$Config$ElementDefinition$defaultElementToHtml('hr');
 var $author$project$RichText$Definitions$htmlToHorizontalRule = F2(
 	function (def, node) {
-		if (node.$ === 'ElementNode') {
+		if (!node.$) {
 			var name = node.a;
 			return (name === 'hr') ? $elm$core$Maybe$Just(
 				_Utils_Tuple2(
@@ -18189,10 +14725,10 @@ var $author$project$RichText$Definitions$htmlToHorizontalRule = F2(
 		}
 	});
 var $author$project$RichText$Definitions$horizontalRule = $author$project$RichText$Config$ElementDefinition$elementDefinition(
-	{contentType: $author$project$RichText$Config$ElementDefinition$blockLeaf, fromHtmlNode: $author$project$RichText$Definitions$htmlToHorizontalRule, group: 'block', name: 'horizontal_rule', selectable: true, toHtmlNode: $author$project$RichText$Definitions$horizontalRuleToHtml});
+	{dp: $author$project$RichText$Config$ElementDefinition$blockLeaf, b9: $author$project$RichText$Definitions$htmlToHorizontalRule, dG: 'block', ct: 'horizontal_rule', ei: true, c0: $author$project$RichText$Definitions$horizontalRuleToHtml});
 var $author$project$RichText$Definitions$htmlNodeToImage = F2(
 	function (def, node) {
-		if (node.$ === 'ElementNode') {
+		if (!node.$) {
 			var name = node.a;
 			var attributes = node.b;
 			if (name === 'img') {
@@ -18238,7 +14774,7 @@ var $author$project$RichText$Definitions$filterAttributesToHtml = function (attr
 		function (_v0) {
 			var p = _v0.a;
 			var v = _v0.b;
-			if (v.$ === 'Nothing') {
+			if (v.$ === 1) {
 				return $elm$core$Maybe$Nothing;
 			} else {
 				var tv = v.a;
@@ -18279,10 +14815,10 @@ var $author$project$RichText$Definitions$imageToHtmlNode = F2(
 		return A3($author$project$RichText$Model$HtmlNode$ElementNode, 'img', attr, $elm$core$Array$empty);
 	});
 var $author$project$RichText$Definitions$image = $author$project$RichText$Config$ElementDefinition$elementDefinition(
-	{contentType: $author$project$RichText$Config$ElementDefinition$inlineLeaf, fromHtmlNode: $author$project$RichText$Definitions$htmlNodeToImage, group: 'inline', name: 'image', selectable: true, toHtmlNode: $author$project$RichText$Definitions$imageToHtmlNode});
+	{dp: $author$project$RichText$Config$ElementDefinition$inlineLeaf, b9: $author$project$RichText$Definitions$htmlNodeToImage, dG: 'inline', ct: 'image', ei: true, c0: $author$project$RichText$Definitions$imageToHtmlNode});
 var $author$project$RichText$Internal$Editor$SelectionEvent = F2(
 	function (a, b) {
-		return {$: 'SelectionEvent', a: a, b: b};
+		return {$: 0, a: a, b: b};
 	});
 var $elm$json$Json$Encode$string = _Json_wrap;
 var $elm$html$Html$Attributes$stringProperty = F2(
@@ -18294,7 +14830,7 @@ var $elm$html$Html$Attributes$stringProperty = F2(
 	});
 var $elm$html$Html$Attributes$class = $elm$html$Html$Attributes$stringProperty('className');
 var $elm$virtual_dom$VirtualDom$Normal = function (a) {
-	return {$: 'Normal', a: a};
+	return {$: 0, a: a};
 };
 var $elm$virtual_dom$VirtualDom$on = _VirtualDom_on;
 var $elm$html$Html$Events$on = F2(
@@ -18333,11 +14869,10 @@ var $author$project$RichText$Config$Decorations$selectableDecoration = F4(
 	});
 var $author$project$RichText$Config$Decorations$withTopLevelAttributes = F2(
 	function (topLevelAttributes_, d) {
-		var c = d.a;
-		return $author$project$RichText$Config$Decorations$Decorations(
-			_Utils_update(
-				c,
-				{topLevelAttributes: topLevelAttributes_}));
+		var c = d;
+		return _Utils_update(
+			c,
+			{bh: topLevelAttributes_});
 	});
 var $author$project$Editor$decorations = A2(
 	$author$project$RichText$Config$Decorations$withTopLevelAttributes,
@@ -18358,14 +14893,14 @@ var $author$project$RichText$Definitions$blockquoteToHtml = $author$project$Rich
 var $author$project$RichText$Definitions$htmlToBlockquote = $author$project$RichText$Config$ElementDefinition$defaultHtmlToElement('blockquote');
 var $author$project$RichText$Definitions$blockquote = $author$project$RichText$Config$ElementDefinition$elementDefinition(
 	{
-		contentType: $author$project$RichText$Config$ElementDefinition$blockNode(
+		dp: $author$project$RichText$Config$ElementDefinition$blockNode(
 			_List_fromArray(
 				['block'])),
-		fromHtmlNode: $author$project$RichText$Definitions$htmlToBlockquote,
-		group: 'block',
-		name: 'blockquote',
-		selectable: false,
-		toHtmlNode: $author$project$RichText$Definitions$blockquoteToHtml
+		b9: $author$project$RichText$Definitions$htmlToBlockquote,
+		dG: 'block',
+		ct: 'blockquote',
+		ei: false,
+		c0: $author$project$RichText$Definitions$blockquoteToHtml
 	});
 var $author$project$RichText$Definitions$codeBlockToHtmlNode = F2(
 	function (_v0, children) {
@@ -18381,16 +14916,16 @@ var $author$project$RichText$Definitions$codeBlockToHtmlNode = F2(
 	});
 var $author$project$RichText$Definitions$htmlNodeToCodeBlock = F2(
 	function (def, node) {
-		if (node.$ === 'ElementNode') {
+		if (!node.$) {
 			var name = node.a;
 			var children = node.c;
 			if ((name === 'pre') && ($elm$core$Array$length(children) === 1)) {
 				var _v1 = A2($elm$core$Array$get, 0, children);
-				if (_v1.$ === 'Nothing') {
+				if (_v1.$ === 1) {
 					return $elm$core$Maybe$Nothing;
 				} else {
 					var n = _v1.a;
-					if (n.$ === 'ElementNode') {
+					if (!n.$) {
 						var childChildren = n.c;
 						return $elm$core$Maybe$Just(
 							_Utils_Tuple2(
@@ -18409,24 +14944,21 @@ var $author$project$RichText$Definitions$htmlNodeToCodeBlock = F2(
 	});
 var $author$project$RichText$Definitions$codeBlock = $author$project$RichText$Config$ElementDefinition$elementDefinition(
 	{
-		contentType: $author$project$RichText$Config$ElementDefinition$textBlock(
+		dp: $author$project$RichText$Config$ElementDefinition$textBlock(
 			{
-				allowedGroups: _List_fromArray(
+				da: _List_fromArray(
 					['text']),
-				allowedMarks: _List_fromArray(
+				db: _List_fromArray(
 					['__nothing__'])
 			}),
-		fromHtmlNode: $author$project$RichText$Definitions$htmlNodeToCodeBlock,
-		group: 'block',
-		name: 'code_block',
-		selectable: false,
-		toHtmlNode: $author$project$RichText$Definitions$codeBlockToHtmlNode
+		b9: $author$project$RichText$Definitions$htmlNodeToCodeBlock,
+		dG: 'block',
+		ct: 'code_block',
+		ei: false,
+		c0: $author$project$RichText$Definitions$codeBlockToHtmlNode
 	});
-var $author$project$RichText$Config$Spec$Spec = function (a) {
-	return {$: 'Spec', a: a};
-};
-var $author$project$RichText$Config$Spec$emptySpec = $author$project$RichText$Config$Spec$Spec(
-	{elements: _List_Nil, marks: _List_Nil, nameToElement: $elm$core$Dict$empty, nameToMark: $elm$core$Dict$empty});
+var $author$project$RichText$Config$Spec$Spec = $elm$core$Basics$identity;
+var $author$project$RichText$Config$Spec$emptySpec = {a_: _List_Nil, am: _List_Nil, a6: $elm$core$Dict$empty, a7: $elm$core$Dict$empty};
 var $author$project$RichText$Definitions$headingToHtml = F2(
 	function (parameters, children) {
 		var level = A2(
@@ -18444,11 +14976,11 @@ var $author$project$RichText$Definitions$headingToHtml = F2(
 	});
 var $author$project$RichText$Model$Attribute$IntegerAttribute = F2(
 	function (a, b) {
-		return {$: 'IntegerAttribute', a: a, b: b};
+		return {$: 1, a: a, b: b};
 	});
 var $author$project$RichText$Definitions$htmlToHeading = F2(
 	function (def, node) {
-		if (node.$ === 'ElementNode') {
+		if (!node.$) {
 			var name = node.a;
 			var children = node.c;
 			var maybeLevel = function () {
@@ -18469,7 +15001,7 @@ var $author$project$RichText$Definitions$htmlToHeading = F2(
 						return $elm$core$Maybe$Nothing;
 				}
 			}();
-			if (maybeLevel.$ === 'Nothing') {
+			if (maybeLevel.$ === 1) {
 				return $elm$core$Maybe$Nothing;
 			} else {
 				var level = maybeLevel.a;
@@ -18490,21 +15022,21 @@ var $author$project$RichText$Definitions$htmlToHeading = F2(
 	});
 var $author$project$RichText$Definitions$heading = $author$project$RichText$Config$ElementDefinition$elementDefinition(
 	{
-		contentType: $author$project$RichText$Config$ElementDefinition$textBlock(
+		dp: $author$project$RichText$Config$ElementDefinition$textBlock(
 			{
-				allowedGroups: _List_fromArray(
+				da: _List_fromArray(
 					['inline']),
-				allowedMarks: _List_Nil
+				db: _List_Nil
 			}),
-		fromHtmlNode: $author$project$RichText$Definitions$htmlToHeading,
-		group: 'block',
-		name: 'heading',
-		selectable: false,
-		toHtmlNode: $author$project$RichText$Definitions$headingToHtml
+		b9: $author$project$RichText$Definitions$htmlToHeading,
+		dG: 'block',
+		ct: 'heading',
+		ei: false,
+		c0: $author$project$RichText$Definitions$headingToHtml
 	});
 var $author$project$RichText$Definitions$htmlNodeToLink = F2(
 	function (def, node) {
-		if (node.$ === 'ElementNode') {
+		if (!node.$) {
 			var name = node.a;
 			var attributes = node.b;
 			var children = node.c;
@@ -18564,42 +15096,40 @@ var $author$project$RichText$Definitions$linkToHtmlNode = F2(
 		return A3($author$project$RichText$Model$HtmlNode$ElementNode, 'a', attributes, children);
 	});
 var $author$project$RichText$Definitions$link = $author$project$RichText$Config$MarkDefinition$markDefinition(
-	{fromHtmlNode: $author$project$RichText$Definitions$htmlNodeToLink, name: 'link', toHtmlNode: $author$project$RichText$Definitions$linkToHtmlNode});
+	{b9: $author$project$RichText$Definitions$htmlNodeToLink, ct: 'link', c0: $author$project$RichText$Definitions$linkToHtmlNode});
 var $author$project$RichText$Config$Spec$withElementDefinitions = F2(
 	function (nodes, spec) {
-		var c = spec.a;
-		return $author$project$RichText$Config$Spec$Spec(
-			_Utils_update(
-				c,
-				{
-					elements: nodes,
-					nameToElement: $elm$core$Dict$fromList(
-						A2(
-							$elm$core$List$map,
-							function (x) {
-								var m = x.a;
-								return _Utils_Tuple2(m.name, x);
-							},
-							nodes))
-				}));
+		var c = spec;
+		return _Utils_update(
+			c,
+			{
+				a_: nodes,
+				a6: $elm$core$Dict$fromList(
+					A2(
+						$elm$core$List$map,
+						function (x) {
+							var m = x;
+							return _Utils_Tuple2(m.ct, x);
+						},
+						nodes))
+			});
 	});
 var $author$project$RichText$Config$Spec$withMarkDefinitions = F2(
 	function (marks, spec) {
-		var c = spec.a;
-		return $author$project$RichText$Config$Spec$Spec(
-			_Utils_update(
-				c,
-				{
-					marks: marks,
-					nameToMark: $elm$core$Dict$fromList(
-						A2(
-							$elm$core$List$map,
-							function (x) {
-								var m = x.a;
-								return _Utils_Tuple2(m.name, x);
-							},
-							marks))
-				}));
+		var c = spec;
+		return _Utils_update(
+			c,
+			{
+				am: marks,
+				a7: $elm$core$Dict$fromList(
+					A2(
+						$elm$core$List$map,
+						function (x) {
+							var m = x;
+							return _Utils_Tuple2(m.ct, x);
+						},
+						marks))
+			});
 	});
 var $author$project$RichText$Definitions$markdown = A2(
 	$author$project$RichText$Config$Spec$withMarkDefinitions,
@@ -18612,28 +15142,27 @@ var $author$project$RichText$Definitions$markdown = A2(
 		$author$project$RichText$Config$Spec$emptySpec));
 var $author$project$Page$Basic$config = $author$project$RichText$Editor$config(
 	{
-		commandMap: $author$project$Editor$commandBindings($author$project$RichText$Definitions$markdown),
-		decorations: $author$project$Editor$decorations,
-		spec: $author$project$RichText$Definitions$markdown,
-		toMsg: $author$project$Controls$InternalMsg
+		dn: $author$project$Editor$commandBindings($author$project$RichText$Definitions$markdown),
+		du: $author$project$Editor$decorations,
+		em: $author$project$RichText$Definitions$markdown,
+		er: $author$project$Controls$InternalMsg
 	});
 var $author$project$RichText$Internal$History$contents = function (history) {
-	var c = history.a;
+	var c = history;
 	return c;
 };
 var $author$project$RichText$Internal$History$fromContents = function (c) {
-	return $author$project$RichText$Internal$History$History(c);
+	return c;
 };
 var $author$project$RichText$Internal$Editor$history = function (e) {
-	var c = e.a;
-	return c.history;
+	var c = e;
+	return c.a3;
 };
 var $author$project$RichText$Internal$Editor$incrementChangeCount = function (e) {
-	var c = e.a;
-	return $author$project$RichText$Internal$Editor$Editor(
-		_Utils_update(
-			c,
-			{changeCount: c.changeCount + 1}));
+	var c = e;
+	return _Utils_update(
+		c,
+		{aD: c.aD + 1});
 };
 var $elm$core$Tuple$mapSecond = F2(
 	function (func, _v0) {
@@ -18644,10 +15173,10 @@ var $elm$core$Tuple$mapSecond = F2(
 			func(y));
 	});
 var $folkertdev$elm_deque$Internal$rebalance = function (deque) {
-	var sizeF = deque.sizeF;
-	var sizeR = deque.sizeR;
-	var front = deque.front;
-	var rear = deque.rear;
+	var sizeF = deque.y;
+	var sizeR = deque.z;
+	var front = deque.D;
+	var rear = deque.E;
 	var size1 = ((sizeF + sizeR) / 2) | 0;
 	var size2 = (sizeF + sizeR) - size1;
 	var balanceConstant = 4;
@@ -18660,7 +15189,7 @@ var $folkertdev$elm_deque$Internal$rebalance = function (deque) {
 				$elm$core$List$reverse(
 					A2($elm$core$List$drop, size1, front)));
 			var newFront = A2($elm$core$List$take, size1, front);
-			return {front: newFront, rear: newRear, sizeF: size1, sizeR: size2};
+			return {D: newFront, E: newRear, y: size1, z: size2};
 		} else {
 			if (_Utils_cmp(sizeR, (balanceConstant * sizeF) + 1) > 0) {
 				var newRear = A2($elm$core$List$take, size1, rear);
@@ -18668,7 +15197,7 @@ var $folkertdev$elm_deque$Internal$rebalance = function (deque) {
 					front,
 					$elm$core$List$reverse(
 						A2($elm$core$List$drop, size1, rear)));
-				return {front: newFront, rear: newRear, sizeF: size1, sizeR: size2};
+				return {D: newFront, E: newRear, y: size1, z: size2};
 			} else {
 				return deque;
 			}
@@ -18676,8 +15205,8 @@ var $folkertdev$elm_deque$Internal$rebalance = function (deque) {
 	}
 };
 var $folkertdev$elm_deque$Internal$popBack = function (deque) {
-	var front = deque.front;
-	var rear = deque.rear;
+	var front = deque.D;
+	var rear = deque.E;
 	var _v0 = _Utils_Tuple2(front, rear);
 	if (!_v0.b.b) {
 		if (!_v0.a.b) {
@@ -18700,7 +15229,7 @@ var $folkertdev$elm_deque$Internal$popBack = function (deque) {
 		return _Utils_Tuple2(
 			$elm$core$Maybe$Just(r),
 			$folkertdev$elm_deque$Internal$rebalance(
-				{front: deque.front, rear: rs, sizeF: deque.sizeF, sizeR: deque.sizeR - 1}));
+				{D: deque.D, E: rs, y: deque.y, z: deque.z - 1}));
 	}
 };
 var $folkertdev$elm_deque$BoundedDeque$popBack = function (_v0) {
@@ -18714,8 +15243,8 @@ var $folkertdev$elm_deque$BoundedDeque$popBack = function (_v0) {
 		$folkertdev$elm_deque$Internal$popBack(deque));
 };
 var $folkertdev$elm_deque$BoundedDeque$reachedMaxSize = function (_v0) {
-	var sizeF = _v0.a.sizeF;
-	var sizeR = _v0.a.sizeR;
+	var sizeF = _v0.a.y;
+	var sizeR = _v0.a.z;
 	var maxSize = _v0.b;
 	return _Utils_eq(sizeF + sizeR, maxSize);
 };
@@ -18733,10 +15262,10 @@ var $folkertdev$elm_deque$BoundedDeque$pushFront = F2(
 			var newDeque = _v0.a;
 			var newMaxSize = _v0.b;
 			var newerDeque = {
-				front: A2($elm$core$List$cons, elem, newDeque.front),
-				rear: newDeque.rear,
-				sizeF: newDeque.sizeF + 1,
-				sizeR: newDeque.sizeR
+				D: A2($elm$core$List$cons, elem, newDeque.D),
+				E: newDeque.E,
+				y: newDeque.y + 1,
+				z: newDeque.z
 			};
 			return A2(
 				$folkertdev$elm_deque$BoundedDeque$BoundedDeque,
@@ -18745,29 +15274,27 @@ var $folkertdev$elm_deque$BoundedDeque$pushFront = F2(
 		}
 	});
 var $author$project$RichText$Internal$Editor$state = function (e) {
-	var c = e.a;
-	return c.state;
+	var c = e;
+	return c.be;
 };
 var $author$project$RichText$Internal$Editor$withHistory = F2(
 	function (h, e) {
-		var c = e.a;
-		return $author$project$RichText$Internal$Editor$Editor(
-			_Utils_update(
-				c,
-				{history: h}));
+		var c = e;
+		return _Utils_update(
+			c,
+			{a3: h});
 	});
 var $author$project$RichText$Internal$Editor$withState = F2(
 	function (s, e) {
-		var c = e.a;
-		return $author$project$RichText$Internal$Editor$Editor(
-			_Utils_update(
-				c,
-				{state: s}));
+		var c = e;
+		return _Utils_update(
+			c,
+			{be: s});
 	});
 var $author$project$RichText$Internal$Editor$handleRedo = function (editor_) {
 	var editorHistory = $author$project$RichText$Internal$History$contents(
 		$author$project$RichText$Internal$Editor$history(editor_));
-	var _v0 = editorHistory.redoStack;
+	var _v0 = editorHistory.aK;
 	if (!_v0.b) {
 		return $elm$core$Result$Err('There are no states on the redo stack');
 	} else {
@@ -18776,13 +15303,13 @@ var $author$project$RichText$Internal$Editor$handleRedo = function (editor_) {
 		var newHistory = _Utils_update(
 			editorHistory,
 			{
-				redoStack: xs,
-				undoDeque: A2(
+				aK: xs,
+				S: A2(
 					$folkertdev$elm_deque$BoundedDeque$pushFront,
 					_Utils_Tuple2(
 						'redo',
 						$author$project$RichText$Internal$Editor$state(editor_)),
-					editorHistory.undoDeque)
+					editorHistory.S)
 			});
 		return $elm$core$Result$Ok(
 			$author$project$RichText$Internal$Editor$incrementChangeCount(
@@ -18793,8 +15320,8 @@ var $author$project$RichText$Internal$Editor$handleRedo = function (editor_) {
 	}
 };
 var $folkertdev$elm_deque$Internal$popFront = function (deque) {
-	var front = deque.front;
-	var rear = deque.rear;
+	var front = deque.D;
+	var rear = deque.E;
 	var _v0 = _Utils_Tuple2(front, rear);
 	if (!_v0.a.b) {
 		if (!_v0.b.b) {
@@ -18817,7 +15344,7 @@ var $folkertdev$elm_deque$Internal$popFront = function (deque) {
 		return _Utils_Tuple2(
 			$elm$core$Maybe$Just(f),
 			$folkertdev$elm_deque$Internal$rebalance(
-				{front: fs, rear: deque.rear, sizeF: deque.sizeF - 1, sizeR: deque.sizeR}));
+				{D: fs, E: deque.E, y: deque.y - 1, z: deque.z}));
 	}
 };
 var $folkertdev$elm_deque$BoundedDeque$popFront = function (_v0) {
@@ -18837,7 +15364,7 @@ var $author$project$RichText$Internal$Editor$findNextState = F2(
 			var _v0 = $folkertdev$elm_deque$BoundedDeque$popFront(undoDeque);
 			var maybeState = _v0.a;
 			var rest = _v0.b;
-			if (maybeState.$ === 'Nothing') {
+			if (maybeState.$ === 1) {
 				return _Utils_Tuple2($elm$core$Maybe$Nothing, rest);
 			} else {
 				var _v2 = maybeState.a;
@@ -18860,19 +15387,19 @@ var $author$project$RichText$Internal$Editor$handleUndo = function (editor_) {
 	var editorState = $author$project$RichText$Internal$Editor$state(editor_);
 	var editorHistory = $author$project$RichText$Internal$History$contents(
 		$author$project$RichText$Internal$Editor$history(editor_));
-	var _v0 = A2($author$project$RichText$Internal$Editor$findNextState, editorState, editorHistory.undoDeque);
+	var _v0 = A2($author$project$RichText$Internal$Editor$findNextState, editorState, editorHistory.S);
 	var maybeState = _v0.a;
 	var newUndoDeque = _v0.b;
-	if (maybeState.$ === 'Nothing') {
+	if (maybeState.$ === 1) {
 		return editor_;
 	} else {
 		var newState = maybeState.a;
 		var newHistory = _Utils_update(
 			editorHistory,
 			{
-				lastTextChangeTimestamp: 0,
-				redoStack: A2($elm$core$List$cons, editorState, editorHistory.redoStack),
-				undoDeque: newUndoDeque
+				bt: 0,
+				aK: A2($elm$core$List$cons, editorState, editorHistory.aK),
+				S: newUndoDeque
 			});
 		return $author$project$RichText$Internal$Editor$incrementChangeCount(
 			A2(
@@ -18883,7 +15410,7 @@ var $author$project$RichText$Internal$Editor$handleUndo = function (editor_) {
 };
 var $author$project$RichText$Internal$Editor$applyInternalCommand = F2(
 	function (action, editor_) {
-		if (action.$ === 'Undo') {
+		if (!action) {
 			return $elm$core$Result$Ok(
 				$author$project$RichText$Internal$Editor$handleUndo(editor_));
 		} else {
@@ -18891,11 +15418,10 @@ var $author$project$RichText$Internal$Editor$applyInternalCommand = F2(
 		}
 	});
 var $author$project$RichText$Internal$Editor$forceReselection = function (e) {
-	var c = e.a;
-	return $author$project$RichText$Internal$Editor$Editor(
-		_Utils_update(
-			c,
-			{selectionCount: c.selectionCount + 1}));
+	var c = e;
+	return _Utils_update(
+		c,
+		{aN: c.aN + 1});
 };
 var $author$project$RichText$State$mergeSimilarInlineLeaves = function (inlineLeaves) {
 	mergeSimilarInlineLeaves:
@@ -18910,9 +15436,9 @@ var $author$project$RichText$State$mergeSimilarInlineLeaves = function (inlineLe
 				var _v1 = inlineLeaves.b;
 				var y = _v1.a;
 				var xs = _v1.b;
-				if (x.$ === 'Text') {
+				if (x.$ === 1) {
 					var xL = x.a;
-					if (y.$ === 'Text') {
+					if (y.$ === 1) {
 						var yL = y.a;
 						if (_Utils_eq(
 							$author$project$RichText$Model$Text$marks(xL),
@@ -18967,9 +15493,9 @@ var $author$project$RichText$State$removeExtraEmptyTextLeaves = function (inline
 				var _v1 = inlineLeaves.b;
 				var y = _v1.a;
 				var xs = _v1.b;
-				if (x.$ === 'Text') {
+				if (x.$ === 1) {
 					var xL = x.a;
-					if (y.$ === 'Text') {
+					if (y.$ === 1) {
 						var yL = y.a;
 						if ($elm$core$String$isEmpty(
 							$author$project$RichText$Model$Text$text(xL)) && (!A2(
@@ -19018,10 +15544,10 @@ var $author$project$RichText$State$reduceNode = function (node) {
 	var _v0 = A2(
 		$author$project$RichText$Node$map,
 		function (x) {
-			if (x.$ === 'Block') {
+			if (!x.$) {
 				var bn = x.a;
 				var _v2 = $author$project$RichText$Model$Node$childNodes(bn);
-				if (_v2.$ === 'InlineChildren') {
+				if (_v2.$ === 1) {
 					var a = _v2.a;
 					return $author$project$RichText$Node$Block(
 						A2(
@@ -19041,7 +15567,7 @@ var $author$project$RichText$State$reduceNode = function (node) {
 			}
 		},
 		$author$project$RichText$Node$Block(node));
-	if (_v0.$ === 'Block') {
+	if (!_v0.$) {
 		var newNode = _v0.a;
 		return newNode;
 	} else {
@@ -19063,7 +15589,7 @@ var $author$project$RichText$State$childOffset = F2(
 						if (accOffset <= 0) {
 							return _Utils_Tuple3(i, accOffset, true);
 						} else {
-							if (l.$ === 'Text') {
+							if (l.$ === 1) {
 								var tl = l.a;
 								return (_Utils_cmp(
 									accOffset,
@@ -19093,7 +15619,7 @@ var $author$project$RichText$State$parentOffset = F3(
 				function (l, _v1) {
 					var i = _v1.a;
 					var accOffset = _v1.b;
-					if (l.$ === 'Text') {
+					if (l.$ === 1) {
 						var tl = l.a;
 						return _Utils_Tuple2(
 							i + 1,
@@ -19113,13 +15639,13 @@ var $author$project$RichText$State$parentOffset = F3(
 var $author$project$RichText$State$translatePath = F4(
 	function (old, _new, path, offset) {
 		var _v0 = A2($author$project$RichText$Node$findTextBlockNodeAncestor, path, old);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return _Utils_Tuple2(path, offset);
 		} else {
 			var _v1 = _v0.a;
 			var oldN = _v1.b;
 			var _v2 = A2($author$project$RichText$Node$findTextBlockNodeAncestor, path, _new);
-			if (_v2.$ === 'Nothing') {
+			if (_v2.$ === 1) {
 				return _Utils_Tuple2(path, offset);
 			} else {
 				var _v3 = _v2.a;
@@ -19128,15 +15654,15 @@ var $author$project$RichText$State$translatePath = F4(
 					return _Utils_Tuple2(path, offset);
 				} else {
 					var _v4 = $author$project$RichText$Model$Node$childNodes(oldN);
-					if (_v4.$ === 'InlineChildren') {
+					if (_v4.$ === 1) {
 						var oldA = _v4.a;
 						var _v5 = $elm_community$list_extra$List$Extra$last(path);
-						if (_v5.$ === 'Nothing') {
+						if (_v5.$ === 1) {
 							return _Utils_Tuple2(path, offset);
 						} else {
 							var lastIndex = _v5.a;
 							var _v6 = $author$project$RichText$Model$Node$childNodes(newN);
-							if (_v6.$ === 'InlineChildren') {
+							if (_v6.$ === 1) {
 								var newA = _v6.a;
 								var pOff = A3(
 									$author$project$RichText$State$parentOffset,
@@ -19171,7 +15697,7 @@ var $author$project$RichText$State$translatePath = F4(
 var $author$project$RichText$State$translateReducedTextBlockSelection = F2(
 	function (root, state) {
 		var _v0 = $author$project$RichText$Model$State$selection(state);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return A2($author$project$RichText$Model$State$withRoot, root, state);
 		} else {
 			var selection = _v0.a;
@@ -19201,7 +15727,7 @@ var $author$project$RichText$State$translateReducedTextBlockSelection = F2(
 var $author$project$RichText$State$reduce = function (editorState) {
 	var markedRoot = function () {
 		var _v0 = $author$project$RichText$Model$State$selection(editorState);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $author$project$RichText$Model$State$root(editorState);
 		} else {
 			var selection = _v0.a;
@@ -19216,13 +15742,13 @@ var $author$project$RichText$State$reduce = function (editorState) {
 	return A2($author$project$RichText$State$translateReducedTextBlockSelection, reducedRoot, editorState);
 };
 var $folkertdev$elm_deque$Internal$first = function (deque) {
-	var _v0 = _Utils_Tuple2(deque.front, deque.rear);
+	var _v0 = _Utils_Tuple2(deque.D, deque.E);
 	if (((!_v0.a.b) && _v0.b.b) && (!_v0.b.b.b)) {
 		var _v1 = _v0.b;
 		var x = _v1.a;
 		return $elm$core$Maybe$Just(x);
 	} else {
-		return $elm$core$List$head(deque.front);
+		return $elm$core$List$head(deque.D);
 	}
 };
 var $folkertdev$elm_deque$BoundedDeque$first = function (_v0) {
@@ -19235,28 +15761,28 @@ var $author$project$RichText$Internal$Editor$updateEditorStateWithTimestamp = F4
 		var editorHistory = $author$project$RichText$Internal$History$contents(
 			$author$project$RichText$Internal$Editor$history(editor_));
 		var newUndoDeque = function () {
-			var _v0 = $folkertdev$elm_deque$BoundedDeque$first(editorHistory.undoDeque);
-			if (_v0.$ === 'Nothing') {
+			var _v0 = $folkertdev$elm_deque$BoundedDeque$first(editorHistory.S);
+			if (_v0.$ === 1) {
 				return A2(
 					$folkertdev$elm_deque$BoundedDeque$pushFront,
 					_Utils_Tuple2(
 						action,
 						$author$project$RichText$Internal$Editor$state(editor_)),
-					editorHistory.undoDeque);
+					editorHistory.S);
 			} else {
 				var _v1 = _v0.a;
 				var lastAction = _v1.a;
-				return (_Utils_eq(lastAction, action) && ((!(!timestamp)) && (_Utils_cmp(timestamp - editorHistory.lastTextChangeTimestamp, editorHistory.groupDelayMilliseconds) < 0))) ? editorHistory.undoDeque : A2(
+				return (_Utils_eq(lastAction, action) && ((!(!timestamp)) && (_Utils_cmp(timestamp - editorHistory.bt, editorHistory.cd) < 0))) ? editorHistory.S : A2(
 					$folkertdev$elm_deque$BoundedDeque$pushFront,
 					_Utils_Tuple2(
 						action,
 						$author$project$RichText$Internal$Editor$state(editor_)),
-					editorHistory.undoDeque);
+					editorHistory.S);
 			}
 		}();
 		var newHistory = _Utils_update(
 			editorHistory,
-			{lastTextChangeTimestamp: timestamp, redoStack: _List_Nil, undoDeque: newUndoDeque});
+			{bt: timestamp, aK: _List_Nil, S: newUndoDeque});
 		return $author$project$RichText$Internal$Editor$incrementChangeCount(
 			A2(
 				$author$project$RichText$Internal$Editor$withHistory,
@@ -19265,25 +15791,25 @@ var $author$project$RichText$Internal$Editor$updateEditorStateWithTimestamp = F4
 	});
 var $author$project$RichText$Internal$Editor$updateEditorState = $author$project$RichText$Internal$Editor$updateEditorStateWithTimestamp($elm$core$Maybe$Nothing);
 var $author$project$RichText$Config$ElementDefinition$contentType = function (definition_) {
-	var c = definition_.a;
-	return c.contentType;
+	var c = definition_;
+	return c.dp;
 };
 var $author$project$RichText$Config$ElementDefinition$defaultElementDefinition = F3(
 	function (name_, group_, contentType_) {
 		return $author$project$RichText$Config$ElementDefinition$elementDefinition(
 			{
-				contentType: contentType_,
-				fromHtmlNode: $author$project$RichText$Config$ElementDefinition$defaultHtmlToElement(name_),
-				group: group_,
-				name: name_,
-				selectable: false,
-				toHtmlNode: $author$project$RichText$Config$ElementDefinition$defaultElementToHtml(name_)
+				dp: contentType_,
+				b9: $author$project$RichText$Config$ElementDefinition$defaultHtmlToElement(name_),
+				dG: group_,
+				ct: name_,
+				ei: false,
+				c0: $author$project$RichText$Config$ElementDefinition$defaultElementToHtml(name_)
 			});
 	});
 var $author$project$RichText$Config$Spec$elementDefinition = F2(
 	function (name, spec) {
-		var c = spec.a;
-		return A2($elm$core$Dict$get, name, c.nameToElement);
+		var c = spec;
+		return A2($elm$core$Dict$get, name, c.a6);
 	});
 var $author$project$RichText$Internal$Spec$elementDefinitionWithDefault = F2(
 	function (ele, spec) {
@@ -19298,16 +15824,16 @@ var $author$project$RichText$Internal$Spec$elementDefinitionWithDefault = F2(
 			A2($author$project$RichText$Config$Spec$elementDefinition, name, spec));
 	});
 var $author$project$RichText$Config$ElementDefinition$group = function (definition_) {
-	var c = definition_.a;
-	return c.group;
+	var c = definition_;
+	return c.dG;
 };
 var $author$project$RichText$Internal$Definitions$toStringContentType = function (contentType) {
 	switch (contentType.$) {
-		case 'TextBlockNodeType':
+		case 1:
 			return 'TextBlockNodeType';
-		case 'InlineLeafNodeType':
+		case 3:
 			return 'InlineLeafNodeType';
-		case 'BlockNodeType':
+		case 0:
 			return 'BlockNodeType';
 		default:
 			return 'BlockLeafNodeType';
@@ -19315,7 +15841,7 @@ var $author$project$RichText$Internal$Definitions$toStringContentType = function
 };
 var $author$project$RichText$State$validateAllowedGroups = F3(
 	function (allowedGroups, group, name) {
-		if (allowedGroups.$ === 'Nothing') {
+		if (allowedGroups.$ === 1) {
 			return _List_Nil;
 		} else {
 			var groups = allowedGroups.a;
@@ -19341,25 +15867,24 @@ var $elm$core$Dict$diff = F2(
 	});
 var $elm$core$Set$diff = F2(
 	function (_v0, _v1) {
-		var dict1 = _v0.a;
-		var dict2 = _v1.a;
-		return $elm$core$Set$Set_elm_builtin(
-			A2($elm$core$Dict$diff, dict1, dict2));
+		var dict1 = _v0;
+		var dict2 = _v1;
+		return A2($elm$core$Dict$diff, dict1, dict2);
 	});
 var $elm$core$Dict$isEmpty = function (dict) {
-	if (dict.$ === 'RBEmpty_elm_builtin') {
+	if (dict.$ === -2) {
 		return true;
 	} else {
 		return false;
 	}
 };
 var $elm$core$Set$isEmpty = function (_v0) {
-	var dict = _v0.a;
+	var dict = _v0;
 	return $elm$core$Dict$isEmpty(dict);
 };
 var $author$project$RichText$State$validateAllowedMarks = F2(
 	function (allowedMarks, leaf) {
-		if (allowedMarks.$ === 'Nothing') {
+		if (allowedMarks.$ === 1) {
 			return _List_Nil;
 		} else {
 			var allowed = allowedMarks.a;
@@ -19388,7 +15913,7 @@ var $author$project$RichText$State$validateInlineLeaf = F4(
 		return _Utils_ap(
 			A2($author$project$RichText$State$validateAllowedMarks, allowedMarks, leaf),
 			function () {
-				if (leaf.$ === 'Text') {
+				if (leaf.$ === 1) {
 					return _List_Nil;
 				} else {
 					var il = leaf.a;
@@ -19419,9 +15944,9 @@ var $author$project$RichText$State$validateEditorBlockNode = F3(
 			var contentType = $author$project$RichText$Config$ElementDefinition$contentType(definition);
 			var _v0 = $author$project$RichText$Model$Node$childNodes(node);
 			switch (_v0.$) {
-				case 'BlockChildren':
+				case 0:
 					var ba = _v0.a;
-					if (contentType.$ === 'BlockNodeType') {
+					if (!contentType.$) {
 						var groups = contentType.a;
 						return A2(
 							$elm$core$List$concatMap,
@@ -19434,13 +15959,13 @@ var $author$project$RichText$State$validateEditorBlockNode = F3(
 								'I was expecting textblock content type, but instead I got ' + $author$project$RichText$Internal$Definitions$toStringContentType(contentType)
 							]);
 					}
-				case 'InlineChildren':
+				case 1:
 					var la = _v0.a;
-					if (contentType.$ === 'TextBlockNodeType') {
+					if (contentType.$ === 1) {
 						var config = contentType.a;
 						return A2(
 							$elm$core$List$concatMap,
-							A3($author$project$RichText$State$validateInlineLeaf, spec, config.allowedGroups, config.allowedMarks),
+							A3($author$project$RichText$State$validateInlineLeaf, spec, config.da, config.db),
 							$elm$core$Array$toList(
 								$author$project$RichText$Model$Node$toInlineArray(la)));
 					} else {
@@ -19478,7 +16003,7 @@ var $author$project$RichText$Internal$Editor$applyCommand = F3(
 	function (_v0, spec, editor_) {
 		var name = _v0.a;
 		var command = _v0.b;
-		if (command.$ === 'InternalCommand') {
+		if (command.$ === 1) {
 			var action = command.a;
 			return A2($author$project$RichText$Internal$Editor$applyInternalCommand, action, editor_);
 		} else {
@@ -19488,7 +16013,7 @@ var $author$project$RichText$Internal$Editor$applyCommand = F3(
 				$author$project$RichText$State$validate(spec),
 				transform(
 					$author$project$RichText$Internal$Editor$state(editor_)));
-			if (_v2.$ === 'Err') {
+			if (_v2.$ === 1) {
 				var s = _v2.a;
 				return $elm$core$Result$Err(s);
 			} else {
@@ -19504,7 +16029,7 @@ var $author$project$RichText$Editor$apply = $author$project$RichText$Internal$Ed
 var $author$project$RichText$Commands$insertBlockBeforeSelection = F2(
 	function (node, editorState) {
 		var _v0 = $author$project$RichText$Model$State$selection(editorState);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('Nothing is selected');
 		} else {
 			var selection = _v0.a;
@@ -19520,11 +16045,11 @@ var $author$project$RichText$Commands$insertBlockBeforeSelection = F2(
 					$author$project$RichText$Model$Selection$anchorNode(selection),
 					markedRoot);
 				var _v1 = A2($author$project$RichText$Node$nodeAt, closestBlockPath, markedRoot);
-				if (_v1.$ === 'Nothing') {
+				if (_v1.$ === 1) {
 					return $elm$core$Result$Err('Invalid selection');
 				} else {
 					var anchorNode = _v1.a;
-					if (anchorNode.$ === 'Block') {
+					if (!anchorNode.$) {
 						var bn = anchorNode.a;
 						var newFragment = $author$project$RichText$Node$isEmptyTextBlock(
 							$author$project$RichText$Node$Block(bn)) ? _List_fromArray(
@@ -19536,7 +16061,7 @@ var $author$project$RichText$Commands$insertBlockBeforeSelection = F2(
 							$author$project$RichText$Node$BlockFragment(
 								$elm$core$Array$fromList(newFragment)),
 							markedRoot);
-						if (_v3.$ === 'Err') {
+						if (_v3.$ === 1) {
 							var s = _v3.a;
 							return $elm$core$Result$Err(s);
 						} else {
@@ -19564,7 +16089,7 @@ var $author$project$RichText$Commands$insertBlockBeforeSelection = F2(
 var $author$project$RichText$Commands$insertBlock = F2(
 	function (node, editorState) {
 		var _v0 = $author$project$RichText$Model$State$selection(editorState);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('Nothing is selected');
 		} else {
 			var selection = _v0.a;
@@ -19578,11 +16103,11 @@ var $author$project$RichText$Commands$insertBlock = F2(
 					$author$project$RichText$Node$nodeAt,
 					$author$project$RichText$Model$Selection$anchorNode(selection),
 					$author$project$RichText$Model$State$root(editorState));
-				if (_v1.$ === 'Nothing') {
+				if (_v1.$ === 1) {
 					return $elm$core$Result$Err('Invalid selection');
 				} else {
 					var aNode = _v1.a;
-					if (aNode.$ === 'Block') {
+					if (!aNode.$) {
 						var bn = aNode.a;
 						var _v3 = A3(
 							$author$project$RichText$Node$replaceWithFragment,
@@ -19592,7 +16117,7 @@ var $author$project$RichText$Commands$insertBlock = F2(
 									_List_fromArray(
 										[bn, node]))),
 							$author$project$RichText$Model$State$root(editorState));
-						if (_v3.$ === 'Err') {
+						if (_v3.$ === 1) {
 							var s = _v3.a;
 							return $elm$core$Result$Err(s);
 						} else {
@@ -19614,7 +16139,7 @@ var $author$project$RichText$Commands$insertBlock = F2(
 						}
 					} else {
 						var _v4 = $author$project$RichText$Commands$splitTextBlock(editorState);
-						if (_v4.$ === 'Err') {
+						if (_v4.$ === 1) {
 							var s = _v4.a;
 							return $elm$core$Result$Err(s);
 						} else {
@@ -19631,9 +16156,9 @@ var $author$project$Editor$handleInsertHorizontalRule = F2(
 		return _Utils_update(
 			model,
 			{
-				editor: A2(
+				b: A2(
 					$elm$core$Result$withDefault,
-					model.editor,
+					model.b,
 					A3(
 						$author$project$RichText$Editor$apply,
 						_Utils_Tuple2(
@@ -19645,7 +16170,7 @@ var $author$project$Editor$handleInsertHorizontalRule = F2(
 										A2($author$project$RichText$Model$Element$element, $author$project$RichText$Definitions$horizontalRule, _List_Nil),
 										$author$project$RichText$Model$Node$Leaf)))),
 						spec,
-						model.editor))
+						model.b))
 			});
 	});
 var $author$project$Editor$setResult = F2(
@@ -19654,11 +16179,11 @@ var $author$project$Editor$setResult = F2(
 	});
 var $author$project$Editor$handleInsertImage = F2(
 	function (spec, model) {
-		var insertImageModal = model.insertImageModal;
+		var insertImageModal = model.G;
 		var newEditor = function () {
-			var _v0 = insertImageModal.editorState;
-			if (_v0.$ === 'Nothing') {
-				return model.editor;
+			var _v0 = insertImageModal.b3;
+			if (_v0.$ === 1) {
+				return model.b;
 			} else {
 				var state_ = _v0.a;
 				var params = A2(
@@ -19666,13 +16191,13 @@ var $author$project$Editor$handleInsertImage = F2(
 					$author$project$RichText$Definitions$image,
 					_List_fromArray(
 						[
-							A2($author$project$RichText$Model$Attribute$StringAttribute, 'src', insertImageModal.src),
-							A2($author$project$RichText$Model$Attribute$StringAttribute, 'alt', insertImageModal.alt)
+							A2($author$project$RichText$Model$Attribute$StringAttribute, 'src', insertImageModal.cW),
+							A2($author$project$RichText$Model$Attribute$StringAttribute, 'alt', insertImageModal.bT)
 						]));
 				var img = A2($author$project$RichText$Model$Node$inlineElement, params, _List_Nil);
 				return A2(
 					$elm$core$Result$withDefault,
-					model.editor,
+					model.b,
 					A3(
 						$author$project$RichText$Editor$apply,
 						_Utils_Tuple2(
@@ -19681,55 +16206,55 @@ var $author$project$Editor$handleInsertImage = F2(
 								$author$project$Editor$setResult(
 									A2($author$project$RichText$Commands$insertInline, img, state_)))),
 						spec,
-						model.editor));
+						model.b));
 			}
 		}();
 		return _Utils_update(
 			model,
 			{
-				editor: newEditor,
-				insertImageModal: _Utils_update(
+				b: newEditor,
+				G: _Utils_update(
 					insertImageModal,
-					{alt: '', editorState: $elm$core$Maybe$Nothing, src: '', visible: false})
+					{bT: '', b3: $elm$core$Maybe$Nothing, cW: '', bl: false})
 			});
 	});
 var $author$project$Editor$handleInsertLink = F2(
 	function (spec, model) {
-		var insertLinkModal = model.insertLinkModal;
+		var insertLinkModal = model.H;
 		var newEditor = function () {
-			var _v0 = insertLinkModal.editorState;
-			if (_v0.$ === 'Nothing') {
-				return model.editor;
+			var _v0 = insertLinkModal.b3;
+			if (_v0.$ === 1) {
+				return model.b;
 			} else {
 				var state_ = _v0.a;
 				var markOrder = $author$project$RichText$Model$Mark$markOrderFromSpec(spec);
 				var attributes = _List_fromArray(
 					[
-						A2($author$project$RichText$Model$Attribute$StringAttribute, 'href', insertLinkModal.href),
-						A2($author$project$RichText$Model$Attribute$StringAttribute, 'title', insertLinkModal.title)
+						A2($author$project$RichText$Model$Attribute$StringAttribute, 'href', insertLinkModal.ch),
+						A2($author$project$RichText$Model$Attribute$StringAttribute, 'title', insertLinkModal.c$)
 					]);
 				var linkMark = A2($author$project$RichText$Model$Mark$mark, $author$project$RichText$Definitions$link, attributes);
 				return A2(
 					$elm$core$Result$withDefault,
-					model.editor,
+					model.b,
 					A3(
 						$author$project$RichText$Editor$apply,
 						_Utils_Tuple2(
 							'insertLink',
 							$author$project$RichText$Config$Command$transform(
 								$author$project$Editor$setResult(
-									A4($author$project$RichText$Commands$toggleMark, markOrder, linkMark, $author$project$RichText$Model$Mark$Add, state_)))),
+									A4($author$project$RichText$Commands$toggleMark, markOrder, linkMark, 0, state_)))),
 						spec,
-						model.editor));
+						model.b));
 			}
 		}();
 		return _Utils_update(
 			model,
 			{
-				editor: newEditor,
-				insertLinkModal: _Utils_update(
+				b: newEditor,
+				H: _Utils_update(
 					insertLinkModal,
-					{editorState: $elm$core$Maybe$Nothing, href: '', title: '', visible: false})
+					{b3: $elm$core$Maybe$Nothing, ch: '', c$: '', bl: false})
 			});
 	});
 var $author$project$RichText$Internal$Editor$applyNamedCommandList = F3(
@@ -19738,9 +16263,9 @@ var $author$project$RichText$Internal$Editor$applyNamedCommandList = F3(
 			$elm$core$List$foldl,
 			F2(
 				function (cmd, result) {
-					if (result.$ === 'Err') {
+					if (result.$ === 1) {
 						var _v1 = A3($author$project$RichText$Internal$Editor$applyCommand, cmd, spec, editor_);
-						if (_v1.$ === 'Err') {
+						if (_v1.$ === 1) {
 							var s2 = _v1.a;
 							return $elm$core$Result$Err(s2);
 						} else {
@@ -19760,9 +16285,9 @@ var $author$project$Editor$handleLiftBlock = F2(
 		return _Utils_update(
 			model,
 			{
-				editor: A2(
+				b: A2(
 					$elm$core$Result$withDefault,
-					model.editor,
+					model.b,
 					A3(
 						$author$project$RichText$Editor$applyList,
 						_List_fromArray(
@@ -19776,7 +16301,7 @@ var $author$project$Editor$handleLiftBlock = F2(
 								$author$project$RichText$Config$Command$transform($author$project$RichText$Commands$lift))
 							]),
 						spec,
-						model.editor))
+						model.b))
 			});
 	});
 var $author$project$Editor$handleRedo = F2(
@@ -19784,30 +16309,30 @@ var $author$project$Editor$handleRedo = F2(
 		return _Utils_update(
 			model,
 			{
-				editor: A2(
+				b: A2(
 					$elm$core$Result$withDefault,
-					model.editor,
+					model.b,
 					A3(
 						$author$project$RichText$Editor$apply,
 						_Utils_Tuple2(
 							'redo',
-							$author$project$RichText$Config$Command$internal($author$project$RichText$Config$Command$Redo)),
+							$author$project$RichText$Config$Command$internal(1)),
 						spec,
-						model.editor))
+						model.b))
 			});
 	});
 var $author$project$RichText$Editor$state = $author$project$RichText$Internal$Editor$state;
 var $author$project$Editor$handleShowInsertImageModal = function (model) {
-	var insertImageModal = model.insertImageModal;
+	var insertImageModal = model.G;
 	return _Utils_update(
 		model,
 		{
-			insertImageModal: _Utils_update(
+			G: _Utils_update(
 				insertImageModal,
 				{
-					editorState: $elm$core$Maybe$Just(
-						$author$project$RichText$Editor$state(model.editor)),
-					visible: true
+					b3: $elm$core$Maybe$Just(
+						$author$project$RichText$Editor$state(model.b)),
+					bl: true
 				})
 		});
 };
@@ -19824,10 +16349,10 @@ var $author$project$RichText$Node$anyRange = F4(
 	});
 var $author$project$Editor$handleShowInsertLinkModal = F2(
 	function (spec, model) {
-		var insertLinkModal = model.insertLinkModal;
-		var editorState = $author$project$RichText$Editor$state(model.editor);
+		var insertLinkModal = model.H;
+		var editorState = $author$project$RichText$Editor$state(model.b);
 		var _v0 = $author$project$RichText$Model$State$selection(editorState);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return model;
 		} else {
 			var selection = _v0.a;
@@ -19835,7 +16360,7 @@ var $author$project$Editor$handleShowInsertLinkModal = F2(
 			var hasLink = A4(
 				$author$project$RichText$Node$anyRange,
 				function (n) {
-					if (n.$ === 'Inline') {
+					if (n.$ === 1) {
 						var il = n.a;
 						return A2(
 							$elm$core$List$any,
@@ -19861,27 +16386,27 @@ var $author$project$Editor$handleShowInsertLinkModal = F2(
 						]));
 				var newEditor = A2(
 					$elm$core$Result$withDefault,
-					model.editor,
+					model.b,
 					A3(
 						$author$project$RichText$Editor$apply,
 						_Utils_Tuple2(
 							'removeLink',
 							$author$project$RichText$Config$Command$transform(
-								A3($author$project$RichText$Commands$toggleMark, markOrder, linkMark, $author$project$RichText$Model$Mark$Remove))),
+								A3($author$project$RichText$Commands$toggleMark, markOrder, linkMark, 1))),
 						spec,
-						model.editor));
+						model.b));
 				return _Utils_update(
 					model,
-					{editor: newEditor});
+					{b: newEditor});
 			} else {
 				return _Utils_update(
 					model,
 					{
-						insertLinkModal: _Utils_update(
+						H: _Utils_update(
 							insertLinkModal,
 							{
-								editorState: $elm$core$Maybe$Just(editorState),
-								visible: true
+								b3: $elm$core$Maybe$Just(editorState),
+								bl: true
 							})
 					});
 			}
@@ -19900,7 +16425,7 @@ var $author$project$RichText$Commands$convertInlineChildrenToString = function (
 		$elm$core$Array$foldl,
 		F2(
 			function (i, s) {
-				if (i.$ === 'Text') {
+				if (i.$ === 1) {
 					var t = i.a;
 					return _Utils_ap(
 						s,
@@ -19915,7 +16440,7 @@ var $author$project$RichText$Commands$convertInlineChildrenToString = function (
 var $author$project$RichText$Commands$toggleTextBlock = F4(
 	function (onElement, offElement, convertToPlainText, editorState) {
 		var _v0 = $author$project$RichText$Model$State$selection(editorState);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('Nothing is selected.');
 		} else {
 			var selection = _v0.a;
@@ -19931,10 +16456,10 @@ var $author$project$RichText$Commands$toggleTextBlock = F4(
 			var doOffBehavior = A4(
 				$author$project$RichText$Node$allRange,
 				function (node) {
-					if (node.$ === 'Block') {
+					if (!node.$) {
 						var bn = node.a;
 						var _v5 = $author$project$RichText$Model$Node$childNodes(bn);
-						if (_v5.$ === 'InlineChildren') {
+						if (_v5.$ === 1) {
 							return _Utils_eq(
 								$author$project$RichText$Model$Node$element(bn),
 								onElement);
@@ -19957,10 +16482,10 @@ var $author$project$RichText$Commands$toggleTextBlock = F4(
 							if ((_Utils_cmp(path, anchorPath) < 0) || (_Utils_cmp(path, focusPath) > 0)) {
 								return node;
 							} else {
-								if (node.$ === 'Block') {
+								if (!node.$) {
 									var bn = node.a;
 									var _v3 = $author$project$RichText$Model$Node$childNodes(bn);
-									if (_v3.$ === 'InlineChildren') {
+									if (_v3.$ === 1) {
 										var ic = _v3.a;
 										var newInlineChildren = convertToPlainText ? $author$project$RichText$Model$Node$inlineChildren(
 											$elm$core$Array$fromList(
@@ -19984,7 +16509,7 @@ var $author$project$RichText$Commands$toggleTextBlock = F4(
 						}),
 					$author$project$RichText$Node$Block(
 						$author$project$RichText$Model$State$root(editorState)));
-				if (_v1.$ === 'Block') {
+				if (!_v1.$) {
 					var bn = _v1.a;
 					return bn;
 				} else {
@@ -20017,9 +16542,9 @@ var $author$project$Editor$handleToggleBlock = F3(
 		return _Utils_update(
 			model,
 			{
-				editor: A2(
+				b: A2(
 					$elm$core$Result$withDefault,
-					model.editor,
+					model.b,
 					A3(
 						$author$project$RichText$Editor$apply,
 						_Utils_Tuple2(
@@ -20027,7 +16552,7 @@ var $author$project$Editor$handleToggleBlock = F3(
 							$author$project$RichText$Config$Command$transform(
 								A3($author$project$RichText$Commands$toggleTextBlock, onParams, offParams, isCode))),
 						spec,
-						model.editor))
+						model.b))
 			});
 	});
 var $author$project$ExtraMarks$htmlNodeToStrikethrough = $author$project$RichText$Config$MarkDefinition$defaultHtmlToMark('s');
@@ -20036,26 +16561,26 @@ var $author$project$ExtraMarks$strikethroughToHtmlNode = F2(
 		return A3($author$project$RichText$Model$HtmlNode$ElementNode, 's', _List_Nil, children);
 	});
 var $author$project$ExtraMarks$strikethrough = $author$project$RichText$Config$MarkDefinition$markDefinition(
-	{fromHtmlNode: $author$project$ExtraMarks$htmlNodeToStrikethrough, name: 'strikethrough', toHtmlNode: $author$project$ExtraMarks$strikethroughToHtmlNode});
+	{b9: $author$project$ExtraMarks$htmlNodeToStrikethrough, ct: 'strikethrough', c0: $author$project$ExtraMarks$strikethroughToHtmlNode});
 var $author$project$ExtraMarks$htmlNodeToUnderline = $author$project$RichText$Config$MarkDefinition$defaultHtmlToMark('u');
 var $author$project$ExtraMarks$underlineToHtmlNode = F2(
 	function (_v0, children) {
 		return A3($author$project$RichText$Model$HtmlNode$ElementNode, 'u', _List_Nil, children);
 	});
 var $author$project$ExtraMarks$underline = $author$project$RichText$Config$MarkDefinition$markDefinition(
-	{fromHtmlNode: $author$project$ExtraMarks$htmlNodeToUnderline, name: 'underline', toHtmlNode: $author$project$ExtraMarks$underlineToHtmlNode});
+	{b9: $author$project$ExtraMarks$htmlNodeToUnderline, ct: 'underline', c0: $author$project$ExtraMarks$underlineToHtmlNode});
 var $author$project$Editor$handleToggleStyle = F3(
 	function (style, spec, model) {
 		var markOrder = $author$project$RichText$Model$Mark$markOrderFromSpec(spec);
 		var markDef = function () {
-			switch (style.$) {
-				case 'Bold':
+			switch (style) {
+				case 0:
 					return $author$project$RichText$Definitions$bold;
-				case 'Italic':
+				case 1:
 					return $author$project$RichText$Definitions$italic;
-				case 'Code':
+				case 2:
 					return $author$project$RichText$Definitions$code;
-				case 'Strikethrough':
+				case 3:
 					return $author$project$ExtraMarks$strikethrough;
 				default:
 					return $author$project$ExtraMarks$underline;
@@ -20064,9 +16589,9 @@ var $author$project$Editor$handleToggleStyle = F3(
 		return _Utils_update(
 			model,
 			{
-				editor: A2(
+				b: A2(
 					$elm$core$Result$withDefault,
-					model.editor,
+					model.b,
 					A3(
 						$author$project$RichText$Editor$apply,
 						_Utils_Tuple2(
@@ -20076,9 +16601,9 @@ var $author$project$Editor$handleToggleStyle = F3(
 									$author$project$RichText$Commands$toggleMark,
 									markOrder,
 									A2($author$project$RichText$Model$Mark$mark, markDef, _List_Nil),
-									$author$project$RichText$Model$Mark$Flip))),
+									2))),
 						spec,
-						model.editor))
+						model.b))
 			});
 	});
 var $author$project$Editor$handleUndo = F2(
@@ -20086,66 +16611,66 @@ var $author$project$Editor$handleUndo = F2(
 		return _Utils_update(
 			model,
 			{
-				editor: A2(
+				b: A2(
 					$elm$core$Result$withDefault,
-					model.editor,
+					model.b,
 					A3(
 						$author$project$RichText$Editor$apply,
 						_Utils_Tuple2(
 							'undo',
-							$author$project$RichText$Config$Command$internal($author$project$RichText$Config$Command$Undo)),
+							$author$project$RichText$Config$Command$internal(0)),
 						spec,
-						model.editor))
+						model.b))
 			});
 	});
 var $author$project$Editor$handleUpdateImageAlt = F2(
 	function (alt, model) {
-		var insertImageModal = model.insertImageModal;
+		var insertImageModal = model.G;
 		return _Utils_update(
 			model,
 			{
-				insertImageModal: _Utils_update(
+				G: _Utils_update(
 					insertImageModal,
-					{alt: alt})
+					{bT: alt})
 			});
 	});
 var $author$project$Editor$handleUpdateImageSrc = F2(
 	function (src, model) {
-		var insertImageModal = model.insertImageModal;
+		var insertImageModal = model.G;
 		return _Utils_update(
 			model,
 			{
-				insertImageModal: _Utils_update(
+				G: _Utils_update(
 					insertImageModal,
-					{src: src})
+					{cW: src})
 			});
 	});
 var $author$project$Editor$handleUpdateLinkHref = F2(
 	function (href, model) {
-		var insertLinkModal = model.insertLinkModal;
+		var insertLinkModal = model.H;
 		return _Utils_update(
 			model,
 			{
-				insertLinkModal: _Utils_update(
+				H: _Utils_update(
 					insertLinkModal,
-					{href: href})
+					{ch: href})
 			});
 	});
 var $author$project$Editor$handleUpdateLinkTitle = F2(
 	function (title, model) {
-		var insertLinkModal = model.insertLinkModal;
+		var insertLinkModal = model.H;
 		return _Utils_update(
 			model,
 			{
-				insertLinkModal: _Utils_update(
+				H: _Utils_update(
 					insertLinkModal,
-					{title: title})
+					{c$: title})
 			});
 	});
 var $author$project$RichText$Commands$wrap = F3(
 	function (contentsMapFunc, elementParameters, editorState) {
 		var _v0 = $author$project$RichText$Model$State$selection(editorState);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('Nothing is selected');
 		} else {
 			var selection = _v0.a;
@@ -20165,12 +16690,12 @@ var $author$project$RichText$Commands$wrap = F3(
 			var ancestor = A2($author$project$RichText$Model$Node$commonAncestor, anchorBlockPath, focusBlockPath);
 			if (_Utils_eq(ancestor, anchorBlockPath) || _Utils_eq(ancestor, focusBlockPath)) {
 				var _v1 = A2($author$project$RichText$Node$nodeAt, ancestor, markedRoot);
-				if (_v1.$ === 'Nothing') {
+				if (_v1.$ === 1) {
 					return $elm$core$Result$Err('I cannot find a node at selection');
 				} else {
 					var node = _v1.a;
 					var newChildren = function () {
-						if (node.$ === 'Block') {
+						if (!node.$) {
 							var bn = node.a;
 							return $author$project$RichText$Model$Node$blockChildren(
 								A2(
@@ -20193,7 +16718,7 @@ var $author$project$RichText$Commands$wrap = F3(
 						ancestor,
 						$author$project$RichText$Node$Block(newNode),
 						markedRoot);
-					if (_v2.$ === 'Err') {
+					if (_v2.$ === 1) {
 						var err = _v2.a;
 						return $elm$core$Result$Err(err);
 					} else {
@@ -20217,7 +16742,7 @@ var $author$project$RichText$Commands$wrap = F3(
 					$elm_community$list_extra$List$Extra$getAt,
 					$elm$core$List$length(ancestor),
 					$author$project$RichText$Model$Selection$anchorNode(normalizedSelection));
-				if (_v4.$ === 'Nothing') {
+				if (_v4.$ === 1) {
 					return $elm$core$Result$Err('Invalid ancestor path at anchor node');
 				} else {
 					var childAnchorIndex = _v4.a;
@@ -20225,20 +16750,20 @@ var $author$project$RichText$Commands$wrap = F3(
 						$elm_community$list_extra$List$Extra$getAt,
 						$elm$core$List$length(ancestor),
 						$author$project$RichText$Model$Selection$focusNode(normalizedSelection));
-					if (_v5.$ === 'Nothing') {
+					if (_v5.$ === 1) {
 						return $elm$core$Result$Err('Invalid ancestor path at focus node');
 					} else {
 						var childFocusIndex = _v5.a;
 						var _v6 = A2($author$project$RichText$Node$nodeAt, ancestor, markedRoot);
-						if (_v6.$ === 'Nothing') {
+						if (_v6.$ === 1) {
 							return $elm$core$Result$Err('Invalid common ancestor path');
 						} else {
 							var node = _v6.a;
-							if (node.$ === 'Block') {
+							if (!node.$) {
 								var bn = node.a;
 								var _v8 = $author$project$RichText$Model$Node$childNodes(bn);
 								switch (_v8.$) {
-									case 'BlockChildren':
+									case 0:
 										var a = _v8.a;
 										var newChildNode = A2(
 											$author$project$RichText$Model$Node$block,
@@ -20274,7 +16799,7 @@ var $author$project$RichText$Commands$wrap = F3(
 											ancestor,
 											$author$project$RichText$Node$Block(newNode),
 											markedRoot);
-										if (_v9.$ === 'Err') {
+										if (_v9.$ === 1) {
 											var s = _v9.a;
 											return $elm$core$Result$Err(s);
 										} else {
@@ -20292,7 +16817,7 @@ var $author$project$RichText$Commands$wrap = F3(
 														$author$project$RichText$Annotation$clearSelectionAnnotations(newRoot),
 														editorState)));
 										}
-									case 'InlineChildren':
+									case 1:
 										return $elm$core$Result$Err('Cannot wrap inline elements');
 									default:
 										return $elm$core$Result$Err('Cannot wrap leaf elements');
@@ -20311,9 +16836,9 @@ var $author$project$Editor$handleWrapBlockNode = F2(
 		return _Utils_update(
 			model,
 			{
-				editor: A2(
+				b: A2(
 					$elm$core$Result$withDefault,
-					model.editor,
+					model.b,
 					A3(
 						$author$project$RichText$Editor$apply,
 						_Utils_Tuple2(
@@ -20326,10 +16851,10 @@ var $author$project$Editor$handleWrapBlockNode = F2(
 									},
 									A2($author$project$RichText$Model$Element$element, $author$project$RichText$Definitions$blockquote, _List_Nil)))),
 						spec,
-						model.editor))
+						model.b))
 			});
 	});
-var $author$project$RichText$List$Ordered = {$: 'Ordered'};
+var $author$project$RichText$List$Ordered = 0;
 var $author$project$RichText$List$addListItem = F2(
 	function (definition, node) {
 		return A2(
@@ -20345,7 +16870,7 @@ var $author$project$RichText$List$wrap = F3(
 		return A3(
 			$author$project$RichText$Commands$wrap,
 			$author$project$RichText$List$addListItem(definition),
-			_Utils_eq(type_, $author$project$RichText$List$Ordered) ? $author$project$RichText$List$ordered(definition) : $author$project$RichText$List$unordered(definition),
+			(!type_) ? $author$project$RichText$List$ordered(definition) : $author$project$RichText$List$unordered(definition),
 			editorState);
 	});
 var $author$project$Editor$handleWrapInList = F3(
@@ -20353,9 +16878,9 @@ var $author$project$Editor$handleWrapInList = F3(
 		return _Utils_update(
 			model,
 			{
-				editor: A2(
+				b: A2(
 					$elm$core$Result$withDefault,
-					model.editor,
+					model.b,
 					A3(
 						$author$project$RichText$Editor$apply,
 						_Utils_Tuple2(
@@ -20363,27 +16888,26 @@ var $author$project$Editor$handleWrapInList = F3(
 							$author$project$RichText$Config$Command$transform(
 								A2($author$project$RichText$List$wrap, $author$project$RichText$List$defaultListDefinition, listType))),
 						spec,
-						model.editor))
+						model.b))
 			});
 	});
 var $author$project$RichText$Editor$spec = function (cfg) {
-	var c = cfg.a;
-	return c.spec;
+	var c = cfg;
+	return c.em;
 };
 var $author$project$RichText$Internal$Editor$forceRerender = function (e) {
-	var c = e.a;
-	return $author$project$RichText$Internal$Editor$Editor(
-		_Utils_update(
-			c,
-			{renderCount: c.renderCount + 1}));
+	var c = e;
+	return _Utils_update(
+		c,
+		{aL: c.aL + 1});
 };
 var $author$project$RichText$Config$Command$namedCommandListFromInputEvent = F2(
 	function (event, map) {
-		var contents = map.a;
+		var contents = map;
 		return A2(
 			$elm$core$Maybe$withDefault,
-			contents.defaultInputEventCommand(event),
-			A2($elm$core$Dict$get, event.inputType, contents.inputEventTypeMap));
+			contents.W(event),
+			A2($elm$core$Dict$get, event.dL, contents._));
 	});
 var $author$project$RichText$Internal$BeforeInput$handleInputEvent = F4(
 	function (commandMap, spec, editor, inputEvent) {
@@ -20391,16 +16915,16 @@ var $author$project$RichText$Internal$BeforeInput$handleInputEvent = F4(
 		return A3($author$project$RichText$Internal$Editor$applyNamedCommandList, namedCommandList, spec, editor);
 	});
 var $author$project$RichText$Internal$Editor$isComposing = function (e) {
-	var c = e.a;
-	return c.isComposing;
+	var c = e;
+	return c.cn;
 };
 var $author$project$RichText$Internal$BeforeInput$handleBeforeInput = F4(
 	function (inputEvent, commandMap, spec, editor) {
-		if (inputEvent.isComposing || $author$project$RichText$Internal$Editor$isComposing(editor)) {
+		if (inputEvent.cn || $author$project$RichText$Internal$Editor$isComposing(editor)) {
 			return editor;
 		} else {
 			var _v0 = A4($author$project$RichText$Internal$BeforeInput$handleInputEvent, commandMap, spec, editor, inputEvent);
-			if (_v0.$ === 'Err') {
+			if (_v0.$ === 1) {
 				return editor;
 			} else {
 				var newEditor = _v0.a;
@@ -20409,31 +16933,29 @@ var $author$project$RichText$Internal$BeforeInput$handleBeforeInput = F4(
 		}
 	});
 var $author$project$RichText$Internal$Editor$bufferedEditorState = function (e) {
-	var c = e.a;
-	return c.bufferedEditorState;
+	var c = e;
+	return c.aV;
 };
 var $author$project$RichText$Internal$Editor$withBufferedEditorState = F2(
 	function (s, e) {
-		var c = e.a;
-		return $author$project$RichText$Internal$Editor$Editor(
-			_Utils_update(
-				c,
-				{bufferedEditorState: s}));
+		var c = e;
+		return _Utils_update(
+			c,
+			{aV: s});
 	});
 var $author$project$RichText$Internal$Editor$withComposing = F2(
 	function (composing, e) {
-		var c = e.a;
-		return $author$project$RichText$Internal$Editor$Editor(
-			_Utils_update(
-				c,
-				{isComposing: composing}));
+		var c = e;
+		return _Utils_update(
+			c,
+			{cn: composing});
 	});
 var $author$project$RichText$Editor$applyForceFunctionOnEditor = F2(
 	function (rerenderFunc, editor_) {
 		return rerenderFunc(
 			function () {
 				var _v0 = $author$project$RichText$Internal$Editor$bufferedEditorState(editor_);
-				if (_v0.$ === 'Nothing') {
+				if (_v0.$ === 1) {
 					return editor_;
 				} else {
 					var bufferedEditorState = _v0.a;
@@ -20447,7 +16969,7 @@ var $author$project$RichText$Editor$applyForceFunctionOnEditor = F2(
 	});
 var $author$project$RichText$Editor$handleCompositionEnd = function (editor_) {
 	var _v0 = $author$project$RichText$Internal$Editor$bufferedEditorState(editor_);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return A2($author$project$RichText$Internal$Editor$withComposing, false, editor_);
 	} else {
 		return A2($author$project$RichText$Editor$applyForceFunctionOnEditor, $author$project$RichText$Internal$Editor$forceReselection, editor_);
@@ -20468,7 +16990,7 @@ var $author$project$RichText$Editor$handleCut = F2(
 				]),
 			spec_,
 			editor_);
-		if (_v0.$ === 'Err') {
+		if (_v0.$ === 1) {
 			return editor_;
 		} else {
 			var e = _v0.a;
@@ -20477,32 +16999,31 @@ var $author$project$RichText$Editor$handleCut = F2(
 	});
 var $author$project$RichText$Internal$Editor$withShortKey = F2(
 	function (key, e) {
-		var c = e.a;
-		return $author$project$RichText$Internal$Editor$Editor(
-			_Utils_update(
-				c,
-				{shortKey: key}));
+		var c = e;
+		return _Utils_update(
+			c,
+			{ej: key});
 	});
 var $author$project$RichText$Editor$handleInitEvent = F2(
 	function (initEvent, editor_) {
-		return A2($author$project$RichText$Internal$Editor$withShortKey, initEvent.shortKey, editor_);
+		return A2($author$project$RichText$Internal$Editor$withShortKey, initEvent.ej, editor_);
 	});
 var $author$project$RichText$Config$Command$addAltKey = F2(
 	function (keyboardEvent, keys) {
-		return keyboardEvent.altKey ? A2($elm$core$List$cons, $author$project$RichText$Config$Keys$alt, keys) : keys;
+		return keyboardEvent.dc ? A2($elm$core$List$cons, $author$project$RichText$Config$Keys$alt, keys) : keys;
 	});
 var $author$project$RichText$Config$Keys$ctrl = 'Control';
 var $author$project$RichText$Config$Command$addCtrlKey = F2(
 	function (keyboardEvent, keys) {
-		return keyboardEvent.ctrlKey ? A2($elm$core$List$cons, $author$project$RichText$Config$Keys$ctrl, keys) : keys;
+		return keyboardEvent.dr ? A2($elm$core$List$cons, $author$project$RichText$Config$Keys$ctrl, keys) : keys;
 	});
 var $author$project$RichText$Config$Command$addMetaKey = F2(
 	function (keyboardEvent, keys) {
-		return keyboardEvent.metaKey ? A2($elm$core$List$cons, $author$project$RichText$Config$Keys$meta, keys) : keys;
+		return keyboardEvent.dT ? A2($elm$core$List$cons, $author$project$RichText$Config$Keys$meta, keys) : keys;
 	});
 var $author$project$RichText$Config$Command$addShiftKey = F2(
 	function (keyboardEvent, keys) {
-		return keyboardEvent.shiftKey ? A2($elm$core$List$cons, $author$project$RichText$Config$Keys$shift, keys) : keys;
+		return keyboardEvent.cT ? A2($elm$core$List$cons, $author$project$RichText$Config$Keys$shift, keys) : keys;
 	});
 var $author$project$RichText$Config$Command$keyboardEventToDictKey = F2(
 	function (shortKey, keyboardEvent) {
@@ -20525,25 +17046,25 @@ var $author$project$RichText$Config$Command$keyboardEventToDictKey = F2(
 								$author$project$RichText$Config$Command$addShiftKey,
 								keyboardEvent,
 								_List_fromArray(
-									[keyboardEvent.key])))))));
+									[keyboardEvent.co])))))));
 	});
 var $author$project$RichText$Config$Command$namedCommandListFromKeyboardEvent = F3(
 	function (shortKey, event, map) {
-		var contents = map.a;
+		var contents = map;
 		var mapping = A2($author$project$RichText$Config$Command$keyboardEventToDictKey, shortKey, event);
-		var _v1 = A2($elm$core$Dict$get, mapping, contents.keyMap);
-		if (_v1.$ === 'Nothing') {
-			var _v2 = A2($elm$core$Dict$get, mapping, contents.keyMap);
-			if (_v2.$ === 'Nothing') {
-				return contents.defaultKeyCommand(event);
+		var _v1 = A2($elm$core$Dict$get, mapping, contents.J);
+		if (_v1.$ === 1) {
+			var _v2 = A2($elm$core$Dict$get, mapping, contents.J);
+			if (_v2.$ === 1) {
+				return contents.X(event);
 			} else {
 				var v = _v2.a;
 				return v;
 			}
 		} else {
 			var v = _v1.a;
-			var _v3 = A2($elm$core$Dict$get, mapping, contents.keyMap);
-			if (_v3.$ === 'Nothing') {
+			var _v3 = A2($elm$core$Dict$get, mapping, contents.J);
+			if (_v3.$ === 1) {
 				return v;
 			} else {
 				var v2 = _v3.a;
@@ -20552,8 +17073,8 @@ var $author$project$RichText$Config$Command$namedCommandListFromKeyboardEvent = 
 		}
 	});
 var $author$project$RichText$Internal$Editor$shortKey = function (e) {
-	var c = e.a;
-	return c.shortKey;
+	var c = e;
+	return c.ej;
 };
 var $author$project$RichText$Internal$KeyDown$handleKeyDownEvent = F4(
 	function (commandMap, spec, editor, event) {
@@ -20566,7 +17087,7 @@ var $author$project$RichText$Internal$KeyDown$handleKeyDownEvent = F4(
 	});
 var $author$project$RichText$Internal$KeyDown$handleKeyDown = F4(
 	function (keyboardEvent, commandMap, spec, editor) {
-		return (keyboardEvent.isComposing || $author$project$RichText$Internal$Editor$isComposing(editor)) ? editor : A2(
+		return (keyboardEvent.cn || $author$project$RichText$Internal$Editor$isComposing(editor)) ? editor : A2(
 			$elm$core$Result$withDefault,
 			editor,
 			A4($author$project$RichText$Internal$KeyDown$handleKeyDownEvent, commandMap, spec, editor, keyboardEvent));
@@ -20588,13 +17109,13 @@ var $author$project$RichText$Internal$Spec$reduceEditorFragmentArray = function 
 					$elm$core$Array$get,
 					$elm$core$Array$length(arr) - 1,
 					arr);
-				if (_v0.$ === 'Nothing') {
+				if (_v0.$ === 1) {
 					return A2($elm$core$Array$push, fragment, arr);
 				} else {
 					var prevFragment = _v0.a;
-					if (prevFragment.$ === 'InlineFragment') {
+					if (prevFragment.$ === 1) {
 						var pilf = prevFragment.a;
-						if (fragment.$ === 'InlineFragment') {
+						if (fragment.$ === 1) {
 							var ilf = fragment.a;
 							return A3(
 								$elm$core$Array$set,
@@ -20607,7 +17128,7 @@ var $author$project$RichText$Internal$Spec$reduceEditorFragmentArray = function 
 						}
 					} else {
 						var pbnf = prevFragment.a;
-						if (fragment.$ === 'InlineFragment') {
+						if (fragment.$ === 1) {
 							return A2($elm$core$Array$push, fragment, arr);
 						} else {
 							var bnf = fragment.a;
@@ -20629,12 +17150,12 @@ var $author$project$RichText$Internal$Spec$arrayToFragment = function (results) 
 		$elm$core$Array$foldl,
 		F2(
 			function (fragmentResult, arrayResult) {
-				if (arrayResult.$ === 'Err') {
+				if (arrayResult.$ === 1) {
 					var e = arrayResult.a;
 					return $elm$core$Result$Err(e);
 				} else {
 					var arr = arrayResult.a;
-					if (fragmentResult.$ === 'Err') {
+					if (fragmentResult.$ === 1) {
 						var e = fragmentResult.a;
 						return $elm$core$Result$Err(e);
 					} else {
@@ -20646,14 +17167,14 @@ var $author$project$RichText$Internal$Spec$arrayToFragment = function (results) 
 			}),
 		$elm$core$Result$Ok($elm$core$Array$empty),
 		results);
-	if (aResult.$ === 'Err') {
+	if (aResult.$ === 1) {
 		var e = aResult.a;
 		return $elm$core$Result$Err(e);
 	} else {
 		var result = aResult.a;
 		var reducedArray = $author$project$RichText$Internal$Spec$reduceEditorFragmentArray(result);
 		var _v1 = A2($elm$core$Array$get, 0, reducedArray);
-		if (_v1.$ === 'Nothing') {
+		if (_v1.$ === 1) {
 			return $elm$core$Result$Err('Unable to parse an editor fragment from the results');
 		} else {
 			var fragment = _v1.a;
@@ -20664,21 +17185,21 @@ var $author$project$RichText$Internal$Spec$arrayToFragment = function (results) 
 var $author$project$RichText$Internal$Spec$arrayToChildNodes = F2(
 	function (contentType, results) {
 		if ($elm$core$Array$isEmpty(results)) {
-			if (contentType.$ === 'BlockLeafNodeType') {
+			if (contentType.$ === 2) {
 				return $elm$core$Result$Ok($author$project$RichText$Model$Node$Leaf);
 			} else {
 				return $elm$core$Result$Err('Invalid node type for empty fragment result array');
 			}
 		} else {
 			var _v1 = $author$project$RichText$Internal$Spec$arrayToFragment(results);
-			if (_v1.$ === 'Err') {
+			if (_v1.$ === 1) {
 				var e = _v1.a;
 				return $elm$core$Result$Err(e);
 			} else {
 				var fragment = _v1.a;
-				if (fragment.$ === 'InlineFragment') {
+				if (fragment.$ === 1) {
 					var ilf = fragment.a;
-					if (contentType.$ === 'TextBlockNodeType') {
+					if (contentType.$ === 1) {
 						return $elm$core$Result$Ok(
 							$author$project$RichText$Model$Node$inlineChildren(ilf));
 					} else {
@@ -20686,7 +17207,7 @@ var $author$project$RichText$Internal$Spec$arrayToChildNodes = F2(
 					}
 				} else {
 					var bnf = fragment.a;
-					if (contentType.$ === 'BlockNodeType') {
+					if (!contentType.$) {
 						return $elm$core$Result$Ok(
 							$author$project$RichText$Model$Node$blockChildren(bnf));
 					} else {
@@ -20697,16 +17218,16 @@ var $author$project$RichText$Internal$Spec$arrayToChildNodes = F2(
 		}
 	});
 var $author$project$RichText$Config$Spec$elementDefinitions = function (spec) {
-	var c = spec.a;
-	return c.elements;
+	var c = spec;
+	return c.a_;
 };
 var $author$project$RichText$Config$ElementDefinition$fromHtmlNode = function (definition_) {
-	var c = definition_.a;
-	return c.fromHtmlNode;
+	var c = definition_;
+	return c.b9;
 };
 var $author$project$RichText$Config$MarkDefinition$fromHtmlNode = function (definition_) {
-	var c = definition_.a;
-	return c.fromHtmlNode;
+	var c = definition_;
+	return c.b9;
 };
 var $author$project$RichText$Internal$Spec$htmlNodeToMark = F2(
 	function (spec, node) {
@@ -20714,9 +17235,9 @@ var $author$project$RichText$Internal$Spec$htmlNodeToMark = F2(
 			$elm$core$List$foldl,
 			F2(
 				function (definition, result) {
-					if (result.$ === 'Nothing') {
+					if (result.$ === 1) {
 						var _v1 = A3($author$project$RichText$Config$MarkDefinition$fromHtmlNode, definition, definition, node);
-						if (_v1.$ === 'Nothing') {
+						if (_v1.$ === 1) {
 							return $elm$core$Maybe$Nothing;
 						} else {
 							var m = _v1.a;
@@ -20739,7 +17260,7 @@ var $elm$core$String$replace = F3(
 var $author$project$RichText$Internal$Constants$zeroWidthSpace = '\u200B';
 var $author$project$RichText$Internal$Spec$htmlNodeToEditorFragment = F3(
 	function (spec, marks, node) {
-		if (node.$ === 'TextNode') {
+		if (node.$ === 1) {
 			var s = node.a;
 			return $elm$core$Result$Ok(
 				$author$project$RichText$Node$InlineFragment(
@@ -20761,9 +17282,9 @@ var $author$project$RichText$Internal$Spec$htmlNodeToEditorFragment = F3(
 				$elm$core$List$foldl,
 				F2(
 					function (definition, result) {
-						if (result.$ === 'Nothing') {
+						if (result.$ === 1) {
 							var _v8 = A3($author$project$RichText$Config$ElementDefinition$fromHtmlNode, definition, definition, node);
-							if (_v8.$ === 'Nothing') {
+							if (_v8.$ === 1) {
 								return $elm$core$Maybe$Nothing;
 							} else {
 								var v = _v8.a;
@@ -20776,7 +17297,7 @@ var $author$project$RichText$Internal$Spec$htmlNodeToEditorFragment = F3(
 					}),
 				$elm$core$Maybe$Nothing,
 				definitions);
-			if (maybeElementAndChildren.$ === 'Just') {
+			if (!maybeElementAndChildren.$) {
 				var _v2 = maybeElementAndChildren.a;
 				var definition = _v2.a;
 				var _v3 = _v2.b;
@@ -20798,7 +17319,7 @@ var $author$project$RichText$Internal$Spec$htmlNodeToEditorFragment = F3(
 						A2($author$project$RichText$Internal$Spec$htmlNodeToEditorFragment, spec, _List_Nil),
 						children);
 					var _v4 = A2($author$project$RichText$Internal$Spec$arrayToChildNodes, contentType, childArr);
-					if (_v4.$ === 'Err') {
+					if (_v4.$ === 1) {
 						var s = _v4.a;
 						return $elm$core$Result$Err(s);
 					} else {
@@ -20814,7 +17335,7 @@ var $author$project$RichText$Internal$Spec$htmlNodeToEditorFragment = F3(
 				}
 			} else {
 				var _v5 = A2($author$project$RichText$Internal$Spec$htmlNodeToMark, spec, node);
-				if (_v5.$ === 'Nothing') {
+				if (_v5.$ === 1) {
 					return $elm$core$Result$Err('No mark or node matches the spec');
 				} else {
 					var _v6 = _v5.a;
@@ -20822,7 +17343,7 @@ var $author$project$RichText$Internal$Spec$htmlNodeToEditorFragment = F3(
 					var children = _v6.b;
 					var newMarks = A4(
 						$author$project$RichText$Model$Mark$toggle,
-						$author$project$RichText$Model$Mark$Add,
+						0,
 						$author$project$RichText$Model$Mark$markOrderFromSpec(spec),
 						mark,
 						marks);
@@ -20848,7 +17369,7 @@ var $author$project$RichText$Internal$Spec$resultFilterMap = F2(
 		var maybePush = F3(
 			function (f_, mx, xs_) {
 				var _v0 = f_(mx);
-				if (_v0.$ === 'Ok') {
+				if (!_v0.$) {
 					var x = _v0.a;
 					return A2(
 						$elm$core$Tuple$mapFirst,
@@ -20869,7 +17390,7 @@ var $author$project$RichText$Internal$Spec$resultFilterMap = F2(
 			xs);
 	});
 var $author$project$RichText$Model$HtmlNode$TextNode = function (a) {
-	return {$: 'TextNode', a: a};
+	return {$: 1, a: a};
 };
 var $elm$core$String$toLower = _String_toLower;
 var $author$project$RichText$Internal$Spec$nodeListToHtmlNodeArray = function (nodeList) {
@@ -20878,7 +17399,7 @@ var $author$project$RichText$Internal$Spec$nodeListToHtmlNodeArray = function (n
 			$elm$core$List$concatMap,
 			function (n) {
 				switch (n.$) {
-					case 'Element':
+					case 1:
 						var name = n.a;
 						var attributes = n.b;
 						var children = n.c;
@@ -20890,7 +17411,7 @@ var $author$project$RichText$Internal$Spec$nodeListToHtmlNodeArray = function (n
 								attributes,
 								$author$project$RichText$Internal$Spec$nodeListToHtmlNodeArray(children))
 							]) : _List_Nil;
-					case 'Text':
+					case 0:
 						var s = n.a;
 						return _List_fromArray(
 							[
@@ -20904,102 +17425,97 @@ var $author$project$RichText$Internal$Spec$nodeListToHtmlNodeArray = function (n
 };
 var $hecrj$html_parser$Html$Parser$Element = F3(
 	function (a, b, c) {
-		return {$: 'Element', a: a, b: b, c: c};
+		return {$: 1, a: a, b: b, c: c};
 	});
 var $elm$parser$Parser$Advanced$Bad = F2(
 	function (a, b) {
-		return {$: 'Bad', a: a, b: b};
+		return {$: 1, a: a, b: b};
 	});
 var $elm$parser$Parser$Advanced$Good = F3(
 	function (a, b, c) {
-		return {$: 'Good', a: a, b: b, c: c};
+		return {$: 0, a: a, b: b, c: c};
 	});
-var $elm$parser$Parser$Advanced$Parser = function (a) {
-	return {$: 'Parser', a: a};
-};
+var $elm$parser$Parser$Advanced$Parser = $elm$core$Basics$identity;
 var $elm$parser$Parser$Advanced$andThen = F2(
 	function (callback, _v0) {
-		var parseA = _v0.a;
-		return $elm$parser$Parser$Advanced$Parser(
-			function (s0) {
-				var _v1 = parseA(s0);
-				if (_v1.$ === 'Bad') {
-					var p = _v1.a;
-					var x = _v1.b;
-					return A2($elm$parser$Parser$Advanced$Bad, p, x);
+		var parseA = _v0;
+		return function (s0) {
+			var _v1 = parseA(s0);
+			if (_v1.$ === 1) {
+				var p = _v1.a;
+				var x = _v1.b;
+				return A2($elm$parser$Parser$Advanced$Bad, p, x);
+			} else {
+				var p1 = _v1.a;
+				var a = _v1.b;
+				var s1 = _v1.c;
+				var _v2 = callback(a);
+				var parseB = _v2;
+				var _v3 = parseB(s1);
+				if (_v3.$ === 1) {
+					var p2 = _v3.a;
+					var x = _v3.b;
+					return A2($elm$parser$Parser$Advanced$Bad, p1 || p2, x);
 				} else {
-					var p1 = _v1.a;
-					var a = _v1.b;
-					var s1 = _v1.c;
-					var _v2 = callback(a);
-					var parseB = _v2.a;
-					var _v3 = parseB(s1);
-					if (_v3.$ === 'Bad') {
-						var p2 = _v3.a;
-						var x = _v3.b;
-						return A2($elm$parser$Parser$Advanced$Bad, p1 || p2, x);
-					} else {
-						var p2 = _v3.a;
-						var b = _v3.b;
-						var s2 = _v3.c;
-						return A3($elm$parser$Parser$Advanced$Good, p1 || p2, b, s2);
-					}
+					var p2 = _v3.a;
+					var b = _v3.b;
+					var s2 = _v3.c;
+					return A3($elm$parser$Parser$Advanced$Good, p1 || p2, b, s2);
 				}
-			});
+			}
+		};
 	});
 var $elm$parser$Parser$andThen = $elm$parser$Parser$Advanced$andThen;
 var $elm$parser$Parser$Advanced$backtrackable = function (_v0) {
-	var parse = _v0.a;
-	return $elm$parser$Parser$Advanced$Parser(
-		function (s0) {
-			var _v1 = parse(s0);
-			if (_v1.$ === 'Bad') {
-				var x = _v1.b;
-				return A2($elm$parser$Parser$Advanced$Bad, false, x);
-			} else {
-				var a = _v1.b;
-				var s1 = _v1.c;
-				return A3($elm$parser$Parser$Advanced$Good, false, a, s1);
-			}
-		});
+	var parse = _v0;
+	return function (s0) {
+		var _v1 = parse(s0);
+		if (_v1.$ === 1) {
+			var x = _v1.b;
+			return A2($elm$parser$Parser$Advanced$Bad, false, x);
+		} else {
+			var a = _v1.b;
+			var s1 = _v1.c;
+			return A3($elm$parser$Parser$Advanced$Good, false, a, s1);
+		}
+	};
 };
 var $elm$parser$Parser$backtrackable = $elm$parser$Parser$Advanced$backtrackable;
-var $elm$parser$Parser$UnexpectedChar = {$: 'UnexpectedChar'};
+var $elm$parser$Parser$UnexpectedChar = {$: 11};
 var $elm$parser$Parser$Advanced$AddRight = F2(
 	function (a, b) {
-		return {$: 'AddRight', a: a, b: b};
+		return {$: 1, a: a, b: b};
 	});
 var $elm$parser$Parser$Advanced$DeadEnd = F4(
 	function (row, col, problem, contextStack) {
-		return {col: col, contextStack: contextStack, problem: problem, row: row};
+		return {bZ: col, dq: contextStack, cF: problem, cN: row};
 	});
-var $elm$parser$Parser$Advanced$Empty = {$: 'Empty'};
+var $elm$parser$Parser$Advanced$Empty = {$: 0};
 var $elm$parser$Parser$Advanced$fromState = F2(
 	function (s, x) {
 		return A2(
 			$elm$parser$Parser$Advanced$AddRight,
 			$elm$parser$Parser$Advanced$Empty,
-			A4($elm$parser$Parser$Advanced$DeadEnd, s.row, s.col, x, s.context));
+			A4($elm$parser$Parser$Advanced$DeadEnd, s.cN, s.bZ, x, s.f));
 	});
 var $elm$parser$Parser$Advanced$isSubChar = _Parser_isSubChar;
 var $elm$parser$Parser$Advanced$chompIf = F2(
 	function (isGood, expecting) {
-		return $elm$parser$Parser$Advanced$Parser(
-			function (s) {
-				var newOffset = A3($elm$parser$Parser$Advanced$isSubChar, isGood, s.offset, s.src);
-				return _Utils_eq(newOffset, -1) ? A2(
-					$elm$parser$Parser$Advanced$Bad,
-					false,
-					A2($elm$parser$Parser$Advanced$fromState, s, expecting)) : (_Utils_eq(newOffset, -2) ? A3(
-					$elm$parser$Parser$Advanced$Good,
-					true,
-					_Utils_Tuple0,
-					{col: 1, context: s.context, indent: s.indent, offset: s.offset + 1, row: s.row + 1, src: s.src}) : A3(
-					$elm$parser$Parser$Advanced$Good,
-					true,
-					_Utils_Tuple0,
-					{col: s.col + 1, context: s.context, indent: s.indent, offset: newOffset, row: s.row, src: s.src}));
-			});
+		return function (s) {
+			var newOffset = A3($elm$parser$Parser$Advanced$isSubChar, isGood, s.c, s.cW);
+			return _Utils_eq(newOffset, -1) ? A2(
+				$elm$parser$Parser$Advanced$Bad,
+				false,
+				A2($elm$parser$Parser$Advanced$fromState, s, expecting)) : (_Utils_eq(newOffset, -2) ? A3(
+				$elm$parser$Parser$Advanced$Good,
+				true,
+				0,
+				{bZ: 1, f: s.f, h: s.h, c: s.c + 1, cN: s.cN + 1, cW: s.cW}) : A3(
+				$elm$parser$Parser$Advanced$Good,
+				true,
+				0,
+				{bZ: s.bZ + 1, f: s.f, h: s.h, c: newOffset, cN: s.cN, cW: s.cW}));
+		};
 	});
 var $elm$parser$Parser$chompIf = function (isGood) {
 	return A2($elm$parser$Parser$Advanced$chompIf, isGood, $elm$parser$Parser$UnexpectedChar);
@@ -21008,13 +17524,13 @@ var $elm$parser$Parser$Advanced$chompWhileHelp = F5(
 	function (isGood, offset, row, col, s0) {
 		chompWhileHelp:
 		while (true) {
-			var newOffset = A3($elm$parser$Parser$Advanced$isSubChar, isGood, offset, s0.src);
+			var newOffset = A3($elm$parser$Parser$Advanced$isSubChar, isGood, offset, s0.cW);
 			if (_Utils_eq(newOffset, -1)) {
 				return A3(
 					$elm$parser$Parser$Advanced$Good,
-					_Utils_cmp(s0.offset, offset) < 0,
-					_Utils_Tuple0,
-					{col: col, context: s0.context, indent: s0.indent, offset: offset, row: row, src: s0.src});
+					_Utils_cmp(s0.c, offset) < 0,
+					0,
+					{bZ: col, f: s0.f, h: s0.h, c: offset, cN: row, cW: s0.cW});
 			} else {
 				if (_Utils_eq(newOffset, -2)) {
 					var $temp$isGood = isGood,
@@ -21045,10 +17561,9 @@ var $elm$parser$Parser$Advanced$chompWhileHelp = F5(
 		}
 	});
 var $elm$parser$Parser$Advanced$chompWhile = function (isGood) {
-	return $elm$parser$Parser$Advanced$Parser(
-		function (s) {
-			return A5($elm$parser$Parser$Advanced$chompWhileHelp, isGood, s.offset, s.row, s.col, s);
-		});
+	return function (s) {
+		return A5($elm$parser$Parser$Advanced$chompWhileHelp, isGood, s.c, s.cN, s.bZ, s);
+	};
 };
 var $elm$parser$Parser$chompWhile = $elm$parser$Parser$Advanced$chompWhile;
 var $elm$core$Basics$always = F2(
@@ -21057,36 +17572,35 @@ var $elm$core$Basics$always = F2(
 	});
 var $elm$parser$Parser$Advanced$map2 = F3(
 	function (func, _v0, _v1) {
-		var parseA = _v0.a;
-		var parseB = _v1.a;
-		return $elm$parser$Parser$Advanced$Parser(
-			function (s0) {
-				var _v2 = parseA(s0);
-				if (_v2.$ === 'Bad') {
-					var p = _v2.a;
-					var x = _v2.b;
-					return A2($elm$parser$Parser$Advanced$Bad, p, x);
+		var parseA = _v0;
+		var parseB = _v1;
+		return function (s0) {
+			var _v2 = parseA(s0);
+			if (_v2.$ === 1) {
+				var p = _v2.a;
+				var x = _v2.b;
+				return A2($elm$parser$Parser$Advanced$Bad, p, x);
+			} else {
+				var p1 = _v2.a;
+				var a = _v2.b;
+				var s1 = _v2.c;
+				var _v3 = parseB(s1);
+				if (_v3.$ === 1) {
+					var p2 = _v3.a;
+					var x = _v3.b;
+					return A2($elm$parser$Parser$Advanced$Bad, p1 || p2, x);
 				} else {
-					var p1 = _v2.a;
-					var a = _v2.b;
-					var s1 = _v2.c;
-					var _v3 = parseB(s1);
-					if (_v3.$ === 'Bad') {
-						var p2 = _v3.a;
-						var x = _v3.b;
-						return A2($elm$parser$Parser$Advanced$Bad, p1 || p2, x);
-					} else {
-						var p2 = _v3.a;
-						var b = _v3.b;
-						var s2 = _v3.c;
-						return A3(
-							$elm$parser$Parser$Advanced$Good,
-							p1 || p2,
-							A2(func, a, b),
-							s2);
-					}
+					var p2 = _v3.a;
+					var b = _v3.b;
+					var s2 = _v3.c;
+					return A3(
+						$elm$parser$Parser$Advanced$Good,
+						p1 || p2,
+						A2(func, a, b),
+						s2);
 				}
-			});
+			}
+		};
 	});
 var $elm$parser$Parser$Advanced$ignorer = F2(
 	function (keepParser, ignoreParser) {
@@ -21101,69 +17615,54 @@ var $hecrj$html_parser$Html$Parser$chompOneOrMore = function (fn) {
 };
 var $elm$parser$Parser$Advanced$mapChompedString = F2(
 	function (func, _v0) {
-		var parse = _v0.a;
-		return $elm$parser$Parser$Advanced$Parser(
-			function (s0) {
-				var _v1 = parse(s0);
-				if (_v1.$ === 'Bad') {
-					var p = _v1.a;
-					var x = _v1.b;
-					return A2($elm$parser$Parser$Advanced$Bad, p, x);
-				} else {
-					var p = _v1.a;
-					var a = _v1.b;
-					var s1 = _v1.c;
-					return A3(
-						$elm$parser$Parser$Advanced$Good,
-						p,
-						A2(
-							func,
-							A3($elm$core$String$slice, s0.offset, s1.offset, s0.src),
-							a),
-						s1);
-				}
-			});
+		var parse = _v0;
+		return function (s0) {
+			var _v1 = parse(s0);
+			if (_v1.$ === 1) {
+				var p = _v1.a;
+				var x = _v1.b;
+				return A2($elm$parser$Parser$Advanced$Bad, p, x);
+			} else {
+				var p = _v1.a;
+				var a = _v1.b;
+				var s1 = _v1.c;
+				return A3(
+					$elm$parser$Parser$Advanced$Good,
+					p,
+					A2(
+						func,
+						A3($elm$core$String$slice, s0.c, s1.c, s0.cW),
+						a),
+					s1);
+			}
+		};
 	});
 var $elm$parser$Parser$Advanced$getChompedString = function (parser) {
 	return A2($elm$parser$Parser$Advanced$mapChompedString, $elm$core$Basics$always, parser);
 };
 var $elm$parser$Parser$getChompedString = $elm$parser$Parser$Advanced$getChompedString;
 var $hecrj$html_parser$Html$Parser$isSpaceCharacter = function (c) {
-	return _Utils_eq(
-		c,
-		_Utils_chr(' ')) || (_Utils_eq(
-		c,
-		_Utils_chr('\t')) || (_Utils_eq(
-		c,
-		_Utils_chr('\n')) || (_Utils_eq(
-		c,
-		_Utils_chr('\u000D')) || (_Utils_eq(
-		c,
-		_Utils_chr('\u000C')) || _Utils_eq(
-		c,
-		_Utils_chr('\u00A0'))))));
+	return (c === ' ') || ((c === '\t') || ((c === '\n') || ((c === '\u000D') || ((c === '\u000C') || (c === '\u00A0')))));
 };
 var $elm$parser$Parser$Problem = function (a) {
-	return {$: 'Problem', a: a};
+	return {$: 12, a: a};
 };
 var $elm$parser$Parser$Advanced$problem = function (x) {
-	return $elm$parser$Parser$Advanced$Parser(
-		function (s) {
-			return A2(
-				$elm$parser$Parser$Advanced$Bad,
-				false,
-				A2($elm$parser$Parser$Advanced$fromState, s, x));
-		});
+	return function (s) {
+		return A2(
+			$elm$parser$Parser$Advanced$Bad,
+			false,
+			A2($elm$parser$Parser$Advanced$fromState, s, x));
+	};
 };
 var $elm$parser$Parser$problem = function (msg) {
 	return $elm$parser$Parser$Advanced$problem(
 		$elm$parser$Parser$Problem(msg));
 };
 var $elm$parser$Parser$Advanced$succeed = function (a) {
-	return $elm$parser$Parser$Advanced$Parser(
-		function (s) {
-			return A3($elm$parser$Parser$Advanced$Good, false, a, s);
-		});
+	return function (s) {
+		return A3($elm$parser$Parser$Advanced$Good, false, a, s);
+	};
 };
 var $elm$parser$Parser$succeed = $elm$parser$Parser$Advanced$succeed;
 var $hecrj$html_parser$Html$Parser$closingTag = function (name) {
@@ -21172,14 +17671,12 @@ var $hecrj$html_parser$Html$Parser$closingTag = function (name) {
 		function (closingName) {
 			return _Utils_eq(
 				$elm$core$String$toLower(closingName),
-				name) ? $elm$parser$Parser$succeed(_Utils_Tuple0) : $elm$parser$Parser$problem('closing tag does not match opening tag: ' + name);
+				name) ? $elm$parser$Parser$succeed(0) : $elm$parser$Parser$problem('closing tag does not match opening tag: ' + name);
 		},
 		$elm$parser$Parser$getChompedString(
 			$hecrj$html_parser$Html$Parser$chompOneOrMore(
 				function (c) {
-					return (!$hecrj$html_parser$Html$Parser$isSpaceCharacter(c)) && (!_Utils_eq(
-						c,
-						_Utils_chr('>')));
+					return (!$hecrj$html_parser$Html$Parser$isSpaceCharacter(c)) && (c !== '>');
 				})));
 	return A2(
 		$elm$parser$Parser$ignorer,
@@ -21190,19 +17687,16 @@ var $hecrj$html_parser$Html$Parser$closingTag = function (name) {
 				A2(
 					$elm$parser$Parser$ignorer,
 					$elm$parser$Parser$chompIf(
-						$elm$core$Basics$eq(
-							_Utils_chr('<'))),
+						$elm$core$Basics$eq('<')),
 					$elm$parser$Parser$chompIf(
-						$elm$core$Basics$eq(
-							_Utils_chr('/')))),
+						$elm$core$Basics$eq('/'))),
 				chompName),
 			$elm$parser$Parser$chompWhile($hecrj$html_parser$Html$Parser$isSpaceCharacter)),
 		$elm$parser$Parser$chompIf(
-			$elm$core$Basics$eq(
-				_Utils_chr('>'))));
+			$elm$core$Basics$eq('>')));
 };
 var $hecrj$html_parser$Html$Parser$Comment = function (a) {
-	return {$: 'Comment', a: a};
+	return {$: 2, a: a};
 };
 var $elm$parser$Parser$Advanced$findSubString = _Parser_findSubString;
 var $elm$parser$Parser$Advanced$fromInfo = F4(
@@ -21215,28 +17709,27 @@ var $elm$parser$Parser$Advanced$fromInfo = F4(
 var $elm$parser$Parser$Advanced$chompUntil = function (_v0) {
 	var str = _v0.a;
 	var expecting = _v0.b;
-	return $elm$parser$Parser$Advanced$Parser(
-		function (s) {
-			var _v1 = A5($elm$parser$Parser$Advanced$findSubString, str, s.offset, s.row, s.col, s.src);
-			var newOffset = _v1.a;
-			var newRow = _v1.b;
-			var newCol = _v1.c;
-			return _Utils_eq(newOffset, -1) ? A2(
-				$elm$parser$Parser$Advanced$Bad,
-				false,
-				A4($elm$parser$Parser$Advanced$fromInfo, newRow, newCol, expecting, s.context)) : A3(
-				$elm$parser$Parser$Advanced$Good,
-				_Utils_cmp(s.offset, newOffset) < 0,
-				_Utils_Tuple0,
-				{col: newCol, context: s.context, indent: s.indent, offset: newOffset, row: newRow, src: s.src});
-		});
+	return function (s) {
+		var _v1 = A5($elm$parser$Parser$Advanced$findSubString, str, s.c, s.cN, s.bZ, s.cW);
+		var newOffset = _v1.a;
+		var newRow = _v1.b;
+		var newCol = _v1.c;
+		return _Utils_eq(newOffset, -1) ? A2(
+			$elm$parser$Parser$Advanced$Bad,
+			false,
+			A4($elm$parser$Parser$Advanced$fromInfo, newRow, newCol, expecting, s.f)) : A3(
+			$elm$parser$Parser$Advanced$Good,
+			_Utils_cmp(s.c, newOffset) < 0,
+			0,
+			{bZ: newCol, f: s.f, h: s.h, c: newOffset, cN: newRow, cW: s.cW});
+	};
 };
 var $elm$parser$Parser$Expecting = function (a) {
-	return {$: 'Expecting', a: a};
+	return {$: 0, a: a};
 };
 var $elm$parser$Parser$Advanced$Token = F2(
 	function (a, b) {
-		return {$: 'Token', a: a, b: b};
+		return {$: 0, a: a, b: b};
 	});
 var $elm$parser$Parser$toToken = function (str) {
 	return A2(
@@ -21258,21 +17751,20 @@ var $elm$parser$Parser$Advanced$token = function (_v0) {
 	var str = _v0.a;
 	var expecting = _v0.b;
 	var progress = !$elm$core$String$isEmpty(str);
-	return $elm$parser$Parser$Advanced$Parser(
-		function (s) {
-			var _v1 = A5($elm$parser$Parser$Advanced$isSubString, str, s.offset, s.row, s.col, s.src);
-			var newOffset = _v1.a;
-			var newRow = _v1.b;
-			var newCol = _v1.c;
-			return _Utils_eq(newOffset, -1) ? A2(
-				$elm$parser$Parser$Advanced$Bad,
-				false,
-				A2($elm$parser$Parser$Advanced$fromState, s, expecting)) : A3(
-				$elm$parser$Parser$Advanced$Good,
-				progress,
-				_Utils_Tuple0,
-				{col: newCol, context: s.context, indent: s.indent, offset: newOffset, row: newRow, src: s.src});
-		});
+	return function (s) {
+		var _v1 = A5($elm$parser$Parser$Advanced$isSubString, str, s.c, s.cN, s.bZ, s.cW);
+		var newOffset = _v1.a;
+		var newRow = _v1.b;
+		var newCol = _v1.c;
+		return _Utils_eq(newOffset, -1) ? A2(
+			$elm$parser$Parser$Advanced$Bad,
+			false,
+			A2($elm$parser$Parser$Advanced$fromState, s, expecting)) : A3(
+			$elm$parser$Parser$Advanced$Good,
+			progress,
+			0,
+			{bZ: newCol, f: s.f, h: s.h, c: newOffset, cN: newRow, cW: s.cW});
+	};
 };
 var $elm$parser$Parser$token = function (str) {
 	return $elm$parser$Parser$Advanced$token(
@@ -21294,25 +17786,24 @@ var $hecrj$html_parser$Html$Parser$commentString = A2(
 		$elm$parser$Parser$token('-->')));
 var $elm$parser$Parser$Advanced$map = F2(
 	function (func, _v0) {
-		var parse = _v0.a;
-		return $elm$parser$Parser$Advanced$Parser(
-			function (s0) {
-				var _v1 = parse(s0);
-				if (_v1.$ === 'Good') {
-					var p = _v1.a;
-					var a = _v1.b;
-					var s1 = _v1.c;
-					return A3(
-						$elm$parser$Parser$Advanced$Good,
-						p,
-						func(a),
-						s1);
-				} else {
-					var p = _v1.a;
-					var x = _v1.b;
-					return A2($elm$parser$Parser$Advanced$Bad, p, x);
-				}
-			});
+		var parse = _v0;
+		return function (s0) {
+			var _v1 = parse(s0);
+			if (!_v1.$) {
+				var p = _v1.a;
+				var a = _v1.b;
+				var s1 = _v1.c;
+				return A3(
+					$elm$parser$Parser$Advanced$Good,
+					p,
+					func(a),
+					s1);
+			} else {
+				var p = _v1.a;
+				var x = _v1.b;
+				return A2($elm$parser$Parser$Advanced$Bad, p, x);
+			}
+		};
 	});
 var $elm$parser$Parser$map = $elm$parser$Parser$Advanced$map;
 var $hecrj$html_parser$Html$Parser$comment = A2($elm$parser$Parser$map, $hecrj$html_parser$Html$Parser$Comment, $hecrj$html_parser$Html$Parser$commentString);
@@ -21322,23 +17813,23 @@ var $hecrj$html_parser$Html$Parser$isVoidElement = function (name) {
 	return A2($elm$core$List$member, name, $hecrj$html_parser$Html$Parser$voidElements);
 };
 var $elm$parser$Parser$Done = function (a) {
-	return {$: 'Done', a: a};
+	return {$: 1, a: a};
 };
 var $elm$parser$Parser$Loop = function (a) {
-	return {$: 'Loop', a: a};
+	return {$: 0, a: a};
 };
 var $elm$parser$Parser$Advanced$loopHelp = F4(
 	function (p, state, callback, s0) {
 		loopHelp:
 		while (true) {
 			var _v0 = callback(state);
-			var parse = _v0.a;
+			var parse = _v0;
 			var _v1 = parse(s0);
-			if (_v1.$ === 'Good') {
+			if (!_v1.$) {
 				var p1 = _v1.a;
 				var step = _v1.b;
 				var s1 = _v1.c;
-				if (step.$ === 'Loop') {
+				if (!step.$) {
 					var newState = step.a;
 					var $temp$p = p || p1,
 						$temp$state = newState,
@@ -21362,19 +17853,18 @@ var $elm$parser$Parser$Advanced$loopHelp = F4(
 	});
 var $elm$parser$Parser$Advanced$loop = F2(
 	function (state, callback) {
-		return $elm$parser$Parser$Advanced$Parser(
-			function (s) {
-				return A4($elm$parser$Parser$Advanced$loopHelp, false, state, callback, s);
-			});
+		return function (s) {
+			return A4($elm$parser$Parser$Advanced$loopHelp, false, state, callback, s);
+		};
 	});
 var $elm$parser$Parser$Advanced$Done = function (a) {
-	return {$: 'Done', a: a};
+	return {$: 1, a: a};
 };
 var $elm$parser$Parser$Advanced$Loop = function (a) {
-	return {$: 'Loop', a: a};
+	return {$: 0, a: a};
 };
 var $elm$parser$Parser$toAdvancedStep = function (step) {
-	if (step.$ === 'Loop') {
+	if (!step.$) {
 		var s = step.a;
 		return $elm$parser$Parser$Advanced$Loop(s);
 	} else {
@@ -21396,7 +17886,7 @@ var $elm$parser$Parser$loop = F2(
 	});
 var $elm$parser$Parser$Advanced$Append = F2(
 	function (a, b) {
-		return {$: 'Append', a: a, b: b};
+		return {$: 2, a: a, b: b};
 	});
 var $elm$parser$Parser$Advanced$oneOfHelp = F3(
 	function (s0, bag, parsers) {
@@ -21405,10 +17895,10 @@ var $elm$parser$Parser$Advanced$oneOfHelp = F3(
 			if (!parsers.b) {
 				return A2($elm$parser$Parser$Advanced$Bad, false, bag);
 			} else {
-				var parse = parsers.a.a;
+				var parse = parsers.a;
 				var remainingParsers = parsers.b;
 				var _v1 = parse(s0);
-				if (_v1.$ === 'Good') {
+				if (!_v1.$) {
 					var step = _v1;
 					return step;
 				} else {
@@ -21431,10 +17921,9 @@ var $elm$parser$Parser$Advanced$oneOfHelp = F3(
 		}
 	});
 var $elm$parser$Parser$Advanced$oneOf = function (parsers) {
-	return $elm$parser$Parser$Advanced$Parser(
-		function (s) {
-			return A3($elm$parser$Parser$Advanced$oneOfHelp, s, $elm$parser$Parser$Advanced$Empty, parsers);
-		});
+	return function (s) {
+		return A3($elm$parser$Parser$Advanced$oneOfHelp, s, $elm$parser$Parser$Advanced$Empty, parsers);
+	};
 };
 var $elm$parser$Parser$oneOf = $elm$parser$Parser$Advanced$oneOf;
 var $hecrj$html_parser$Html$Parser$many = function (parser_) {
@@ -21459,17 +17948,7 @@ var $hecrj$html_parser$Html$Parser$many = function (parser_) {
 		});
 };
 var $hecrj$html_parser$Html$Parser$isTagAttributeCharacter = function (c) {
-	return (!$hecrj$html_parser$Html$Parser$isSpaceCharacter(c)) && ((!_Utils_eq(
-		c,
-		_Utils_chr('\"'))) && ((!_Utils_eq(
-		c,
-		_Utils_chr('\''))) && ((!_Utils_eq(
-		c,
-		_Utils_chr('>'))) && ((!_Utils_eq(
-		c,
-		_Utils_chr('/'))) && (!_Utils_eq(
-		c,
-		_Utils_chr('=')))))));
+	return (!$hecrj$html_parser$Html$Parser$isSpaceCharacter(c)) && ((c !== '\"') && ((c !== '\'') && ((c !== '>') && ((c !== '/') && (c !== '=')))));
 };
 var $hecrj$html_parser$Html$Parser$tagAttributeName = A2(
 	$elm$parser$Parser$map,
@@ -21477,8 +17956,7 @@ var $hecrj$html_parser$Html$Parser$tagAttributeName = A2(
 	$elm$parser$Parser$getChompedString(
 		$hecrj$html_parser$Html$Parser$chompOneOrMore($hecrj$html_parser$Html$Parser$isTagAttributeCharacter)));
 var $hecrj$html_parser$Html$Parser$chompSemicolon = $elm$parser$Parser$chompIf(
-	$elm$core$Basics$eq(
-		_Utils_chr(';')));
+	$elm$core$Basics$eq(';'));
 var $hecrj$html_parser$Html$Parser$NamedCharacterReferences$dict = $elm$core$Dict$fromList(
 	_List_fromArray(
 		[
@@ -23638,7 +20116,7 @@ var $rtfeldman$elm_hex$Hex$fromStringHelp = F3(
 			} else {
 				var _char = chars.a;
 				var rest = chars.b;
-				switch (_char.valueOf()) {
+				switch (_char) {
 					case '0':
 						var $temp$position = position - 1,
 							$temp$chars = rest,
@@ -23777,7 +20255,7 @@ var $rtfeldman$elm_hex$Hex$fromStringHelp = F3(
 	});
 var $elm$core$Result$mapError = F2(
 	function (f, result) {
-		if (result.$ === 'Ok') {
+		if (!result.$) {
 			var v = result.a;
 			return $elm$core$Result$Ok(v);
 		} else {
@@ -23836,7 +20314,7 @@ var $hecrj$html_parser$Html$Parser$hexadecimal = A2(
 	function (hex) {
 		var _v0 = $rtfeldman$elm_hex$Hex$fromString(
 			$elm$core$String$toLower(hex));
-		if (_v0.$ === 'Ok') {
+		if (!_v0.$) {
 			var value = _v0.a;
 			return $elm$parser$Parser$succeed(value);
 		} else {
@@ -23846,12 +20324,12 @@ var $hecrj$html_parser$Html$Parser$hexadecimal = A2(
 	},
 	$elm$parser$Parser$getChompedString(
 		$hecrj$html_parser$Html$Parser$chompOneOrMore($elm$core$Char$isHexDigit)));
-var $elm$parser$Parser$ExpectingInt = {$: 'ExpectingInt'};
+var $elm$parser$Parser$ExpectingInt = {$: 1};
 var $elm$parser$Parser$Advanced$consumeBase = _Parser_consumeBase;
 var $elm$parser$Parser$Advanced$consumeBase16 = _Parser_consumeBase16;
 var $elm$parser$Parser$Advanced$bumpOffset = F2(
 	function (newOffset, s) {
-		return {col: s.col + (newOffset - s.offset), context: s.context, indent: s.indent, offset: newOffset, row: s.row, src: s.src};
+		return {bZ: s.bZ + (newOffset - s.c), f: s.f, h: s.h, c: newOffset, cN: s.cN, cW: s.cW};
 	});
 var $elm$parser$Parser$Advanced$chompBase10 = _Parser_chompBase10;
 var $elm$parser$Parser$Advanced$isAsciiCode = _Parser_isAsciiCode;
@@ -23877,7 +20355,7 @@ var $elm$parser$Parser$Advanced$finalizeInt = F5(
 	function (invalid, handler, startOffset, _v0, s) {
 		var endOffset = _v0.a;
 		var n = _v0.b;
-		if (handler.$ === 'Err') {
+		if (handler.$ === 1) {
 			var x = handler.a;
 			return A2(
 				$elm$parser$Parser$Advanced$Bad,
@@ -23887,7 +20365,7 @@ var $elm$parser$Parser$Advanced$finalizeInt = F5(
 			var toValue = handler.a;
 			return _Utils_eq(startOffset, endOffset) ? A2(
 				$elm$parser$Parser$Advanced$Bad,
-				_Utils_cmp(s.offset, startOffset) < 0,
+				_Utils_cmp(s.c, startOffset) < 0,
 				A2($elm$parser$Parser$Advanced$fromState, s, invalid)) : A3(
 				$elm$parser$Parser$Advanced$Good,
 				true,
@@ -23899,23 +20377,23 @@ var $elm$core$String$toFloat = _String_toFloat;
 var $elm$parser$Parser$Advanced$finalizeFloat = F6(
 	function (invalid, expecting, intSettings, floatSettings, intPair, s) {
 		var intOffset = intPair.a;
-		var floatOffset = A2($elm$parser$Parser$Advanced$consumeDotAndExp, intOffset, s.src);
+		var floatOffset = A2($elm$parser$Parser$Advanced$consumeDotAndExp, intOffset, s.cW);
 		if (floatOffset < 0) {
 			return A2(
 				$elm$parser$Parser$Advanced$Bad,
 				true,
-				A4($elm$parser$Parser$Advanced$fromInfo, s.row, s.col - (floatOffset + s.offset), invalid, s.context));
+				A4($elm$parser$Parser$Advanced$fromInfo, s.cN, s.bZ - (floatOffset + s.c), invalid, s.f));
 		} else {
-			if (_Utils_eq(s.offset, floatOffset)) {
+			if (_Utils_eq(s.c, floatOffset)) {
 				return A2(
 					$elm$parser$Parser$Advanced$Bad,
 					false,
 					A2($elm$parser$Parser$Advanced$fromState, s, expecting));
 			} else {
 				if (_Utils_eq(intOffset, floatOffset)) {
-					return A5($elm$parser$Parser$Advanced$finalizeInt, invalid, intSettings, s.offset, intPair, s);
+					return A5($elm$parser$Parser$Advanced$finalizeInt, invalid, intSettings, s.c, intPair, s);
 				} else {
-					if (floatSettings.$ === 'Err') {
+					if (floatSettings.$ === 1) {
 						var x = floatSettings.a;
 						return A2(
 							$elm$parser$Parser$Advanced$Bad,
@@ -23924,8 +20402,8 @@ var $elm$parser$Parser$Advanced$finalizeFloat = F6(
 					} else {
 						var toValue = floatSettings.a;
 						var _v1 = $elm$core$String$toFloat(
-							A3($elm$core$String$slice, s.offset, floatOffset, s.src));
-						if (_v1.$ === 'Nothing') {
+							A3($elm$core$String$slice, s.c, floatOffset, s.cW));
+						if (_v1.$ === 1) {
 							return A2(
 								$elm$parser$Parser$Advanced$Bad,
 								true,
@@ -23944,60 +20422,59 @@ var $elm$parser$Parser$Advanced$finalizeFloat = F6(
 		}
 	});
 var $elm$parser$Parser$Advanced$number = function (c) {
-	return $elm$parser$Parser$Advanced$Parser(
-		function (s) {
-			if (A3($elm$parser$Parser$Advanced$isAsciiCode, 48, s.offset, s.src)) {
-				var zeroOffset = s.offset + 1;
-				var baseOffset = zeroOffset + 1;
-				return A3($elm$parser$Parser$Advanced$isAsciiCode, 120, zeroOffset, s.src) ? A5(
-					$elm$parser$Parser$Advanced$finalizeInt,
-					c.invalid,
-					c.hex,
-					baseOffset,
-					A2($elm$parser$Parser$Advanced$consumeBase16, baseOffset, s.src),
-					s) : (A3($elm$parser$Parser$Advanced$isAsciiCode, 111, zeroOffset, s.src) ? A5(
-					$elm$parser$Parser$Advanced$finalizeInt,
-					c.invalid,
-					c.octal,
-					baseOffset,
-					A3($elm$parser$Parser$Advanced$consumeBase, 8, baseOffset, s.src),
-					s) : (A3($elm$parser$Parser$Advanced$isAsciiCode, 98, zeroOffset, s.src) ? A5(
-					$elm$parser$Parser$Advanced$finalizeInt,
-					c.invalid,
-					c.binary,
-					baseOffset,
-					A3($elm$parser$Parser$Advanced$consumeBase, 2, baseOffset, s.src),
-					s) : A6(
-					$elm$parser$Parser$Advanced$finalizeFloat,
-					c.invalid,
-					c.expecting,
-					c._int,
-					c._float,
-					_Utils_Tuple2(zeroOffset, 0),
-					s)));
-			} else {
-				return A6(
-					$elm$parser$Parser$Advanced$finalizeFloat,
-					c.invalid,
-					c.expecting,
-					c._int,
-					c._float,
-					A3($elm$parser$Parser$Advanced$consumeBase, 10, s.offset, s.src),
-					s);
-			}
-		});
+	return function (s) {
+		if (A3($elm$parser$Parser$Advanced$isAsciiCode, 48, s.c, s.cW)) {
+			var zeroOffset = s.c + 1;
+			var baseOffset = zeroOffset + 1;
+			return A3($elm$parser$Parser$Advanced$isAsciiCode, 120, zeroOffset, s.cW) ? A5(
+				$elm$parser$Parser$Advanced$finalizeInt,
+				c.dM,
+				c.cf,
+				baseOffset,
+				A2($elm$parser$Parser$Advanced$consumeBase16, baseOffset, s.cW),
+				s) : (A3($elm$parser$Parser$Advanced$isAsciiCode, 111, zeroOffset, s.cW) ? A5(
+				$elm$parser$Parser$Advanced$finalizeInt,
+				c.dM,
+				c.cz,
+				baseOffset,
+				A3($elm$parser$Parser$Advanced$consumeBase, 8, baseOffset, s.cW),
+				s) : (A3($elm$parser$Parser$Advanced$isAsciiCode, 98, zeroOffset, s.cW) ? A5(
+				$elm$parser$Parser$Advanced$finalizeInt,
+				c.dM,
+				c.bV,
+				baseOffset,
+				A3($elm$parser$Parser$Advanced$consumeBase, 2, baseOffset, s.cW),
+				s) : A6(
+				$elm$parser$Parser$Advanced$finalizeFloat,
+				c.dM,
+				c.b6,
+				c.cm,
+				c.b8,
+				_Utils_Tuple2(zeroOffset, 0),
+				s)));
+		} else {
+			return A6(
+				$elm$parser$Parser$Advanced$finalizeFloat,
+				c.dM,
+				c.b6,
+				c.cm,
+				c.b8,
+				A3($elm$parser$Parser$Advanced$consumeBase, 10, s.c, s.cW),
+				s);
+		}
+	};
 };
 var $elm$parser$Parser$Advanced$int = F2(
 	function (expecting, invalid) {
 		return $elm$parser$Parser$Advanced$number(
 			{
-				binary: $elm$core$Result$Err(invalid),
-				expecting: expecting,
-				_float: $elm$core$Result$Err(invalid),
-				hex: $elm$core$Result$Err(invalid),
-				_int: $elm$core$Result$Ok($elm$core$Basics$identity),
-				invalid: invalid,
-				octal: $elm$core$Result$Err(invalid)
+				bV: $elm$core$Result$Err(invalid),
+				b6: expecting,
+				b8: $elm$core$Result$Err(invalid),
+				cf: $elm$core$Result$Err(invalid),
+				cm: $elm$core$Result$Ok($elm$core$Basics$identity),
+				dM: invalid,
+				cz: $elm$core$Result$Err(invalid)
 			});
 	});
 var $elm$parser$Parser$int = A2($elm$parser$Parser$Advanced$int, $elm$parser$Parser$ExpectingInt, $elm$parser$Parser$ExpectingInt);
@@ -24012,11 +20489,7 @@ var $hecrj$html_parser$Html$Parser$numericCharacterReference = function () {
 					$elm$parser$Parser$succeed($elm$core$Basics$identity),
 					$elm$parser$Parser$chompIf(
 						function (c) {
-							return _Utils_eq(
-								c,
-								_Utils_chr('x')) || _Utils_eq(
-								c,
-								_Utils_chr('X'));
+							return (c === 'x') || (c === 'X');
 						})),
 				$hecrj$html_parser$Html$Parser$hexadecimal),
 				A2(
@@ -24025,8 +20498,7 @@ var $hecrj$html_parser$Html$Parser$numericCharacterReference = function () {
 					$elm$parser$Parser$ignorer,
 					$elm$parser$Parser$succeed($elm$core$Basics$identity),
 					$elm$parser$Parser$chompWhile(
-						$elm$core$Basics$eq(
-							_Utils_chr('0')))),
+						$elm$core$Basics$eq('0'))),
 				$elm$parser$Parser$int)
 			]));
 	return A2(
@@ -24035,8 +20507,7 @@ var $hecrj$html_parser$Html$Parser$numericCharacterReference = function () {
 			$elm$parser$Parser$ignorer,
 			$elm$parser$Parser$succeed($elm$core$Basics$identity),
 			$elm$parser$Parser$chompIf(
-				$elm$core$Basics$eq(
-					_Utils_chr('#')))),
+				$elm$core$Basics$eq('#'))),
 		A2(
 			$elm$parser$Parser$map,
 			A2($elm$core$Basics$composeR, $elm$core$Char$fromCode, $elm$core$String$fromChar),
@@ -24048,8 +20519,7 @@ var $hecrj$html_parser$Html$Parser$characterReference = A2(
 		$elm$parser$Parser$ignorer,
 		$elm$parser$Parser$succeed($elm$core$Basics$identity),
 		$elm$parser$Parser$chompIf(
-			$elm$core$Basics$eq(
-				_Utils_chr('&')))),
+			$elm$core$Basics$eq('&'))),
 	$elm$parser$Parser$oneOf(
 		_List_fromArray(
 			[
@@ -24065,9 +20535,7 @@ var $hecrj$html_parser$Html$Parser$characterReference = A2(
 			])));
 var $hecrj$html_parser$Html$Parser$tagAttributeQuotedValue = function (quote) {
 	var isQuotedValueChar = function (c) {
-		return (!_Utils_eq(c, quote)) && (!_Utils_eq(
-			c,
-			_Utils_chr('&')));
+		return (!_Utils_eq(c, quote)) && (c !== '&');
 	};
 	return A2(
 		$elm$parser$Parser$keeper,
@@ -24116,21 +20584,7 @@ var $hecrj$html_parser$Html$Parser$oneOrMore = F2(
 	});
 var $hecrj$html_parser$Html$Parser$tagAttributeUnquotedValue = function () {
 	var isUnquotedValueChar = function (c) {
-		return (!$hecrj$html_parser$Html$Parser$isSpaceCharacter(c)) && ((!_Utils_eq(
-			c,
-			_Utils_chr('\"'))) && ((!_Utils_eq(
-			c,
-			_Utils_chr('\''))) && ((!_Utils_eq(
-			c,
-			_Utils_chr('='))) && ((!_Utils_eq(
-			c,
-			_Utils_chr('<'))) && ((!_Utils_eq(
-			c,
-			_Utils_chr('>'))) && ((!_Utils_eq(
-			c,
-			_Utils_chr('`'))) && (!_Utils_eq(
-			c,
-			_Utils_chr('&')))))))));
+		return (!$hecrj$html_parser$Html$Parser$isSpaceCharacter(c)) && ((c !== '\"') && ((c !== '\'') && ((c !== '=') && ((c !== '<') && ((c !== '>') && ((c !== '`') && (c !== '&')))))));
 	};
 	return A2(
 		$elm$parser$Parser$map,
@@ -24157,17 +20611,14 @@ var $hecrj$html_parser$Html$Parser$tagAttributeValue = $elm$parser$Parser$oneOf(
 					$elm$parser$Parser$ignorer,
 					$elm$parser$Parser$succeed($elm$core$Basics$identity),
 					$elm$parser$Parser$chompIf(
-						$elm$core$Basics$eq(
-							_Utils_chr('=')))),
+						$elm$core$Basics$eq('='))),
 				$elm$parser$Parser$chompWhile($hecrj$html_parser$Html$Parser$isSpaceCharacter)),
 			$elm$parser$Parser$oneOf(
 				_List_fromArray(
 					[
 						$hecrj$html_parser$Html$Parser$tagAttributeUnquotedValue,
-						$hecrj$html_parser$Html$Parser$tagAttributeQuotedValue(
-						_Utils_chr('\"')),
-						$hecrj$html_parser$Html$Parser$tagAttributeQuotedValue(
-						_Utils_chr('\''))
+						$hecrj$html_parser$Html$Parser$tagAttributeQuotedValue('\"'),
+						$hecrj$html_parser$Html$Parser$tagAttributeQuotedValue('\'')
 					]))),
 			$elm$parser$Parser$succeed('')
 		]));
@@ -24194,12 +20645,10 @@ var $hecrj$html_parser$Html$Parser$tagName = A2(
 			$elm$parser$Parser$chompIf($elm$core$Char$isAlphaNum),
 			$elm$parser$Parser$chompWhile(
 				function (c) {
-					return $elm$core$Char$isAlphaNum(c) || _Utils_eq(
-						c,
-						_Utils_chr('-'));
+					return $elm$core$Char$isAlphaNum(c) || (c === '-');
 				}))));
 var $hecrj$html_parser$Html$Parser$Text = function (a) {
-	return {$: 'Text', a: a};
+	return {$: 0, a: a};
 };
 var $hecrj$html_parser$Html$Parser$text = A2(
 	$elm$parser$Parser$map,
@@ -24216,11 +20665,7 @@ var $hecrj$html_parser$Html$Parser$text = A2(
 					$elm$parser$Parser$getChompedString(
 					$hecrj$html_parser$Html$Parser$chompOneOrMore(
 						function (c) {
-							return (!_Utils_eq(
-								c,
-								_Utils_chr('<'))) && (!_Utils_eq(
-								c,
-								_Utils_chr('&')));
+							return (c !== '<') && (c !== '&');
 						})),
 					$hecrj$html_parser$Html$Parser$characterReference
 				]))));
@@ -24249,21 +20694,18 @@ function $hecrj$html_parser$Html$Parser$cyclic$element() {
 						_List_fromArray(
 							[
 								$elm$parser$Parser$chompIf(
-								$elm$core$Basics$eq(
-									_Utils_chr('/'))),
-								$elm$parser$Parser$succeed(_Utils_Tuple0)
+								$elm$core$Basics$eq('/')),
+								$elm$parser$Parser$succeed(0)
 							]))),
 				$elm$parser$Parser$chompIf(
-					$elm$core$Basics$eq(
-						_Utils_chr('>')))) : A2(
+					$elm$core$Basics$eq('>'))) : A2(
 				$elm$parser$Parser$keeper,
 				A2(
 					$elm$parser$Parser$ignorer,
 					$elm$parser$Parser$succeed(
 						A2($hecrj$html_parser$Html$Parser$Element, name, attributes)),
 					$elm$parser$Parser$chompIf(
-						$elm$core$Basics$eq(
-							_Utils_chr('>')))),
+						$elm$core$Basics$eq('>'))),
 				A2(
 					$elm$parser$Parser$ignorer,
 					$hecrj$html_parser$Html$Parser$many(
@@ -24279,40 +20721,36 @@ function $hecrj$html_parser$Html$Parser$cyclic$element() {
 					$elm$parser$Parser$ignorer,
 					$elm$parser$Parser$succeed($elm$core$Tuple$pair),
 					$elm$parser$Parser$chompIf(
-						$elm$core$Basics$eq(
-							_Utils_chr('<')))),
+						$elm$core$Basics$eq('<'))),
 				A2(
 					$elm$parser$Parser$ignorer,
 					$hecrj$html_parser$Html$Parser$tagName,
 					$elm$parser$Parser$chompWhile($hecrj$html_parser$Html$Parser$isSpaceCharacter))),
 			$hecrj$html_parser$Html$Parser$tagAttributes));
 }
-try {
-	var $hecrj$html_parser$Html$Parser$node = $hecrj$html_parser$Html$Parser$cyclic$node();
-	$hecrj$html_parser$Html$Parser$cyclic$node = function () {
-		return $hecrj$html_parser$Html$Parser$node;
-	};
-	var $hecrj$html_parser$Html$Parser$element = $hecrj$html_parser$Html$Parser$cyclic$element();
-	$hecrj$html_parser$Html$Parser$cyclic$element = function () {
-		return $hecrj$html_parser$Html$Parser$element;
-	};
-} catch ($) {
-	throw 'Some top-level definitions from `Html.Parser` are causing infinite recursion:\n\n  ┌─────┐\n  │    node\n  │     ↓\n  │    element\n  └─────┘\n\nThese errors are very tricky, so read https://elm-lang.org/0.19.1/bad-recursion to learn how to fix it!';}
+var $hecrj$html_parser$Html$Parser$node = $hecrj$html_parser$Html$Parser$cyclic$node();
+$hecrj$html_parser$Html$Parser$cyclic$node = function () {
+	return $hecrj$html_parser$Html$Parser$node;
+};
+var $hecrj$html_parser$Html$Parser$element = $hecrj$html_parser$Html$Parser$cyclic$element();
+$hecrj$html_parser$Html$Parser$cyclic$element = function () {
+	return $hecrj$html_parser$Html$Parser$element;
+};
 var $elm$parser$Parser$DeadEnd = F3(
 	function (row, col, problem) {
-		return {col: col, problem: problem, row: row};
+		return {bZ: col, cF: problem, cN: row};
 	});
 var $elm$parser$Parser$problemToDeadEnd = function (p) {
-	return A3($elm$parser$Parser$DeadEnd, p.row, p.col, p.problem);
+	return A3($elm$parser$Parser$DeadEnd, p.cN, p.bZ, p.cF);
 };
 var $elm$parser$Parser$Advanced$bagToList = F2(
 	function (bag, list) {
 		bagToList:
 		while (true) {
 			switch (bag.$) {
-				case 'Empty':
+				case 0:
 					return list;
-				case 'AddRight':
+				case 1:
 					var bag1 = bag.a;
 					var x = bag.b;
 					var $temp$bag = bag1,
@@ -24333,10 +20771,10 @@ var $elm$parser$Parser$Advanced$bagToList = F2(
 	});
 var $elm$parser$Parser$Advanced$run = F2(
 	function (_v0, src) {
-		var parse = _v0.a;
+		var parse = _v0;
 		var _v1 = parse(
-			{col: 1, context: _List_Nil, indent: 1, offset: 0, row: 1, src: src});
-		if (_v1.$ === 'Good') {
+			{bZ: 1, f: _List_Nil, h: 1, c: 0, cN: 1, cW: src});
+		if (!_v1.$) {
 			var value = _v1.b;
 			return $elm$core$Result$Ok(value);
 		} else {
@@ -24348,7 +20786,7 @@ var $elm$parser$Parser$Advanced$run = F2(
 var $elm$parser$Parser$run = F2(
 	function (parser, source) {
 		var _v0 = A2($elm$parser$Parser$Advanced$run, parser, source);
-		if (_v0.$ === 'Ok') {
+		if (!_v0.$) {
 			var a = _v0.a;
 			return $elm$core$Result$Ok(a);
 		} else {
@@ -24365,7 +20803,7 @@ var $hecrj$html_parser$Html$Parser$run = function (str) {
 };
 var $author$project$RichText$Internal$Spec$stringToHtmlNodeArray = function (html) {
 	var _v0 = $hecrj$html_parser$Html$Parser$run(html);
-	if (_v0.$ === 'Err') {
+	if (_v0.$ === 1) {
 		return $elm$core$Result$Err('Could not parse html string');
 	} else {
 		var nodeList = _v0.a;
@@ -24376,7 +20814,7 @@ var $author$project$RichText$Internal$Spec$stringToHtmlNodeArray = function (htm
 var $author$project$RichText$Internal$Spec$htmlToElementArray = F2(
 	function (spec, html) {
 		var _v0 = $author$project$RichText$Internal$Spec$stringToHtmlNodeArray(html);
-		if (_v0.$ === 'Err') {
+		if (_v0.$ === 1) {
 			var s = _v0.a;
 			return $elm$core$Result$Err(s);
 		} else {
@@ -24406,7 +20844,7 @@ var $author$project$RichText$Internal$Spec$htmlToElementArray = F2(
 var $author$project$RichText$Internal$Paste$pasteBlockArray = F2(
 	function (blockFragment, editorState) {
 		var _v0 = $author$project$RichText$Model$State$selection(editorState);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('Nothing is selected');
 		} else {
 			var selection = _v0.a;
@@ -24422,32 +20860,32 @@ var $author$project$RichText$Internal$Paste$pasteBlockArray = F2(
 					$author$project$RichText$Node$nodeAt,
 					parentPath,
 					$author$project$RichText$Model$State$root(editorState));
-				if (_v1.$ === 'Nothing') {
+				if (_v1.$ === 1) {
 					return $elm$core$Result$Err('I cannot find the parent node of the selection');
 				} else {
 					var parentNode = _v1.a;
-					if (parentNode.$ === 'Inline') {
+					if (parentNode.$ === 1) {
 						return $elm$core$Result$Err('Invalid parent node');
 					} else {
 						var bn = parentNode.a;
 						var _v3 = $author$project$RichText$Model$Node$childNodes(bn);
 						switch (_v3.$) {
-							case 'Leaf':
+							case 2:
 								return $elm$core$Result$Err('Invalid parent node, somehow the parent node was a leaf');
-							case 'BlockChildren':
+							case 0:
 								var _v4 = A3(
 									$author$project$RichText$Node$replaceWithFragment,
 									$author$project$RichText$Model$Selection$anchorNode(selection),
 									$author$project$RichText$Node$BlockFragment(blockFragment),
 									$author$project$RichText$Model$State$root(editorState));
-								if (_v4.$ === 'Err') {
+								if (_v4.$ === 1) {
 									var s = _v4.a;
 									return $elm$core$Result$Err(s);
 								} else {
 									var newRoot = _v4.a;
 									var _v5 = $elm_community$list_extra$List$Extra$last(
 										$author$project$RichText$Model$Selection$anchorNode(selection));
-									if (_v5.$ === 'Nothing') {
+									if (_v5.$ === 1) {
 										return $elm$core$Result$Err('Invalid anchor node, somehow the parent is root');
 									} else {
 										var index = _v5.a;
@@ -24472,13 +20910,13 @@ var $author$project$RichText$Internal$Paste$pasteBlockArray = F2(
 								}
 							default:
 								var _v6 = $author$project$RichText$Commands$splitTextBlock(editorState);
-								if (_v6.$ === 'Err') {
+								if (_v6.$ === 1) {
 									var s = _v6.a;
 									return $elm$core$Result$Err(s);
 								} else {
 									var splitEditorState = _v6.a;
 									var _v7 = $author$project$RichText$Model$State$selection(splitEditorState);
-									if (_v7.$ === 'Nothing') {
+									if (_v7.$ === 1) {
 										return $elm$core$Result$Err('Invalid editor state selection after split action.');
 									} else {
 										var splitSelection = _v7.a;
@@ -24491,7 +20929,7 @@ var $author$project$RichText$Internal$Paste$pasteBlockArray = F2(
 											parentPath,
 											$author$project$RichText$Node$BlockFragment(blockFragment),
 											annotatedSelectionRoot);
-										if (_v8.$ === 'Err') {
+										if (_v8.$ === 1) {
 											var s = _v8.a;
 											return $elm$core$Result$Err(s);
 										} else {
@@ -24537,7 +20975,7 @@ var $author$project$RichText$Internal$Paste$pasteBlockArray = F2(
 var $author$project$RichText$Internal$Paste$pasteInlineArray = F2(
 	function (inlineFragment, editorState) {
 		var _v0 = $author$project$RichText$Model$State$selection(editorState);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('Nothing is selected');
 		} else {
 			var selection = _v0.a;
@@ -24551,7 +20989,7 @@ var $author$project$RichText$Internal$Paste$pasteInlineArray = F2(
 					$author$project$RichText$Node$findTextBlockNodeAncestor,
 					$author$project$RichText$Model$Selection$anchorNode(selection),
 					$author$project$RichText$Model$State$root(editorState));
-				if (_v1.$ === 'Nothing') {
+				if (_v1.$ === 1) {
 					return $elm$core$Result$Err('I can only paste an inline array into a text block node');
 				} else {
 					var _v2 = _v1.a;
@@ -24559,15 +20997,15 @@ var $author$project$RichText$Internal$Paste$pasteInlineArray = F2(
 					var node = _v2.b;
 					var _v3 = $author$project$RichText$Model$Node$childNodes(node);
 					switch (_v3.$) {
-						case 'BlockChildren':
+						case 0:
 							return $elm$core$Result$Err('I cannot add an inline array to a block array');
-						case 'Leaf':
+						case 2:
 							return $elm$core$Result$Err('I cannot add an inline array to a block leaf');
 						default:
 							var a = _v3.a;
 							var _v4 = $elm_community$list_extra$List$Extra$last(
 								$author$project$RichText$Model$Selection$anchorNode(selection));
-							if (_v4.$ === 'Nothing') {
+							if (_v4.$ === 1) {
 								return $elm$core$Result$Err('Invalid state, somehow the anchor node is the root node');
 							} else {
 								var index = _v4.a;
@@ -24575,11 +21013,11 @@ var $author$project$RichText$Internal$Paste$pasteInlineArray = F2(
 									$elm$core$Array$get,
 									index,
 									$author$project$RichText$Model$Node$toInlineArray(a));
-								if (_v5.$ === 'Nothing') {
+								if (_v5.$ === 1) {
 									return $elm$core$Result$Err('Invalid anchor node path');
 								} else {
 									var inlineNode = _v5.a;
-									if (inlineNode.$ === 'Text') {
+									if (inlineNode.$ === 1) {
 										var tl = inlineNode.a;
 										var _v7 = A2(
 											$author$project$RichText$Node$splitTextLeaf,
@@ -24602,7 +21040,7 @@ var $author$project$RichText$Internal$Paste$pasteInlineArray = F2(
 											$author$project$RichText$Model$Selection$anchorNode(selection),
 											$author$project$RichText$Node$InlineFragment(newFragment),
 											$author$project$RichText$Model$State$root(editorState));
-										if (replaceResult.$ === 'Err') {
+										if (replaceResult.$ === 1) {
 											var s = replaceResult.a;
 											return $elm$core$Result$Err(s);
 										} else {
@@ -24631,7 +21069,7 @@ var $author$project$RichText$Internal$Paste$pasteInlineArray = F2(
 											$author$project$RichText$Model$Selection$anchorNode(selection),
 											$author$project$RichText$Node$InlineFragment(inlineFragment),
 											$author$project$RichText$Model$State$root(editorState));
-										if (replaceResult.$ === 'Err') {
+										if (replaceResult.$ === 1) {
 											var s = replaceResult.a;
 											return $elm$core$Result$Err(s);
 										} else {
@@ -24664,7 +21102,7 @@ var $author$project$RichText$Internal$Paste$pasteInlineArray = F2(
 	});
 var $author$project$RichText$Internal$Paste$pasteFragment = F2(
 	function (fragment, editorState) {
-		if (fragment.$ === 'InlineFragment') {
+		if (fragment.$ === 1) {
 			var a = fragment.a;
 			return A2($author$project$RichText$Internal$Paste$pasteInlineArray, a, editorState);
 		} else {
@@ -24678,7 +21116,7 @@ var $author$project$RichText$Internal$Paste$pasteHtml = F3(
 			return $elm$core$Result$Err('There is no html to paste');
 		} else {
 			var _v0 = A2($author$project$RichText$Internal$Spec$htmlToElementArray, spec, html);
-			if (_v0.$ === 'Err') {
+			if (_v0.$ === 1) {
 				var s = _v0.a;
 				return $elm$core$Result$Err(s);
 			} else {
@@ -24687,7 +21125,7 @@ var $author$project$RichText$Internal$Paste$pasteHtml = F3(
 					$elm$core$Array$foldl,
 					F2(
 						function (fragment, result) {
-							if (result.$ === 'Err') {
+							if (result.$ === 1) {
 								return result;
 							} else {
 								var state = result.a;
@@ -24705,7 +21143,7 @@ var $author$project$RichText$Internal$Paste$pasteText = F2(
 			return $elm$core$Result$Err('There is no text to paste');
 		} else {
 			var _v0 = $author$project$RichText$Model$State$selection(editorState);
-			if (_v0.$ === 'Nothing') {
+			if (_v0.$ === 1) {
 				return $elm$core$Result$Err('Nothing is selected');
 			} else {
 				var selection = _v0.a;
@@ -24719,7 +21157,7 @@ var $author$project$RichText$Internal$Paste$pasteText = F2(
 						$author$project$RichText$Node$findTextBlockNodeAncestor,
 						$author$project$RichText$Model$Selection$anchorNode(selection),
 						$author$project$RichText$Model$State$root(editorState));
-					if (_v1.$ === 'Nothing') {
+					if (_v1.$ === 1) {
 						return $elm$core$Result$Err('I can only paste test if there is a text block ancestor');
 					} else {
 						var _v2 = _v1.a;
@@ -24757,23 +21195,21 @@ var $author$project$RichText$Internal$Paste$handlePaste = F3(
 				_Utils_Tuple2(
 				'pasteHtml',
 				$author$project$RichText$Config$Command$transform(
-					A2($author$project$RichText$Internal$Paste$pasteHtml, spec, event.html))),
+					A2($author$project$RichText$Internal$Paste$pasteHtml, spec, event.dI))),
 				_Utils_Tuple2(
 				'pasteText',
 				$author$project$RichText$Config$Command$transform(
-					$author$project$RichText$Internal$Paste$pasteText(event.text)))
+					$author$project$RichText$Internal$Paste$pasteText(event.aP)))
 			]);
 		return A2(
 			$elm$core$Result$withDefault,
 			editor,
 			A3($author$project$RichText$Internal$Editor$applyNamedCommandList, commandArray, spec, editor));
 	});
-var $author$project$RichText$Internal$DomNode$DomNode = function (a) {
-	return {$: 'DomNode', a: a};
-};
+var $author$project$RichText$Internal$DomNode$DomNode = $elm$core$Basics$identity;
 var $author$project$RichText$Internal$DomNode$DomNodeContents = F4(
 	function (nodeType, tagName, nodeValue, childNodes) {
-		return {childNodes: childNodes, nodeType: nodeType, nodeValue: nodeValue, tagName: tagName};
+		return {dl: childNodes, by: nodeType, cy: nodeValue, bK: tagName};
 	});
 var $elm$json$Json$Decode$andThen = _Json_andThen;
 var $elm_community$json_extra$Json$Decode$Extra$combine = A2(
@@ -24803,7 +21239,7 @@ var $elm$json$Json$Decode$lazy = function (thunk) {
 	return A2(
 		$elm$json$Json$Decode$andThen,
 		thunk,
-		$elm$json$Json$Decode$succeed(_Utils_Tuple0));
+		$elm$json$Json$Decode$succeed(0));
 };
 var $elm$json$Json$Decode$map4 = _Json_map4;
 var $elm$json$Json$Decode$oneOf = _Json_oneOf;
@@ -24819,7 +21255,7 @@ var $elm$json$Json$Decode$string = _Json_decodeString;
 function $author$project$RichText$Internal$DomNode$cyclic$decodeDomNode() {
 	return A2(
 		$elm$json$Json$Decode$map,
-		$author$project$RichText$Internal$DomNode$DomNode,
+		$elm$core$Basics$identity,
 		A5(
 			$elm$json$Json$Decode$map4,
 			$author$project$RichText$Internal$DomNode$DomNodeContents,
@@ -24841,13 +21277,10 @@ function $author$project$RichText$Internal$DomNode$cyclic$decodeDomNode() {
 									return $author$project$RichText$Internal$DomNode$cyclic$decodeDomNode();
 								})))))));
 }
-try {
-	var $author$project$RichText$Internal$DomNode$decodeDomNode = $author$project$RichText$Internal$DomNode$cyclic$decodeDomNode();
-	$author$project$RichText$Internal$DomNode$cyclic$decodeDomNode = function () {
-		return $author$project$RichText$Internal$DomNode$decodeDomNode;
-	};
-} catch ($) {
-	throw 'Some top-level definitions from `RichText.Internal.DomNode` are causing infinite recursion:\n\n  ┌─────┐\n  │    decodeDomNode\n  └─────┘\n\nThese errors are very tricky, so read https://elm-lang.org/0.19.1/bad-recursion to learn how to fix it!';}
+var $author$project$RichText$Internal$DomNode$decodeDomNode = $author$project$RichText$Internal$DomNode$cyclic$decodeDomNode();
+$author$project$RichText$Internal$DomNode$cyclic$decodeDomNode = function () {
+	return $author$project$RichText$Internal$DomNode$decodeDomNode;
+};
 var $elm$json$Json$Decode$decodeValue = _Json_run;
 var $author$project$RichText$Editor$sanitizeMutations = function (changes) {
 	return A2(
@@ -24860,8 +21293,8 @@ var $author$project$RichText$Editor$sanitizeMutations = function (changes) {
 		changes);
 };
 var $author$project$RichText$Config$ElementDefinition$toHtmlNode = function (definition_) {
-	var c = definition_.a;
-	return c.toHtmlNode;
+	var c = definition_;
+	return c.c0;
 };
 var $author$project$RichText$Internal$HtmlNode$elementToHtmlNode = F3(
 	function (spec, parameters, children) {
@@ -24873,7 +21306,7 @@ var $author$project$RichText$Internal$HtmlNode$textToHtmlNode = function (text) 
 };
 var $author$project$RichText$Internal$HtmlNode$editorInlineLeafToHtmlNode = F2(
 	function (spec, node) {
-		if (node.$ === 'Text') {
+		if (node.$ === 1) {
 			var contents = node.a;
 			return $author$project$RichText$Internal$HtmlNode$textToHtmlNode(
 				$author$project$RichText$Model$Text$text(contents));
@@ -24902,7 +21335,7 @@ var $author$project$RichText$Config$MarkDefinition$defaultMarkToHtml = F3(
 			A2(
 				$elm$core$List$filterMap,
 				function (attr) {
-					if (attr.$ === 'StringAttribute') {
+					if (!attr.$) {
 						var k = attr.a;
 						var v = attr.b;
 						return $elm$core$Maybe$Just(
@@ -24917,15 +21350,15 @@ var $author$project$RichText$Config$MarkDefinition$defaultMarkToHtml = F3(
 var $author$project$RichText$Config$MarkDefinition$defaultMarkDefinition = function (name_) {
 	return $author$project$RichText$Config$MarkDefinition$markDefinition(
 		{
-			fromHtmlNode: $author$project$RichText$Config$MarkDefinition$defaultHtmlToMark(name_),
-			name: name_,
-			toHtmlNode: $author$project$RichText$Config$MarkDefinition$defaultMarkToHtml(name_)
+			b9: $author$project$RichText$Config$MarkDefinition$defaultHtmlToMark(name_),
+			ct: name_,
+			c0: $author$project$RichText$Config$MarkDefinition$defaultMarkToHtml(name_)
 		});
 };
 var $author$project$RichText$Config$Spec$markDefinition = F2(
 	function (name, spec) {
-		var c = spec.a;
-		return A2($elm$core$Dict$get, name, c.nameToMark);
+		var c = spec;
+		return A2($elm$core$Dict$get, name, c.a7);
 	});
 var $author$project$RichText$Internal$Spec$markDefinitionWithDefault = F2(
 	function (mark, spec) {
@@ -24936,8 +21369,8 @@ var $author$project$RichText$Internal$Spec$markDefinitionWithDefault = F2(
 			A2($author$project$RichText$Config$Spec$markDefinition, name, spec));
 	});
 var $author$project$RichText$Config$MarkDefinition$toHtmlNode = function (definition_) {
-	var c = definition_.a;
-	return c.toHtmlNode;
+	var c = definition_;
+	return c.c0;
 };
 var $author$project$RichText$Internal$HtmlNode$markToHtmlNode = F3(
 	function (spec, mark, children) {
@@ -24946,10 +21379,10 @@ var $author$project$RichText$Internal$HtmlNode$markToHtmlNode = F3(
 	});
 var $author$project$RichText$Internal$HtmlNode$editorInlineLeafTreeToHtmlNode = F3(
 	function (spec, array, tree) {
-		if (tree.$ === 'LeafNode') {
+		if (tree.$ === 1) {
 			var i = tree.a;
 			var _v1 = A2($elm$core$Array$get, i, array);
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return $author$project$RichText$Internal$HtmlNode$errorNode;
 			} else {
 				var l = _v1.a;
@@ -24960,23 +21393,23 @@ var $author$project$RichText$Internal$HtmlNode$editorInlineLeafTreeToHtmlNode = 
 			return A3(
 				$author$project$RichText$Internal$HtmlNode$markToHtmlNode,
 				spec,
-				n.mark,
+				n.cr,
 				A2(
 					$elm$core$Array$map,
 					A2($author$project$RichText$Internal$HtmlNode$editorInlineLeafTreeToHtmlNode, spec, array),
-					n.children));
+					n.dm));
 		}
 	});
 var $author$project$RichText$Internal$HtmlNode$childNodesToHtmlNode = F2(
 	function (spec, childNodes) {
 		switch (childNodes.$) {
-			case 'BlockChildren':
+			case 0:
 				var blockArray = childNodes.a;
 				return A2(
 					$elm$core$Array$map,
 					$author$project$RichText$Internal$HtmlNode$editorBlockNodeToHtmlNode(spec),
 					$author$project$RichText$Model$Node$toBlockArray(blockArray));
-			case 'InlineChildren':
+			case 1:
 				var inlineLeafArray = childNodes.a;
 				return A2(
 					$elm$core$Array$map,
@@ -25014,21 +21447,21 @@ var $elm_community$array_extra$Array$Extra$map2 = F3(
 var $elm$core$String$toUpper = _String_toUpper;
 var $author$project$RichText$Internal$DomNode$findTextChangesRec = F3(
 	function (htmlNode, domNode, backwardsNodePath) {
-		var domNodeContents = domNode.a;
-		if (htmlNode.$ === 'ElementNode') {
+		var domNodeContents = domNode;
+		if (!htmlNode.$) {
 			var tag = htmlNode.a;
 			var children = htmlNode.c;
-			if (!_Utils_eq(domNodeContents.nodeType, $author$project$RichText$Internal$DomNode$domElementNodeType)) {
+			if (!_Utils_eq(domNodeContents.by, $author$project$RichText$Internal$DomNode$domElementNodeType)) {
 				return $elm$core$Result$Err('Dom node is a text node, but I was expecting an element node');
 			} else {
 				if (!_Utils_eq(
 					$elm$core$Maybe$Just(
 						$elm$core$String$toUpper(tag)),
-					domNodeContents.tagName)) {
+					domNodeContents.bK)) {
 					return $elm$core$Result$Err(
-						'Dom node\'s tag was ' + (A2($elm$core$Maybe$withDefault, '', domNodeContents.tagName) + (', but I was expecting ' + tag)));
+						'Dom node\'s tag was ' + (A2($elm$core$Maybe$withDefault, '', domNodeContents.bK) + (', but I was expecting ' + tag)));
 				} else {
-					var domChildNodes = A2($elm$core$Maybe$withDefault, $elm$core$Array$empty, domNodeContents.childNodes);
+					var domChildNodes = A2($elm$core$Maybe$withDefault, $elm$core$Array$empty, domNodeContents.dl);
 					if (!_Utils_eq(
 						$elm$core$Array$length(domChildNodes),
 						$elm$core$Array$length(children))) {
@@ -25049,7 +21482,7 @@ var $author$project$RichText$Internal$DomNode$findTextChangesRec = F3(
 									var _v3 = _v2.b;
 									var htmlChild = _v3.a;
 									var domChild = _v3.b;
-									if (resultTextChangeList.$ === 'Err') {
+									if (resultTextChangeList.$ === 1) {
 										var s = resultTextChangeList.a;
 										return $elm$core$Result$Err(s);
 									} else {
@@ -25059,7 +21492,7 @@ var $author$project$RichText$Internal$DomNode$findTextChangesRec = F3(
 											htmlChild,
 											domChild,
 											A2($elm$core$List$cons, i, backwardsNodePath));
-										if (_v5.$ === 'Err') {
+										if (_v5.$ === 1) {
 											var s = _v5.a;
 											return $elm$core$Result$Err(s);
 										} else {
@@ -25076,11 +21509,11 @@ var $author$project$RichText$Internal$DomNode$findTextChangesRec = F3(
 			}
 		} else {
 			var textNodeText = htmlNode.a;
-			if (!_Utils_eq(domNodeContents.nodeType, $author$project$RichText$Internal$DomNode$domTextNodeType)) {
+			if (!_Utils_eq(domNodeContents.by, $author$project$RichText$Internal$DomNode$domTextNodeType)) {
 				return $elm$core$Result$Err('Dom node was an element node, but I was expecting a text node');
 			} else {
-				var _v6 = domNodeContents.nodeValue;
-				if (_v6.$ === 'Nothing') {
+				var _v6 = domNodeContents.cy;
+				if (_v6.$ === 1) {
 					return $elm$core$Result$Err('Dom node is a text node, but has no value');
 				} else {
 					var domNodeText = _v6.a;
@@ -25106,9 +21539,9 @@ var $author$project$RichText$Editor$deriveTextChanges = F3(
 		return A2($author$project$RichText$Internal$DomNode$findTextChanges, htmlNode, domNode);
 	});
 var $author$project$RichText$Internal$DomNode$extractRootEditorBlockNode = function (domNode) {
-	var node = domNode.a;
-	var _v1 = node.childNodes;
-	if (_v1.$ === 'Nothing') {
+	var node = domNode;
+	var _v1 = node.dl;
+	if (_v1.$ === 1) {
 		return $elm$core$Maybe$Nothing;
 	} else {
 		var childNodes = _v1.a;
@@ -25116,20 +21549,19 @@ var $author$project$RichText$Internal$DomNode$extractRootEditorBlockNode = funct
 	}
 };
 var $author$project$RichText$Internal$Editor$forceCompleteRerender = function (e) {
-	var c = e.a;
-	return $author$project$RichText$Internal$Editor$Editor(
-		_Utils_update(
-			c,
-			{completeRerenderCount: c.completeRerenderCount + 1}));
+	var c = e;
+	return _Utils_update(
+		c,
+		{aE: c.aE + 1});
 };
 var $author$project$RichText$Editor$needCompleteRerender = function (root) {
-	var v = root.a;
-	var cnodes = A2($elm$core$Maybe$withDefault, $elm$core$Array$empty, v.childNodes);
+	var v = root;
+	var cnodes = A2($elm$core$Maybe$withDefault, $elm$core$Array$empty, v.dl);
 	return $elm$core$Array$length(cnodes) !== 1;
 };
 var $elm$core$Maybe$andThen = F2(
 	function (callback, maybeValue) {
-		if (maybeValue.$ === 'Just') {
+		if (!maybeValue.$) {
 			var value = maybeValue.a;
 			return callback(value);
 		} else {
@@ -25141,13 +21573,13 @@ var $author$project$RichText$Editor$differentText = F2(
 		var path = _v0.a;
 		var t = _v0.b;
 		var _v1 = A2($author$project$RichText$Node$nodeAt, path, root);
-		if (_v1.$ === 'Nothing') {
+		if (_v1.$ === 1) {
 			return true;
 		} else {
 			var node = _v1.a;
-			if (node.$ === 'Inline') {
+			if (node.$ === 1) {
 				var il = node.a;
-				if (il.$ === 'Text') {
+				if (il.$ === 1) {
 					var tl = il.a;
 					return !_Utils_eq(
 						$author$project$RichText$Model$Text$text(tl),
@@ -25169,7 +21601,7 @@ var $author$project$RichText$Internal$Path$removePathUpToChildContents = F2(
 	function (node, path) {
 		removePathUpToChildContents:
 		while (true) {
-			if (node.$ === 'ElementNode') {
+			if (!node.$) {
 				var children = node.c;
 				if (_Utils_eq(children, $author$project$RichText$Internal$HtmlNode$childNodesPlaceholder)) {
 					return $elm$core$Maybe$Just(path);
@@ -25180,7 +21612,7 @@ var $author$project$RichText$Internal$Path$removePathUpToChildContents = F2(
 						var x = path.a;
 						var xs = path.b;
 						var _v2 = A2($elm$core$Array$get, x, children);
-						if (_v2.$ === 'Nothing') {
+						if (_v2.$ === 1) {
 							return $elm$core$Maybe$Nothing;
 						} else {
 							var child = _v2.a;
@@ -25201,27 +21633,27 @@ var $author$project$RichText$Internal$Path$domToEditorInlineLeafTree = F3(
 	function (spec, tree, path) {
 		domToEditorInlineLeafTree:
 		while (true) {
-			if (tree.$ === 'LeafNode') {
+			if (tree.$ === 1) {
 				var i = tree.a;
 				return $elm$core$Maybe$Just(
 					_List_fromArray(
 						[i]));
 			} else {
 				var n = tree.a;
-				var markDefinition = A2($author$project$RichText$Internal$Spec$markDefinitionWithDefault, n.mark, spec);
-				var structure = A3($author$project$RichText$Config$MarkDefinition$toHtmlNode, markDefinition, n.mark, $author$project$RichText$Internal$HtmlNode$childNodesPlaceholder);
+				var markDefinition = A2($author$project$RichText$Internal$Spec$markDefinitionWithDefault, n.cr, spec);
+				var structure = A3($author$project$RichText$Config$MarkDefinition$toHtmlNode, markDefinition, n.cr, $author$project$RichText$Internal$HtmlNode$childNodesPlaceholder);
 				var _v1 = A2($author$project$RichText$Internal$Path$removePathUpToChildContents, structure, path);
-				if (_v1.$ === 'Nothing') {
+				if (_v1.$ === 1) {
 					return $elm$core$Maybe$Nothing;
 				} else {
 					var rest = _v1.a;
 					var _v2 = $elm$core$List$head(rest);
-					if (_v2.$ === 'Nothing') {
+					if (_v2.$ === 1) {
 						return $elm$core$Maybe$Just(_List_Nil);
 					} else {
 						var i = _v2.a;
-						var _v3 = A2($elm$core$Array$get, i, n.children);
-						if (_v3.$ === 'Nothing') {
+						var _v3 = A2($elm$core$Array$get, i, n.dm);
+						if (_v3.$ === 1) {
 							return $elm$core$Maybe$Nothing;
 						} else {
 							var l = _v3.a;
@@ -25247,24 +21679,24 @@ var $author$project$RichText$Internal$Path$domToEditor = F3(
 			var elementDefinition = A2($author$project$RichText$Internal$Spec$elementDefinitionWithDefault, parameters, spec);
 			var structure = A3($author$project$RichText$Config$ElementDefinition$toHtmlNode, elementDefinition, parameters, $author$project$RichText$Internal$HtmlNode$childNodesPlaceholder);
 			var _v0 = A2($author$project$RichText$Internal$Path$removePathUpToChildContents, structure, path);
-			if (_v0.$ === 'Nothing') {
+			if (_v0.$ === 1) {
 				return $elm$core$Maybe$Nothing;
 			} else {
 				var rest = _v0.a;
 				var _v1 = $elm$core$List$head(rest);
-				if (_v1.$ === 'Nothing') {
+				if (_v1.$ === 1) {
 					return $elm$core$Maybe$Just(_List_Nil);
 				} else {
 					var i = _v1.a;
 					var _v2 = $author$project$RichText$Model$Node$childNodes(node);
 					switch (_v2.$) {
-						case 'BlockChildren':
+						case 0:
 							var l = _v2.a;
 							var _v3 = A2(
 								$elm$core$Array$get,
 								i,
 								$author$project$RichText$Model$Node$toBlockArray(l));
-							if (_v3.$ === 'Nothing') {
+							if (_v3.$ === 1) {
 								return $elm$core$Maybe$Nothing;
 							} else {
 								var childNode = _v3.a;
@@ -25273,7 +21705,7 @@ var $author$project$RichText$Internal$Path$domToEditor = F3(
 									spec,
 									childNode,
 									A2($elm$core$List$drop, 1, rest));
-								if (_v4.$ === 'Nothing') {
+								if (_v4.$ === 1) {
 									return $elm$core$Maybe$Nothing;
 								} else {
 									var p = _v4.a;
@@ -25281,13 +21713,13 @@ var $author$project$RichText$Internal$Path$domToEditor = F3(
 										A2($elm$core$List$cons, i, p));
 								}
 							}
-						case 'InlineChildren':
+						case 1:
 							var l = _v2.a;
 							var _v5 = A2(
 								$elm$core$Array$get,
 								i,
 								$author$project$RichText$Model$Node$toInlineTree(l));
-							if (_v5.$ === 'Nothing') {
+							if (_v5.$ === 1) {
 								return $elm$core$Maybe$Nothing;
 							} else {
 								var tree = _v5.a;
@@ -25310,7 +21742,7 @@ var $author$project$RichText$Internal$Selection$transformSelection = F3(
 			transformation,
 			node,
 			$author$project$RichText$Model$Selection$anchorNode(selection));
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Maybe$Nothing;
 		} else {
 			var an = _v0.a;
@@ -25318,7 +21750,7 @@ var $author$project$RichText$Internal$Selection$transformSelection = F3(
 				transformation,
 				node,
 				$author$project$RichText$Model$Selection$focusNode(selection));
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return $elm$core$Maybe$Nothing;
 			} else {
 				var fn = _v1.a;
@@ -25347,11 +21779,11 @@ var $author$project$RichText$Editor$applyTextChange = F2(
 			var xs = path.b;
 			var _v2 = $author$project$RichText$Model$Node$childNodes(editorNode);
 			switch (_v2.$) {
-				case 'BlockChildren':
+				case 0:
 					var array = _v2.a;
 					var a = $author$project$RichText$Model$Node$toBlockArray(array);
 					var _v3 = A2($elm$core$Array$get, x, a);
-					if (_v3.$ === 'Nothing') {
+					if (_v3.$ === 1) {
 						return $elm$core$Maybe$Nothing;
 					} else {
 						var cblock = _v3.a;
@@ -25359,7 +21791,7 @@ var $author$project$RichText$Editor$applyTextChange = F2(
 							$author$project$RichText$Editor$applyTextChange,
 							cblock,
 							_Utils_Tuple2(xs, text));
-						if (_v4.$ === 'Nothing') {
+						if (_v4.$ === 1) {
 							return $elm$core$Maybe$Nothing;
 						} else {
 							var textChangeNode = _v4.a;
@@ -25371,18 +21803,18 @@ var $author$project$RichText$Editor$applyTextChange = F2(
 									editorNode));
 						}
 					}
-				case 'InlineChildren':
+				case 1:
 					var array = _v2.a;
 					if (!$elm$core$List$isEmpty(xs)) {
 						return $elm$core$Maybe$Nothing;
 					} else {
 						var a = $author$project$RichText$Model$Node$toInlineArray(array);
 						var _v5 = A2($elm$core$Array$get, x, a);
-						if (_v5.$ === 'Nothing') {
+						if (_v5.$ === 1) {
 							return $elm$core$Maybe$Nothing;
 						} else {
 							var inlineNode = _v5.a;
-							if (inlineNode.$ === 'Text') {
+							if (inlineNode.$ === 1) {
 								var contents = inlineNode.a;
 								return $elm$core$Maybe$Just(
 									A2(
@@ -25414,7 +21846,7 @@ var $author$project$RichText$Editor$replaceText = F2(
 			$elm$core$List$foldl,
 			F2(
 				function (change, maybeNode) {
-					if (maybeNode.$ === 'Nothing') {
+					if (maybeNode.$ === 1) {
 						return $elm$core$Maybe$Nothing;
 					} else {
 						var node = maybeNode.a;
@@ -25432,12 +21864,12 @@ var $author$project$RichText$Editor$textChangesDomToEditor = F3(
 				function (_v0, maybeAgg) {
 					var p = _v0.a;
 					var text = _v0.b;
-					if (maybeAgg.$ === 'Nothing') {
+					if (maybeAgg.$ === 1) {
 						return $elm$core$Maybe$Nothing;
 					} else {
 						var agg = maybeAgg.a;
 						var _v2 = A3($author$project$RichText$Internal$Path$domToEditor, spec_, editorNode, p);
-						if (_v2.$ === 'Nothing') {
+						if (_v2.$ === 1) {
 							return $elm$core$Maybe$Nothing;
 						} else {
 							var translatedPath = _v2.a;
@@ -25464,7 +21896,7 @@ var $author$project$RichText$Editor$updateChangeEventTextChanges = F6(
 			spec_,
 			$author$project$RichText$Model$State$root(stateToCompare),
 			textChanges);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return A2($author$project$RichText$Editor$applyForceFunctionOnEditor, $author$project$RichText$Internal$Editor$forceRerender, editor_);
 		} else {
 			var changes = _v0.a;
@@ -25481,7 +21913,7 @@ var $author$project$RichText$Editor$updateChangeEventTextChanges = F6(
 					$author$project$RichText$Editor$replaceText,
 					$author$project$RichText$Model$State$root(editorState),
 					actualChanges);
-				if (_v1.$ === 'Nothing') {
+				if (_v1.$ === 1) {
 					return A2($author$project$RichText$Editor$applyForceFunctionOnEditor, $author$project$RichText$Internal$Editor$forceRerender, editor_);
 				} else {
 					var replacedEditorNodes = _v1.a;
@@ -25519,7 +21951,7 @@ var $author$project$RichText$Editor$updateChangeEventTextChanges = F6(
 var $author$project$RichText$Editor$updateChangeEventFullScan = F6(
 	function (timestamp, isComposing, domRoot, selection, spec_, editor_) {
 		var _v0 = $author$project$RichText$Internal$DomNode$extractRootEditorBlockNode(domRoot);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return A2($author$project$RichText$Editor$applyForceFunctionOnEditor, $author$project$RichText$Internal$Editor$forceCompleteRerender, editor_);
 		} else {
 			var editorRootDomNode = _v0.a;
@@ -25532,7 +21964,7 @@ var $author$project$RichText$Editor$updateChangeEventFullScan = F6(
 					$author$project$RichText$Model$State$root(
 						$author$project$RichText$Editor$state(editor_)),
 					editorRootDomNode);
-				if (_v1.$ === 'Ok') {
+				if (!_v1.$) {
 					var changes = _v1.a;
 					return A6($author$project$RichText$Editor$updateChangeEventTextChanges, timestamp, isComposing, changes, selection, spec_, editor_);
 				} else {
@@ -25543,23 +21975,23 @@ var $author$project$RichText$Editor$updateChangeEventFullScan = F6(
 	});
 var $author$project$RichText$Editor$updateChangeEvent = F3(
 	function (change, spec_, editor_) {
-		var _v0 = change.characterDataMutations;
-		if (_v0.$ === 'Nothing') {
-			var _v1 = A2($elm$json$Json$Decode$decodeValue, $author$project$RichText$Internal$DomNode$decodeDomNode, change.root);
-			if (_v1.$ === 'Err') {
+		var _v0 = change.dk;
+		if (_v0.$ === 1) {
+			var _v1 = A2($elm$json$Json$Decode$decodeValue, $author$project$RichText$Internal$DomNode$decodeDomNode, change.eg);
+			if (_v1.$ === 1) {
 				return editor_;
 			} else {
 				var root = _v1.a;
-				return A6($author$project$RichText$Editor$updateChangeEventFullScan, change.timestamp, change.isComposing, root, change.selection, spec_, editor_);
+				return A6($author$project$RichText$Editor$updateChangeEventFullScan, change.c_, change.cn, root, change.cR, spec_, editor_);
 			}
 		} else {
 			var characterDataMutations = _v0.a;
 			return A6(
 				$author$project$RichText$Editor$updateChangeEventTextChanges,
-				change.timestamp,
-				change.isComposing,
+				change.c_,
+				change.cn,
 				$author$project$RichText$Editor$sanitizeMutations(characterDataMutations),
-				change.selection,
+				change.cR,
 				spec_,
 				editor_);
 		}
@@ -25567,7 +21999,7 @@ var $author$project$RichText$Editor$updateChangeEvent = F3(
 var $author$project$RichText$Editor$updateSelection = F4(
 	function (maybeSelection, isDomPath, spec_, editor_) {
 		var editorState = $author$project$RichText$Editor$state(editor_);
-		if (maybeSelection.$ === 'Nothing') {
+		if (maybeSelection.$ === 1) {
 			return A2(
 				$author$project$RichText$Internal$Editor$withState,
 				A2($author$project$RichText$Model$State$withSelection, maybeSelection, editorState),
@@ -25599,31 +22031,31 @@ var $author$project$RichText$Editor$updateSelection = F4(
 	});
 var $author$project$RichText$Editor$update = F3(
 	function (cfg, msg, editor_) {
-		var c = cfg.a;
-		var spec_ = c.spec;
-		var commandMap_ = c.commandMap;
+		var c = cfg;
+		var spec_ = c.em;
+		var commandMap_ = c.dn;
 		switch (msg.$) {
-			case 'ChangeEvent':
+			case 1:
 				var change = msg.a;
 				return A3($author$project$RichText$Editor$updateChangeEvent, change, spec_, editor_);
-			case 'SelectionEvent':
+			case 0:
 				var selection = msg.a;
 				var isDomPath = msg.b;
 				return A4($author$project$RichText$Editor$updateSelection, selection, isDomPath, spec_, editor_);
-			case 'BeforeInputEvent':
+			case 2:
 				var inputEvent = msg.a;
 				return A4($author$project$RichText$Internal$BeforeInput$handleBeforeInput, inputEvent, commandMap_, spec_, editor_);
-			case 'CompositionStart':
+			case 4:
 				return $author$project$RichText$Editor$handleCompositionStart(editor_);
-			case 'CompositionEnd':
+			case 5:
 				return $author$project$RichText$Editor$handleCompositionEnd(editor_);
-			case 'KeyDownEvent':
+			case 3:
 				var e = msg.a;
 				return A4($author$project$RichText$Internal$KeyDown$handleKeyDown, e, commandMap_, spec_, editor_);
-			case 'PasteWithDataEvent':
+			case 6:
 				var e = msg.a;
 				return A3($author$project$RichText$Internal$Paste$handlePaste, e, spec_, editor_);
-			case 'CutEvent':
+			case 7:
 				return A2($author$project$RichText$Editor$handleCut, spec_, editor_);
 			default:
 				var e = msg.a;
@@ -25634,87 +22066,87 @@ var $author$project$Editor$update = F3(
 	function (cfg, msg, model) {
 		var spec = $author$project$RichText$Editor$spec(cfg);
 		switch (msg.$) {
-			case 'InternalMsg':
+			case 0:
 				var internalEditorMsg = msg.a;
 				return _Utils_Tuple2(
 					_Utils_update(
 						model,
 						{
-							editor: A3($author$project$RichText$Editor$update, cfg, internalEditorMsg, model.editor)
+							b: A3($author$project$RichText$Editor$update, cfg, internalEditorMsg, model.b)
 						}),
 					$elm$core$Platform$Cmd$none);
-			case 'ToggleStyle':
+			case 1:
 				var style = msg.a;
 				return _Utils_Tuple2(
 					A3($author$project$Editor$handleToggleStyle, style, spec, model),
 					$elm$core$Platform$Cmd$none);
-			case 'ShowInsertLinkModal':
+			case 2:
 				return _Utils_Tuple2(
 					A2($author$project$Editor$handleShowInsertLinkModal, spec, model),
 					$elm$core$Platform$Cmd$none);
-			case 'InsertLink':
+			case 5:
 				return _Utils_Tuple2(
 					A2($author$project$Editor$handleInsertLink, spec, model),
 					$elm$core$Platform$Cmd$none);
-			case 'UpdateLinkHref':
+			case 3:
 				var href = msg.a;
 				return _Utils_Tuple2(
 					A2($author$project$Editor$handleUpdateLinkHref, href, model),
 					$elm$core$Platform$Cmd$none);
-			case 'UpdateLinkTitle':
+			case 4:
 				var title = msg.a;
 				return _Utils_Tuple2(
 					A2($author$project$Editor$handleUpdateLinkTitle, title, model),
 					$elm$core$Platform$Cmd$none);
-			case 'ShowInsertImageModal':
+			case 8:
 				return _Utils_Tuple2(
 					$author$project$Editor$handleShowInsertImageModal(model),
 					$elm$core$Platform$Cmd$none);
-			case 'InsertImage':
+			case 9:
 				return _Utils_Tuple2(
 					A2($author$project$Editor$handleInsertImage, spec, model),
 					$elm$core$Platform$Cmd$none);
-			case 'UpdateImageSrc':
+			case 10:
 				var src = msg.a;
 				return _Utils_Tuple2(
 					A2($author$project$Editor$handleUpdateImageSrc, src, model),
 					$elm$core$Platform$Cmd$none);
-			case 'UpdateImageAlt':
+			case 11:
 				var alt = msg.a;
 				return _Utils_Tuple2(
 					A2($author$project$Editor$handleUpdateImageAlt, alt, model),
 					$elm$core$Platform$Cmd$none);
-			case 'WrapInBlockQuote':
+			case 13:
 				return _Utils_Tuple2(
 					A2($author$project$Editor$handleWrapBlockNode, spec, model),
 					$elm$core$Platform$Cmd$none);
-			case 'InsertHorizontalRule':
+			case 12:
 				return _Utils_Tuple2(
 					A2($author$project$Editor$handleInsertHorizontalRule, spec, model),
 					$elm$core$Platform$Cmd$none);
-			case 'LiftOutOfBlock':
+			case 14:
 				return _Utils_Tuple2(
 					A2($author$project$Editor$handleLiftBlock, spec, model),
 					$elm$core$Platform$Cmd$none);
-			case 'ToggleBlock':
+			case 6:
 				var block = msg.a;
 				return _Utils_Tuple2(
 					A3($author$project$Editor$handleToggleBlock, spec, block, model),
 					$elm$core$Platform$Cmd$none);
-			case 'WrapInList':
+			case 7:
 				var listType = msg.a;
 				return _Utils_Tuple2(
 					A3($author$project$Editor$handleWrapInList, spec, listType, model),
 					$elm$core$Platform$Cmd$none);
-			case 'Undo':
+			case 17:
 				return _Utils_Tuple2(
 					A2($author$project$Editor$handleUndo, spec, model),
 					$elm$core$Platform$Cmd$none);
-			case 'Redo':
+			case 18:
 				return _Utils_Tuple2(
 					A2($author$project$Editor$handleRedo, spec, model),
 					$elm$core$Platform$Cmd$none);
-			case 'Noop':
+			case 15:
 				return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 			default:
 				return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
@@ -25722,14 +22154,14 @@ var $author$project$Editor$update = F3(
 	});
 var $author$project$Page$Basic$update = F2(
 	function (msg, model) {
-		if (msg.$ === 'EditorMsg') {
+		if (!msg.$) {
 			var editorMsg = msg.a;
-			var _v1 = A3($author$project$Editor$update, $author$project$Page$Basic$config, editorMsg, model.editor);
+			var _v1 = A3($author$project$Editor$update, $author$project$Page$Basic$config, editorMsg, model.b);
 			var e = _v1.a;
 			return _Utils_Tuple2(
 				_Utils_update(
 					model,
-					{editor: e}),
+					{b: e}),
 				$elm$core$Platform$Cmd$none);
 		} else {
 			return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
@@ -25737,37 +22169,37 @@ var $author$project$Page$Basic$update = F2(
 	});
 var $author$project$Page$Home$config = $author$project$RichText$Editor$config(
 	{
-		commandMap: $author$project$Editor$commandBindings($author$project$RichText$Definitions$markdown),
-		decorations: $author$project$Editor$decorations,
-		spec: $author$project$RichText$Definitions$markdown,
-		toMsg: $author$project$Controls$InternalMsg
+		dn: $author$project$Editor$commandBindings($author$project$RichText$Definitions$markdown),
+		du: $author$project$Editor$decorations,
+		em: $author$project$RichText$Definitions$markdown,
+		er: $author$project$Controls$InternalMsg
 	});
 var $author$project$Page$Home$update = F2(
 	function (msg, model) {
-		if (msg.$ === 'EditorMsg') {
+		if (!msg.$) {
 			var editorMsg = msg.a;
-			var _v1 = A3($author$project$Editor$update, $author$project$Page$Home$config, editorMsg, model.editor);
+			var _v1 = A3($author$project$Editor$update, $author$project$Page$Home$config, editorMsg, model.b);
 			var e = _v1.a;
 			return _Utils_Tuple2(
 				_Utils_update(
 					model,
-					{editor: e}),
+					{b: e}),
 				$elm$core$Platform$Cmd$none);
 		} else {
 			return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 		}
 	});
-var $author$project$Page$Markdown$Markdown = {$: 'Markdown'};
+var $author$project$Page$Markdown$Markdown = 0;
 var $author$project$Page$Markdown$changeEditorTypeToMarkdown = function (model) {
 	var markdownNodes = $author$project$Page$Markdown$rootToMarkdown(
 		$author$project$RichText$Model$State$root(
-			$author$project$RichText$Editor$state(model.editor.editor)));
+			$author$project$RichText$Editor$state(model.b.b)));
 	var _v0 = function () {
 		var _v1 = A2($elm$core$Result$andThen, $author$project$Page$Markdown$markdownToString, markdownNodes);
-		if (_v1.$ === 'Err') {
+		if (_v1.$ === 1) {
 			var e = _v1.a;
 			return _Utils_Tuple2(
-				model.textMarkdown,
+				model.ap,
 				$elm$core$Maybe$Just(e));
 		} else {
 			var m = _v1.a;
@@ -25776,33 +22208,33 @@ var $author$project$Page$Markdown$changeEditorTypeToMarkdown = function (model) 
 	}();
 	var result = _v0.a;
 	var error = _v0.b;
-	if (error.$ === 'Just') {
+	if (!error.$) {
 		var e = error.a;
 		return _Utils_update(
 			model,
 			{
-				markdownError: $elm$core$Maybe$Just(e)
+				al: $elm$core$Maybe$Just(e)
 			});
 	} else {
 		return _Utils_update(
 			model,
-			{editorType: $author$project$Page$Markdown$Markdown, markdownError: $elm$core$Maybe$Nothing, textMarkdown: result});
+			{Y: 0, al: $elm$core$Maybe$Nothing, ap: result});
 	}
 };
-var $pablohirafuji$elm_markdown$Markdown$Config$DontParse = {$: 'DontParse'};
+var $pablohirafuji$elm_markdown$Markdown$Config$DontParse = {$: 2};
 var $author$project$Page$Markdown$filterBlankLines = function (blocks) {
 	var newBlocks = A2(
 		$elm$core$List$filterMap,
 		function (block) {
 			switch (block.$) {
-				case 'BlankLine':
+				case 0:
 					return $elm$core$Maybe$Nothing;
-				case 'BlockQuote':
+				case 5:
 					var children = block.a;
 					return $elm$core$Maybe$Just(
 						$pablohirafuji$elm_markdown$Markdown$Block$BlockQuote(
 							$author$project$Page$Markdown$filterBlankLines(children)));
-				case 'List':
+				case 6:
 					var lb = block.a;
 					var listItems = block.b;
 					return $elm$core$Maybe$Just(
@@ -25820,7 +22252,7 @@ var $author$project$Page$Markdown$filterBlankLines = function (blocks) {
 var $author$project$Page$Markdown$markdownCodeBlockToEditorBlock = F2(
 	function (cb, s) {
 		var attributes = function () {
-			if (cb.$ === 'Indented') {
+			if (!cb.$) {
 				return _List_fromArray(
 					[
 						A2($author$project$RichText$Model$Attribute$StringAttribute, 'type', 'indented')
@@ -25838,15 +22270,15 @@ var $author$project$Page$Markdown$markdownCodeBlockToEditorBlock = F2(
 							$elm$core$Maybe$Just(
 							A2($author$project$RichText$Model$Attribute$StringAttribute, 'type', 'fenced')),
 							$elm$core$Maybe$Just(
-							A2($author$project$RichText$Model$Attribute$IntegerAttribute, 'indentLength', f.indentLength)),
+							A2($author$project$RichText$Model$Attribute$IntegerAttribute, 'indentLength', f.a4)),
 							$elm$core$Maybe$Just(
-							A2($author$project$RichText$Model$Attribute$IntegerAttribute, 'fenceLength', f.fenceLength)),
+							A2($author$project$RichText$Model$Attribute$IntegerAttribute, 'fenceLength', f.b7)),
 							A2(
 							$elm$core$Maybe$map,
 							function (m) {
 								return A2($author$project$RichText$Model$Attribute$StringAttribute, 'language', m);
 							},
-							f.language)
+							f.dP)
 						]));
 			}
 		}();
@@ -25886,7 +22318,7 @@ var $author$project$Page$Markdown$markdownInlineListToInlineLeaves = F2(
 var $author$project$Page$Markdown$markdownInlineToInlineLeaves = F2(
 	function (marks, inline) {
 		switch (inline.$) {
-			case 'Text':
+			case 0:
 				var s = inline.a;
 				return $elm$core$Result$Ok(
 					_List_fromArray(
@@ -25896,7 +22328,7 @@ var $author$project$Page$Markdown$markdownInlineToInlineLeaves = F2(
 							s,
 							A2($author$project$RichText$Model$Mark$sort, $author$project$Page$Markdown$markdownMarkOrder, marks))
 						]));
-			case 'HardLineBreak':
+			case 1:
 				return $elm$core$Result$Ok(
 					_List_fromArray(
 						[
@@ -25905,7 +22337,7 @@ var $author$project$Page$Markdown$markdownInlineToInlineLeaves = F2(
 							A2($author$project$RichText$Model$Element$element, $author$project$RichText$Definitions$hardBreak, _List_Nil),
 							_List_Nil)
 						]));
-			case 'CodeInline':
+			case 2:
 				var s = inline.a;
 				var codeMark = A2($author$project$RichText$Model$Mark$mark, $author$project$RichText$Definitions$code, _List_Nil);
 				return $elm$core$Result$Ok(
@@ -25919,7 +22351,7 @@ var $author$project$Page$Markdown$markdownInlineToInlineLeaves = F2(
 								$author$project$Page$Markdown$markdownMarkOrder,
 								A2($elm$core$List$cons, codeMark, marks)))
 						]));
-			case 'Link':
+			case 3:
 				var href = inline.a;
 				var title = inline.b;
 				var children = inline.c;
@@ -25944,7 +22376,7 @@ var $author$project$Page$Markdown$markdownInlineToInlineLeaves = F2(
 					$author$project$Page$Markdown$markdownInlineListToInlineLeaves,
 					A2($elm$core$List$cons, linkMark, marks),
 					children);
-			case 'Image':
+			case 4:
 				var src = inline.a;
 				var alt = inline.b;
 				var inlineImage = A2(
@@ -25970,7 +22402,7 @@ var $author$project$Page$Markdown$markdownInlineToInlineLeaves = F2(
 				return $elm$core$Result$Ok(
 					_List_fromArray(
 						[inlineImage]));
-			case 'Emphasis':
+			case 6:
 				var i = inline.a;
 				var children = inline.b;
 				var emphasis = function () {
@@ -25999,7 +22431,7 @@ var $author$project$Page$Markdown$markdownInlineToInlineLeaves = F2(
 					$author$project$Page$Markdown$markdownInlineListToInlineLeaves,
 					_Utils_ap(emphasis, marks),
 					children);
-			case 'HtmlInline':
+			case 5:
 				return $elm$core$Result$Err('Not implemented');
 			default:
 				return $elm$core$Result$Err('Not implemented');
@@ -26040,7 +22472,7 @@ var $author$project$Page$Markdown$markdownBlockListToBlockLeaves = function (blo
 };
 var $author$project$Page$Markdown$markdownBlockToEditorBlock = function (mblock) {
 	switch (mblock.$) {
-		case 'BlankLine':
+		case 0:
 			var s = mblock.a;
 			return $elm$core$Result$Ok(
 				A2(
@@ -26052,13 +22484,13 @@ var $author$project$Page$Markdown$markdownBlockToEditorBlock = function (mblock)
 								[
 									$author$project$RichText$Model$Node$plainText(s)
 								])))));
-		case 'ThematicBreak':
+		case 1:
 			return $elm$core$Result$Ok(
 				A2(
 					$author$project$RichText$Model$Node$block,
 					A2($author$project$RichText$Model$Element$element, $author$project$RichText$Definitions$horizontalRule, _List_Nil),
 					$author$project$RichText$Model$Node$Leaf));
-		case 'Heading':
+		case 2:
 			var i = mblock.b;
 			var children = mblock.c;
 			return A2(
@@ -26076,14 +22508,14 @@ var $author$project$Page$Markdown$markdownBlockToEditorBlock = function (mblock)
 						c);
 				},
 				$author$project$Page$Markdown$markdownInlineListToInlineChildNodes(children));
-		case 'CodeBlock':
+		case 3:
 			var cb = mblock.a;
 			var s = mblock.b;
 			return A2($author$project$Page$Markdown$markdownCodeBlockToEditorBlock, cb, s);
-		case 'Paragraph':
+		case 4:
 			var children = mblock.b;
 			return $author$project$Page$Markdown$markdownInlineToParagraphBlock(children);
-		case 'BlockQuote':
+		case 5:
 			var children = mblock.a;
 			return A2(
 				$elm$core$Result$map,
@@ -26094,11 +22526,11 @@ var $author$project$Page$Markdown$markdownBlockToEditorBlock = function (mblock)
 						c);
 				},
 				$author$project$Page$Markdown$markdownBlockListToBlockChildNodes(children));
-		case 'List':
+		case 6:
 			var lb = mblock.a;
 			var listItems = mblock.b;
 			return A2($author$project$Page$Markdown$markdownListToEditorBlock, lb, listItems);
-		case 'PlainInlines':
+		case 7:
 			var children = mblock.a;
 			return $author$project$Page$Markdown$markdownInlineToParagraphBlock(children);
 		default:
@@ -26108,8 +22540,8 @@ var $author$project$Page$Markdown$markdownBlockToEditorBlock = function (mblock)
 var $author$project$Page$Markdown$markdownListToEditorBlock = F2(
 	function (lb, children) {
 		var _v0 = function () {
-			var _v1 = lb.type_;
-			if (_v1.$ === 'Ordered') {
+			var _v1 = lb.bM;
+			if (_v1.$ === 1) {
 				var i = _v1.a;
 				return _Utils_Tuple2(
 					$author$project$RichText$Definitions$orderedList,
@@ -26126,8 +22558,8 @@ var $author$project$Page$Markdown$markdownListToEditorBlock = F2(
 		var attributes = _Utils_ap(
 			_List_fromArray(
 				[
-					A2($author$project$RichText$Model$Attribute$IntegerAttribute, 'indentLength', lb.indentLength),
-					A2($author$project$RichText$Model$Attribute$StringAttribute, 'delimiter', lb.delimiter)
+					A2($author$project$RichText$Model$Attribute$IntegerAttribute, 'indentLength', lb.a4),
+					A2($author$project$RichText$Model$Attribute$StringAttribute, 'delimiter', lb.aY)
 				]),
 			typeAttributes);
 		return A2(
@@ -26194,11 +22626,11 @@ var $pablohirafuji$elm_markdown$Markdown$Block$calcListIndentLength = function (
 	var indentSpaceLength = $elm$core$String$length(indentSpace);
 	var isIndentedCode = indentSpaceLength >= 4;
 	var updtRawLine = isIndentedCode ? _Utils_ap(indentSpace, rawLine) : rawLine;
-	var indentLength = (isIndentedCode || A2($elm$regex$Regex$contains, $pablohirafuji$elm_markdown$Markdown$Block$blankLineRegex, rawLine)) ? (listBlock.indentLength - indentSpaceLength) : listBlock.indentLength;
+	var indentLength = (isIndentedCode || A2($elm$regex$Regex$contains, $pablohirafuji$elm_markdown$Markdown$Block$blankLineRegex, rawLine)) ? (listBlock.a4 - indentSpaceLength) : listBlock.a4;
 	return _Utils_Tuple2(
 		_Utils_update(
 			listBlock,
-			{indentLength: indentLength}),
+			{a4: indentLength}),
 		updtRawLine);
 };
 var $pablohirafuji$elm_markdown$Markdown$Block$atxHeadingLineRegex = A2(
@@ -26206,8 +22638,8 @@ var $pablohirafuji$elm_markdown$Markdown$Block$atxHeadingLineRegex = A2(
 	$elm$regex$Regex$never,
 	$elm$regex$Regex$fromString('^ {0,3}(#{1,6})' + ('(?:[ \\t]+[ \\t#]+$|[ \\t]+|$)' + '(.*?)(?:\\s+[ \\t#]*)?$')));
 var $pablohirafuji$elm_markdown$Markdown$Block$extractATXHeadingRM = function (match) {
-	var _v0 = match.submatches;
-	if ((_v0.b && (_v0.a.$ === 'Just')) && _v0.b.b) {
+	var _v0 = match.en;
+	if ((_v0.b && (!_v0.a.$)) && _v0.b.b) {
 		var lvl = _v0.a.a;
 		var _v1 = _v0.b;
 		var maybeHeading = _v1.a;
@@ -26223,7 +22655,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$extractATXHeadingRM = function (m
 };
 var $elm$core$Result$fromMaybe = F2(
 	function (err, maybe) {
-		if (maybe.$ === 'Just') {
+		if (!maybe.$) {
 			var v = maybe.a;
 			return $elm$core$Result$Ok(v);
 		} else {
@@ -26248,11 +22680,11 @@ var $pablohirafuji$elm_markdown$Markdown$Block$checkATXHeadingLine = function (_
 					A3($elm$regex$Regex$findAtMost, 1, $pablohirafuji$elm_markdown$Markdown$Block$atxHeadingLineRegex, rawLine)))));
 };
 var $pablohirafuji$elm_markdown$Markdown$Block$BlankLine = function (a) {
-	return {$: 'BlankLine', a: a};
+	return {$: 0, a: a};
 };
 var $pablohirafuji$elm_markdown$Markdown$Block$Fenced = F2(
 	function (a, b) {
-		return {$: 'Fenced', a: a, b: b};
+		return {$: 1, a: a, b: b};
 	});
 var $pablohirafuji$elm_markdown$Markdown$Block$addBlankLineToListBlock = F2(
 	function (match, asts) {
@@ -26261,7 +22693,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$addBlankLineToListBlock = F2(
 				[
 					_List_fromArray(
 					[
-						$pablohirafuji$elm_markdown$Markdown$Block$BlankLine(match.match)
+						$pablohirafuji$elm_markdown$Markdown$Block$BlankLine(match.dS)
 					])
 				]);
 		} else {
@@ -26279,8 +22711,8 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseBlankLine = F2(
 		while (true) {
 			if (ast.b) {
 				switch (ast.a.$) {
-					case 'CodeBlock':
-						if ((ast.a.a.$ === 'Fenced') && ast.a.a.a) {
+					case 3:
+						if ((ast.a.a.$ === 1) && ast.a.a.a) {
 							var _v1 = ast.a;
 							var _v2 = _v1.a;
 							var fence = _v2.b;
@@ -26296,7 +22728,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseBlankLine = F2(
 						} else {
 							break _v0$2;
 						}
-					case 'List':
+					case 6:
 						var _v3 = ast.a;
 						var model = _v3.a;
 						var items = _v3.b;
@@ -26317,7 +22749,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseBlankLine = F2(
 		}
 		return A2(
 			$elm$core$List$cons,
-			$pablohirafuji$elm_markdown$Markdown$Block$BlankLine(match.match),
+			$pablohirafuji$elm_markdown$Markdown$Block$BlankLine(match.dS),
 			ast);
 	});
 var $pablohirafuji$elm_markdown$Markdown$Block$checkBlankLine = function (_v0) {
@@ -26340,7 +22772,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$blocksAfterBlankLines = F2(
 	function (ast, blankLines) {
 		blocksAfterBlankLines:
 		while (true) {
-			if (ast.b && (ast.a.$ === 'BlankLine')) {
+			if (ast.b && (!ast.a.$)) {
 				var blankStr = ast.a.a;
 				var astTail = ast.b;
 				var $temp$ast = astTail,
@@ -26359,7 +22791,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$maybeContinueParagraph = F2(
 		while (true) {
 			if (ast.b) {
 				switch (ast.a.$) {
-					case 'Paragraph':
+					case 4:
 						var _v1 = ast.a;
 						var paragraph = _v1.a;
 						var astTail = ast.b;
@@ -26368,7 +22800,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$maybeContinueParagraph = F2(
 								$elm$core$List$cons,
 								A2($pablohirafuji$elm_markdown$Markdown$Block$addToParagraph, paragraph, rawLine),
 								astTail));
-					case 'BlockQuote':
+					case 5:
 						var bqAST = ast.a.a;
 						var astTail = ast.b;
 						return A2(
@@ -26380,7 +22812,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$maybeContinueParagraph = F2(
 									astTail);
 							},
 							A2($pablohirafuji$elm_markdown$Markdown$Block$maybeContinueParagraph, rawLine, bqAST));
-					case 'List':
+					case 6:
 						var _v2 = ast.a;
 						var model = _v2.a;
 						var items = _v2.b;
@@ -26445,7 +22877,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$resumeIndentedCodeBlock = F2(
 	function (codeLine, _v0) {
 		var remainBlocks = _v0.a;
 		var blankLines = _v0.b;
-		if ((remainBlocks.b && (remainBlocks.a.$ === 'CodeBlock')) && (remainBlocks.a.a.$ === 'Indented')) {
+		if ((remainBlocks.b && (remainBlocks.a.$ === 3)) && (!remainBlocks.a.a.$)) {
 			var _v2 = remainBlocks.a;
 			var _v3 = _v2.a;
 			var codeStr = _v2.b;
@@ -26479,8 +22911,8 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseIndentedCodeLine = F2(
 		while (true) {
 			if (ast.b) {
 				switch (ast.a.$) {
-					case 'CodeBlock':
-						if (ast.a.a.$ === 'Indented') {
+					case 3:
+						if (!ast.a.a.$) {
 							var _v1 = ast.a;
 							var _v2 = _v1.a;
 							var codeStr = _v1.b;
@@ -26492,7 +22924,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseIndentedCodeLine = F2(
 						} else {
 							break _v0$2;
 						}
-					case 'BlankLine':
+					case 0:
 						var blankStr = ast.a.a;
 						var astTail = ast.b;
 						return A2(
@@ -26544,7 +22976,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$checkIndentedCode = function (_v0
 						A2(
 							$elm$core$Basics$composeR,
 							function ($) {
-								return $.submatches;
+								return $.en;
 							},
 							$elm$core$List$head),
 						$elm$core$List$head(
@@ -26571,7 +23003,7 @@ var $pablohirafuji$elm_markdown$Markdown$Entity$validUnicode = function (_int) {
 var $pablohirafuji$elm_markdown$Markdown$Entity$replaceDecimal = function (match) {
 	return A2(
 		$elm$core$Maybe$withDefault,
-		match.match,
+		match.dS,
 		A2(
 			$elm$core$Maybe$map,
 			$pablohirafuji$elm_markdown$Markdown$Entity$validUnicode,
@@ -26581,7 +23013,7 @@ var $pablohirafuji$elm_markdown$Markdown$Entity$replaceDecimal = function (match
 				A2(
 					$elm$core$Maybe$withDefault,
 					$elm$core$Maybe$Nothing,
-					$elm$core$List$head(match.submatches)))));
+					$elm$core$List$head(match.en)))));
 };
 var $pablohirafuji$elm_markdown$Markdown$Entity$replaceDecimals = A2($elm$regex$Regex$replace, $pablohirafuji$elm_markdown$Markdown$Entity$decimalRegex, $pablohirafuji$elm_markdown$Markdown$Entity$replaceDecimal);
 var $pablohirafuji$elm_markdown$Markdown$Entity$entitiesRegex = A2(
@@ -26848,7 +23280,7 @@ var $pablohirafuji$elm_markdown$Markdown$Entity$entities = $elm$core$Dict$fromLi
 var $pablohirafuji$elm_markdown$Markdown$Entity$replaceEntity = function (match) {
 	return A2(
 		$elm$core$Maybe$withDefault,
-		match.match,
+		match.dS,
 		A2(
 			$elm$core$Maybe$map,
 			A2($elm$core$Basics$composeR, $elm$core$Char$fromCode, $elm$core$String$fromChar),
@@ -26860,7 +23292,7 @@ var $pablohirafuji$elm_markdown$Markdown$Entity$replaceEntity = function (match)
 				A2(
 					$elm$core$Maybe$withDefault,
 					$elm$core$Maybe$Nothing,
-					$elm$core$List$head(match.submatches)))));
+					$elm$core$List$head(match.en)))));
 };
 var $pablohirafuji$elm_markdown$Markdown$Entity$replaceEntities = A2($elm$regex$Regex$replace, $pablohirafuji$elm_markdown$Markdown$Entity$entitiesRegex, $pablohirafuji$elm_markdown$Markdown$Entity$replaceEntity);
 var $pablohirafuji$elm_markdown$Markdown$Helpers$escapableRegex = A2(
@@ -26871,8 +23303,8 @@ var $pablohirafuji$elm_markdown$Markdown$Helpers$replaceEscapable = A2(
 	$elm$regex$Regex$replace,
 	$pablohirafuji$elm_markdown$Markdown$Helpers$escapableRegex,
 	function (regexMatch) {
-		var _v0 = regexMatch.submatches;
-		if (((_v0.b && (_v0.a.$ === 'Just')) && _v0.b.b) && (_v0.b.a.$ === 'Just')) {
+		var _v0 = regexMatch.en;
+		if (((_v0.b && (!_v0.a.$)) && _v0.b.b) && (!_v0.b.a.$)) {
 			var backslashes = _v0.a.a;
 			var _v1 = _v0.b;
 			var escapedStr = _v1.a.a;
@@ -26883,7 +23315,7 @@ var $pablohirafuji$elm_markdown$Markdown$Helpers$replaceEscapable = A2(
 					'\\'),
 				escapedStr);
 		} else {
-			return regexMatch.match;
+			return regexMatch.dS;
 		}
 	});
 var $pablohirafuji$elm_markdown$Markdown$Entity$hexadecimalRegex = A2(
@@ -26909,14 +23341,14 @@ var $pablohirafuji$elm_markdown$Markdown$Entity$hexToInt = A2(
 var $pablohirafuji$elm_markdown$Markdown$Entity$replaceHexadecimal = function (match) {
 	return A2(
 		$elm$core$Maybe$withDefault,
-		match.match,
+		match.dS,
 		A2(
 			$elm$core$Maybe$map,
 			A2($elm$core$Basics$composeR, $pablohirafuji$elm_markdown$Markdown$Entity$hexToInt, $pablohirafuji$elm_markdown$Markdown$Entity$validUnicode),
 			A2(
 				$elm$core$Maybe$withDefault,
 				$elm$core$Maybe$Nothing,
-				$elm$core$List$head(match.submatches))));
+				$elm$core$List$head(match.en))));
 };
 var $pablohirafuji$elm_markdown$Markdown$Entity$replaceHexadecimals = A2($elm$regex$Regex$replace, $pablohirafuji$elm_markdown$Markdown$Entity$hexadecimalRegex, $pablohirafuji$elm_markdown$Markdown$Entity$replaceHexadecimal);
 var $pablohirafuji$elm_markdown$Markdown$Helpers$formatStr = function (str) {
@@ -26927,8 +23359,8 @@ var $pablohirafuji$elm_markdown$Markdown$Helpers$formatStr = function (str) {
 };
 var $elm$core$String$words = _String_words;
 var $pablohirafuji$elm_markdown$Markdown$Block$extractOpenCodeFenceRM = function (match) {
-	var _v0 = match.submatches;
-	if (((_v0.b && _v0.b.b) && (_v0.b.a.$ === 'Just')) && _v0.b.b.b) {
+	var _v0 = match.en;
+	if (((_v0.b && _v0.b.b) && (!_v0.b.a.$)) && _v0.b.b.b) {
 		var maybeIndent = _v0.a;
 		var _v1 = _v0.b;
 		var fence = _v1.a.a;
@@ -26939,13 +23371,13 @@ var $pablohirafuji$elm_markdown$Markdown$Block$extractOpenCodeFenceRM = function
 				$pablohirafuji$elm_markdown$Markdown$Block$Fenced,
 				true,
 				{
-					fenceChar: A2($elm$core$String$left, 1, fence),
-					fenceLength: $elm$core$String$length(fence),
-					indentLength: A2(
+					dC: A2($elm$core$String$left, 1, fence),
+					b7: $elm$core$String$length(fence),
+					a4: A2(
 						$elm$core$Maybe$withDefault,
 						0,
 						A2($elm$core$Maybe$map, $elm$core$String$length, maybeIndent)),
-					language: A2(
+					dP: A2(
 						$elm$core$Maybe$map,
 						$pablohirafuji$elm_markdown$Markdown$Helpers$formatStr,
 						A2(
@@ -26990,8 +23422,8 @@ var $pablohirafuji$elm_markdown$Markdown$Block$checkOpenCodeFenceLine = function
 						A3($elm$regex$Regex$findAtMost, 1, $pablohirafuji$elm_markdown$Markdown$Block$openCodeFenceLineRegex, rawLine))))));
 };
 var $pablohirafuji$elm_markdown$Markdown$Block$extractOrderedListRM = function (match) {
-	var _v0 = match.submatches;
-	if (((((((_v0.b && (_v0.a.$ === 'Just')) && _v0.b.b) && (_v0.b.a.$ === 'Just')) && _v0.b.b.b) && (_v0.b.b.a.$ === 'Just')) && _v0.b.b.b.b) && _v0.b.b.b.b.b) {
+	var _v0 = match.en;
+	if (((((((_v0.b && (!_v0.a.$)) && _v0.b.b) && (!_v0.b.a.$)) && _v0.b.b.b) && (!_v0.b.b.a.$)) && _v0.b.b.b.b) && _v0.b.b.b.b.b) {
 		var indentString = _v0.a.a;
 		var _v1 = _v0.b;
 		var start = _v1.a.a;
@@ -27004,10 +23436,10 @@ var $pablohirafuji$elm_markdown$Markdown$Block$extractOrderedListRM = function (
 		return $elm$core$Maybe$Just(
 			_Utils_Tuple3(
 				{
-					delimiter: delimiter,
-					indentLength: $elm$core$String$length(indentString) + 1,
-					isLoose: false,
-					type_: A2(
+					aY: delimiter,
+					a4: $elm$core$String$length(indentString) + 1,
+					dN: false,
+					bM: A2(
 						$elm$core$Maybe$withDefault,
 						$pablohirafuji$elm_markdown$Markdown$Block$Unordered,
 						A2(
@@ -27036,8 +23468,8 @@ var $pablohirafuji$elm_markdown$Markdown$Block$checkOrderedListLine = function (
 				A3($elm$regex$Regex$findAtMost, 1, $pablohirafuji$elm_markdown$Markdown$Block$orderedListLineRegex, rawLine))));
 };
 var $pablohirafuji$elm_markdown$Markdown$Block$extractSetextHeadingRM = function (match) {
-	var _v0 = match.submatches;
-	if (_v0.b && (_v0.a.$ === 'Just')) {
+	var _v0 = match.en;
+	if (_v0.b && (!_v0.a.$)) {
 		var delimiter = _v0.a.a;
 		return A2($elm$core$String$startsWith, '=', delimiter) ? $elm$core$Maybe$Just(
 			_Utils_Tuple2(1, delimiter)) : $elm$core$Maybe$Just(
@@ -27050,7 +23482,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseSetextHeadingLine = F3(
 	function (rawLine, ast, _v0) {
 		var lvl = _v0.a;
 		var delimiter = _v0.b;
-		if (ast.b && (ast.a.$ === 'Paragraph')) {
+		if (ast.b && (ast.a.$ === 4)) {
 			var _v2 = ast.a;
 			var rawText = _v2.a;
 			var astTail = ast.b;
@@ -27101,8 +23533,8 @@ var $pablohirafuji$elm_markdown$Markdown$Block$checkThematicBreakLine = function
 				A3($elm$regex$Regex$findAtMost, 1, $pablohirafuji$elm_markdown$Markdown$Block$thematicBreakLineRegex, rawLine))));
 };
 var $pablohirafuji$elm_markdown$Markdown$Block$extractUnorderedListRM = function (match) {
-	var _v0 = match.submatches;
-	if ((((((_v0.b && (_v0.a.$ === 'Just')) && _v0.b.b) && (_v0.b.a.$ === 'Just')) && _v0.b.b.b) && _v0.b.b.b.b) && (!_v0.b.b.b.b.b)) {
+	var _v0 = match.en;
+	if ((((((_v0.b && (!_v0.a.$)) && _v0.b.b) && (!_v0.b.a.$)) && _v0.b.b.b) && _v0.b.b.b.b) && (!_v0.b.b.b.b.b)) {
 		var indentString = _v0.a.a;
 		var _v1 = _v0.b;
 		var delimiter = _v1.a.a;
@@ -27113,10 +23545,10 @@ var $pablohirafuji$elm_markdown$Markdown$Block$extractUnorderedListRM = function
 		return $elm$core$Maybe$Just(
 			_Utils_Tuple3(
 				{
-					delimiter: delimiter,
-					indentLength: $elm$core$String$length(indentString) + 1,
-					isLoose: false,
-					type_: $pablohirafuji$elm_markdown$Markdown$Block$Unordered
+					aY: delimiter,
+					a4: $elm$core$String$length(indentString) + 1,
+					dN: false,
+					bM: $pablohirafuji$elm_markdown$Markdown$Block$Unordered
 				},
 				A2($elm$core$Maybe$withDefault, '', maybeIndentSpace),
 				A2($elm$core$Maybe$withDefault, '', maybeRawLine)));
@@ -27144,14 +23576,14 @@ var $pablohirafuji$elm_markdown$Markdown$Block$closeCodeFenceLineRegex = A2(
 	$elm$regex$Regex$fromString('^ {0,3}(`{3,}|~{3,})\\s*$'));
 var $pablohirafuji$elm_markdown$Markdown$Block$isCloseFenceLineHelp = F2(
 	function (fence, match) {
-		var _v0 = match.submatches;
-		if (_v0.b && (_v0.a.$ === 'Just')) {
+		var _v0 = match.en;
+		if (_v0.b && (!_v0.a.$)) {
 			var fenceStr = _v0.a.a;
 			return (_Utils_cmp(
 				$elm$core$String$length(fenceStr),
-				fence.fenceLength) > -1) && _Utils_eq(
+				fence.b7) > -1) && _Utils_eq(
 				A2($elm$core$String$left, 1, fenceStr),
-				fence.fenceChar);
+				fence.dC);
 		} else {
 			return false;
 		}
@@ -27177,11 +23609,11 @@ var $pablohirafuji$elm_markdown$Markdown$Block$continueOrCloseCodeFence = F3(
 			previousCode) : A2(
 			$pablohirafuji$elm_markdown$Markdown$Block$CodeBlock,
 			A2($pablohirafuji$elm_markdown$Markdown$Block$Fenced, true, fence),
-			previousCode + (A2($pablohirafuji$elm_markdown$Markdown$Helpers$indentLine, fence.indentLength, rawLine) + '\n'));
+			previousCode + (A2($pablohirafuji$elm_markdown$Markdown$Helpers$indentLine, fence.a4, rawLine) + '\n'));
 	});
 var $pablohirafuji$elm_markdown$Markdown$Helpers$ifError = F2(
 	function (_function, result) {
-		if (result.$ === 'Ok') {
+		if (!result.$) {
 			return result;
 		} else {
 			var err = result.a;
@@ -27212,7 +23644,7 @@ var $pablohirafuji$elm_markdown$Markdown$Helpers$indentLength = A2(
 					A2(
 						$elm$core$Basics$composeR,
 						function ($) {
-							return $.match;
+							return $.dS;
 						},
 						$elm$core$String$length)),
 				$elm$core$Maybe$withDefault(0)))));
@@ -27228,13 +23660,13 @@ var $pablohirafuji$elm_markdown$Markdown$Block$isBlankLineLast = function (items
 			while (true) {
 				if (item.b) {
 					switch (item.a.$) {
-						case 'BlankLine':
+						case 0:
 							if (!item.b.b) {
 								return false;
 							} else {
 								return true;
 							}
-						case 'List':
+						case 6:
 							var _v2 = item.a;
 							var items_ = _v2.b;
 							var $temp$items = items_;
@@ -27278,7 +23710,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$checkBlockQuote = function (_v16)
 				A2(
 					$elm$core$Basics$composeR,
 					function ($) {
-						return $.submatches;
+						return $.en;
 					},
 					A2(
 						$elm$core$Basics$composeR,
@@ -27315,8 +23747,8 @@ var $pablohirafuji$elm_markdown$Markdown$Block$incorporateLine = F2(
 		while (true) {
 			if (ast.b) {
 				switch (ast.a.$) {
-					case 'CodeBlock':
-						if ((ast.a.a.$ === 'Fenced') && ast.a.a.a) {
+					case 3:
+						if ((ast.a.a.$ === 1) && ast.a.a.a) {
 							var _v12 = ast.a;
 							var _v13 = _v12.a;
 							var fence = _v13.b;
@@ -27329,14 +23761,14 @@ var $pablohirafuji$elm_markdown$Markdown$Block$incorporateLine = F2(
 						} else {
 							break _v11$2;
 						}
-					case 'List':
+					case 6:
 						var _v14 = ast.a;
 						var model = _v14.a;
 						var items = _v14.b;
 						var astTail = ast.b;
 						return (_Utils_cmp(
 							$pablohirafuji$elm_markdown$Markdown$Helpers$indentLength(rawLine),
-							model.indentLength) > -1) ? A5($pablohirafuji$elm_markdown$Markdown$Block$parseIndentedListLine, rawLine, model, items, ast, astTail) : A2(
+							model.a4) > -1) ? A5($pablohirafuji$elm_markdown$Markdown$Block$parseIndentedListLine, rawLine, model, items, ast, astTail) : A2(
 							$elm$core$Result$withDefault,
 							A2($pablohirafuji$elm_markdown$Markdown$Block$parseTextLine, rawLine, ast),
 							A2(
@@ -27373,7 +23805,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$incorporateLine = F2(
 	});
 var $pablohirafuji$elm_markdown$Markdown$Block$parseBlockQuoteLine = F2(
 	function (ast, rawLine) {
-		if (ast.b && (ast.a.$ === 'BlockQuote')) {
+		if (ast.b && (ast.a.$ === 5)) {
 			var bqAST = ast.a.a;
 			var astTail = ast.b;
 			return function (a) {
@@ -27404,11 +23836,11 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseIndentedListLine = F5(
 						function (a) {
 							return A2($pablohirafuji$elm_markdown$Markdown$Block$incorporateLine, a, _List_Nil);
 						}(
-							A2($pablohirafuji$elm_markdown$Markdown$Helpers$indentLine, model.indentLength, rawLine)))));
+							A2($pablohirafuji$elm_markdown$Markdown$Helpers$indentLine, model.a4, rawLine)))));
 		} else {
 			var item = items.a;
 			var itemsTail = items.b;
-			var indentedRawLine = A2($pablohirafuji$elm_markdown$Markdown$Helpers$indentLine, model.indentLength, rawLine);
+			var indentedRawLine = A2($pablohirafuji$elm_markdown$Markdown$Helpers$indentLine, model.a4, rawLine);
 			var updateList = function (model_) {
 				return function (a) {
 					return A2($elm$core$List$cons, a, astTail);
@@ -27425,7 +23857,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseIndentedListLine = F5(
 			while (true) {
 				if (item.b) {
 					switch (item.a.$) {
-						case 'BlankLine':
+						case 0:
 							if (!item.b.b) {
 								return updateList(model);
 							} else {
@@ -27433,7 +23865,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseIndentedListLine = F5(
 								return A2(
 									$elm$core$List$all,
 									function (block) {
-										if (block.$ === 'BlankLine') {
+										if (!block.$) {
 											return true;
 										} else {
 											return false;
@@ -27442,19 +23874,19 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseIndentedListLine = F5(
 									itemTail) ? A2($pablohirafuji$elm_markdown$Markdown$Block$parseRawLine, rawLine, ast) : updateList(
 									_Utils_update(
 										model,
-										{isLoose: true}));
+										{dN: true}));
 							}
-						case 'List':
+						case 6:
 							var _v9 = item.a;
 							var model_ = _v9.a;
 							var items_ = _v9.b;
 							var itemTail = item.b;
 							return (_Utils_cmp(
 								$pablohirafuji$elm_markdown$Markdown$Helpers$indentLength(indentedRawLine),
-								model_.indentLength) > -1) ? updateList(model) : ($pablohirafuji$elm_markdown$Markdown$Block$isBlankLineLast(items_) ? updateList(
+								model_.a4) > -1) ? updateList(model) : ($pablohirafuji$elm_markdown$Markdown$Block$isBlankLineLast(items_) ? updateList(
 								_Utils_update(
 									model,
-									{isLoose: true})) : updateList(model));
+									{dN: true})) : updateList(model));
 						default:
 							break _v7$3;
 					}
@@ -27482,12 +23914,12 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseListLine = F3(
 		while (true) {
 			if (ast.b) {
 				switch (ast.a.$) {
-					case 'List':
+					case 6:
 						var _v2 = ast.a;
 						var model = _v2.a;
 						var items = _v2.b;
 						var astTail = ast.b;
-						return _Utils_eq(listBlock.delimiter, model.delimiter) ? function (a) {
+						return _Utils_eq(listBlock.aY, model.aY) ? function (a) {
 							return A2($elm$core$List$cons, a, astTail);
 						}(
 							A2(
@@ -27495,23 +23927,23 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseListLine = F3(
 								_Utils_update(
 									model,
 									{
-										indentLength: listBlock.indentLength,
-										isLoose: model.isLoose || $pablohirafuji$elm_markdown$Markdown$Block$isBlankLineLast(items)
+										a4: listBlock.a4,
+										dN: model.dN || $pablohirafuji$elm_markdown$Markdown$Block$isBlankLineLast(items)
 									}),
 								A2($elm$core$List$cons, parsedRawLine, items))) : newList;
-					case 'Paragraph':
+					case 4:
 						var _v3 = ast.a;
 						var rawText = _v3.a;
 						var inlines = _v3.b;
 						var astTail = ast.b;
-						if ((parsedRawLine.b && (parsedRawLine.a.$ === 'BlankLine')) && (!parsedRawLine.b.b)) {
+						if ((parsedRawLine.b && (!parsedRawLine.a.$)) && (!parsedRawLine.b.b)) {
 							return A2(
 								$elm$core$List$cons,
 								A2($pablohirafuji$elm_markdown$Markdown$Block$addToParagraph, rawText, rawLine),
 								astTail);
 						} else {
-							var _v5 = listBlock.type_;
-							if (_v5.$ === 'Ordered') {
+							var _v5 = listBlock.bM;
+							if (_v5.$ === 1) {
 								if (_v5.a === 1) {
 									return newList;
 								} else {
@@ -27579,42 +24011,42 @@ var $pablohirafuji$elm_markdown$Markdown$Block$incorporateLines = F2(
 var $elm$core$String$lines = _String_lines;
 var $pablohirafuji$elm_markdown$Markdown$Block$Custom = F2(
 	function (a, b) {
-		return {$: 'Custom', a: a, b: b};
+		return {$: 8, a: a, b: b};
 	});
 var $pablohirafuji$elm_markdown$Markdown$Block$PlainInlines = function (a) {
-	return {$: 'PlainInlines', a: a};
+	return {$: 7, a: a};
 };
 var $pablohirafuji$elm_markdown$Markdown$Config$Sanitize = function (a) {
-	return {$: 'Sanitize', a: a};
+	return {$: 1, a: a};
 };
 var $pablohirafuji$elm_markdown$Markdown$Config$defaultAllowedHtmlAttributes = _List_fromArray(
 	['name', 'class']);
 var $pablohirafuji$elm_markdown$Markdown$Config$defaultAllowedHtmlElements = _List_fromArray(
 	['address', 'article', 'aside', 'b', 'blockquote', 'br', 'caption', 'center', 'cite', 'code', 'col', 'colgroup', 'dd', 'details', 'div', 'dl', 'dt', 'figcaption', 'figure', 'footer', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'legend', 'li', 'menu', 'menuitem', 'nav', 'ol', 'optgroup', 'option', 'p', 'pre', 'section', 'strike', 'summary', 'small', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'tr', 'ul']);
-var $pablohirafuji$elm_markdown$Markdown$Config$defaultSanitizeOptions = {allowedHtmlAttributes: $pablohirafuji$elm_markdown$Markdown$Config$defaultAllowedHtmlAttributes, allowedHtmlElements: $pablohirafuji$elm_markdown$Markdown$Config$defaultAllowedHtmlElements};
+var $pablohirafuji$elm_markdown$Markdown$Config$defaultSanitizeOptions = {bR: $pablohirafuji$elm_markdown$Markdown$Config$defaultAllowedHtmlAttributes, bS: $pablohirafuji$elm_markdown$Markdown$Config$defaultAllowedHtmlElements};
 var $pablohirafuji$elm_markdown$Markdown$Config$defaultOptions = {
-	rawHtml: $pablohirafuji$elm_markdown$Markdown$Config$Sanitize($pablohirafuji$elm_markdown$Markdown$Config$defaultSanitizeOptions),
-	softAsHardLineBreak: false
+	ea: $pablohirafuji$elm_markdown$Markdown$Config$Sanitize($pablohirafuji$elm_markdown$Markdown$Config$defaultSanitizeOptions),
+	el: false
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$initParser = F3(
 	function (options, refs, rawText) {
-		return {matches: _List_Nil, options: options, rawText: rawText, refs: refs, tokens: _List_Nil};
+		return {d: _List_Nil, d6: options, x: rawText, eb: refs, i: _List_Nil};
 	});
 var $pablohirafuji$elm_markdown$Markdown$Inline$HtmlInline = F3(
 	function (a, b, c) {
-		return {$: 'HtmlInline', a: a, b: b, c: c};
+		return {$: 5, a: a, b: b, c: c};
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$matchToInline = function (_v0) {
-	var match = _v0.a;
-	var _v1 = match.type_;
+	var match = _v0;
+	var _v1 = match.bM;
 	switch (_v1.$) {
-		case 'NormalType':
-			return $pablohirafuji$elm_markdown$Markdown$Inline$Text(match.text);
-		case 'HardLineBreakType':
+		case 0:
+			return $pablohirafuji$elm_markdown$Markdown$Inline$Text(match.aP);
+		case 1:
 			return $pablohirafuji$elm_markdown$Markdown$Inline$HardLineBreak;
-		case 'CodeType':
-			return $pablohirafuji$elm_markdown$Markdown$Inline$CodeInline(match.text);
-		case 'AutolinkType':
+		case 2:
+			return $pablohirafuji$elm_markdown$Markdown$Inline$CodeInline(match.aP);
+		case 3:
 			var _v2 = _v1.a;
 			var text = _v2.a;
 			var url = _v2.b;
@@ -27626,7 +24058,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$matchToInline = function (
 					[
 						$pablohirafuji$elm_markdown$Markdown$Inline$Text(text)
 					]));
-		case 'LinkType':
+		case 4:
 			var _v3 = _v1.a;
 			var url = _v3.a;
 			var maybeTitle = _v3.b;
@@ -27634,8 +24066,8 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$matchToInline = function (
 				$pablohirafuji$elm_markdown$Markdown$Inline$Link,
 				url,
 				maybeTitle,
-				$pablohirafuji$elm_markdown$Markdown$InlineParser$matchesToInlines(match.matches));
-		case 'ImageType':
+				$pablohirafuji$elm_markdown$Markdown$InlineParser$matchesToInlines(match.d));
+		case 5:
 			var _v4 = _v1.a;
 			var url = _v4.a;
 			var maybeTitle = _v4.b;
@@ -27643,62 +24075,53 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$matchToInline = function (
 				$pablohirafuji$elm_markdown$Markdown$Inline$Image,
 				url,
 				maybeTitle,
-				$pablohirafuji$elm_markdown$Markdown$InlineParser$matchesToInlines(match.matches));
-		case 'HtmlType':
+				$pablohirafuji$elm_markdown$Markdown$InlineParser$matchesToInlines(match.d));
+		case 6:
 			var model = _v1.a;
 			return A3(
 				$pablohirafuji$elm_markdown$Markdown$Inline$HtmlInline,
-				model.tag,
-				model.attributes,
-				$pablohirafuji$elm_markdown$Markdown$InlineParser$matchesToInlines(match.matches));
+				model.bJ,
+				model.V,
+				$pablohirafuji$elm_markdown$Markdown$InlineParser$matchesToInlines(match.d));
 		default:
 			var length = _v1.a;
 			return A2(
 				$pablohirafuji$elm_markdown$Markdown$Inline$Emphasis,
 				length,
-				$pablohirafuji$elm_markdown$Markdown$InlineParser$matchesToInlines(match.matches));
+				$pablohirafuji$elm_markdown$Markdown$InlineParser$matchesToInlines(match.d));
 	}
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$matchesToInlines = function (matches) {
 	return A2($elm$core$List$map, $pablohirafuji$elm_markdown$Markdown$InlineParser$matchToInline, matches);
 };
-var $pablohirafuji$elm_markdown$Markdown$InlineParser$Match = function (a) {
-	return {$: 'Match', a: a};
-};
+var $pablohirafuji$elm_markdown$Markdown$InlineParser$Match = $elm$core$Basics$identity;
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$prepareChildMatch = F2(
 	function (parentMatch, childMatch) {
-		return $pablohirafuji$elm_markdown$Markdown$InlineParser$Match(
-			_Utils_update(
-				childMatch,
-				{end: childMatch.end - parentMatch.textStart, start: childMatch.start - parentMatch.textStart, textEnd: childMatch.textEnd - parentMatch.textStart, textStart: childMatch.textStart - parentMatch.textStart}));
+		return _Utils_update(
+			childMatch,
+			{b4: childMatch.b4 - parentMatch.O, bG: childMatch.bG - parentMatch.O, aw: childMatch.aw - parentMatch.O, O: childMatch.O - parentMatch.O});
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$addChild = F2(
 	function (parentMatch, childMatch) {
-		return $pablohirafuji$elm_markdown$Markdown$InlineParser$Match(
-			_Utils_update(
-				parentMatch,
-				{
-					matches: A2(
-						$elm$core$List$cons,
-						A2($pablohirafuji$elm_markdown$Markdown$InlineParser$prepareChildMatch, parentMatch, childMatch),
-						parentMatch.matches)
-				}));
+		return _Utils_update(
+			parentMatch,
+			{
+				d: A2(
+					$elm$core$List$cons,
+					A2($pablohirafuji$elm_markdown$Markdown$InlineParser$prepareChildMatch, parentMatch, childMatch),
+					parentMatch.d)
+			});
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$organizeMatch = F2(
 	function (_v0, matches) {
-		var match = _v0.a;
+		var match = _v0;
 		if (!matches.b) {
 			return _List_fromArray(
-				[
-					$pablohirafuji$elm_markdown$Markdown$InlineParser$Match(match)
-				]);
+				[match]);
 		} else {
-			var prevMatch = matches.a.a;
+			var prevMatch = matches.a;
 			var matchesTail = matches.b;
-			return (_Utils_cmp(prevMatch.end, match.start) < 1) ? A2(
-				$elm$core$List$cons,
-				$pablohirafuji$elm_markdown$Markdown$InlineParser$Match(match),
-				matches) : (((_Utils_cmp(prevMatch.start, match.start) < 0) && (_Utils_cmp(prevMatch.end, match.end) > 0)) ? A2(
+			return (_Utils_cmp(prevMatch.b4, match.bG) < 1) ? A2($elm$core$List$cons, match, matches) : (((_Utils_cmp(prevMatch.bG, match.bG) < 0) && (_Utils_cmp(prevMatch.b4, match.b4) > 0)) ? A2(
 				$elm$core$List$cons,
 				A2($pablohirafuji$elm_markdown$Markdown$InlineParser$addChild, prevMatch, match),
 				matchesTail) : matches);
@@ -27709,61 +24132,55 @@ function $pablohirafuji$elm_markdown$Markdown$InlineParser$cyclic$organizeMatche
 		$elm$core$Basics$composeR,
 		$elm$core$List$sortBy(
 			function (_v0) {
-				var match = _v0.a;
-				return match.start;
+				var match = _v0;
+				return match.bG;
 			}),
 		A2(
 			$elm$core$Basics$composeR,
 			A2($elm$core$List$foldl, $pablohirafuji$elm_markdown$Markdown$InlineParser$organizeMatch, _List_Nil),
 			$elm$core$List$map(
 				function (_v1) {
-					var match = _v1.a;
-					return $pablohirafuji$elm_markdown$Markdown$InlineParser$Match(
-						_Utils_update(
-							match,
-							{
-								matches: $pablohirafuji$elm_markdown$Markdown$InlineParser$cyclic$organizeMatches()(match.matches)
-							}));
+					var match = _v1;
+					return _Utils_update(
+						match,
+						{
+							d: $pablohirafuji$elm_markdown$Markdown$InlineParser$cyclic$organizeMatches()(match.d)
+						});
 				})));
 }
-try {
-	var $pablohirafuji$elm_markdown$Markdown$InlineParser$organizeMatches = $pablohirafuji$elm_markdown$Markdown$InlineParser$cyclic$organizeMatches();
-	$pablohirafuji$elm_markdown$Markdown$InlineParser$cyclic$organizeMatches = function () {
-		return $pablohirafuji$elm_markdown$Markdown$InlineParser$organizeMatches;
-	};
-} catch ($) {
-	throw 'Some top-level definitions from `Markdown.InlineParser` are causing infinite recursion:\n\n  ┌─────┐\n  │    organizeMatches\n  └─────┘\n\nThese errors are very tricky, so read https://elm-lang.org/0.19.1/bad-recursion to learn how to fix it!';}
+var $pablohirafuji$elm_markdown$Markdown$InlineParser$organizeMatches = $pablohirafuji$elm_markdown$Markdown$InlineParser$cyclic$organizeMatches();
+$pablohirafuji$elm_markdown$Markdown$InlineParser$cyclic$organizeMatches = function () {
+	return $pablohirafuji$elm_markdown$Markdown$InlineParser$organizeMatches;
+};
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$organizeParserMatches = function (model) {
 	return _Utils_update(
 		model,
 		{
-			matches: $pablohirafuji$elm_markdown$Markdown$InlineParser$organizeMatches(model.matches)
+			d: $pablohirafuji$elm_markdown$Markdown$InlineParser$organizeMatches(model.d)
 		});
 };
-var $pablohirafuji$elm_markdown$Markdown$InlineParser$NormalType = {$: 'NormalType'};
+var $pablohirafuji$elm_markdown$Markdown$InlineParser$NormalType = {$: 0};
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$normalMatch = function (text) {
-	return $pablohirafuji$elm_markdown$Markdown$InlineParser$Match(
-		{
-			end: 0,
-			matches: _List_Nil,
-			start: 0,
-			text: $pablohirafuji$elm_markdown$Markdown$Helpers$formatStr(text),
-			textEnd: 0,
-			textStart: 0,
-			type_: $pablohirafuji$elm_markdown$Markdown$InlineParser$NormalType
-		});
+	return {
+		b4: 0,
+		d: _List_Nil,
+		bG: 0,
+		aP: $pablohirafuji$elm_markdown$Markdown$Helpers$formatStr(text),
+		aw: 0,
+		O: 0,
+		bM: $pablohirafuji$elm_markdown$Markdown$InlineParser$NormalType
+	};
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$parseTextMatch = F3(
 	function (rawText, _v2, parsedMatches) {
-		var matchModel = _v2.a;
-		var updtMatch = $pablohirafuji$elm_markdown$Markdown$InlineParser$Match(
-			_Utils_update(
-				matchModel,
-				{
-					matches: A3($pablohirafuji$elm_markdown$Markdown$InlineParser$parseTextMatches, matchModel.text, _List_Nil, matchModel.matches)
-				}));
+		var matchModel = _v2;
+		var updtMatch = _Utils_update(
+			matchModel,
+			{
+				d: A3($pablohirafuji$elm_markdown$Markdown$InlineParser$parseTextMatches, matchModel.aP, _List_Nil, matchModel.d)
+			});
 		if (!parsedMatches.b) {
-			var finalStr = A2($elm$core$String$dropLeft, matchModel.end, rawText);
+			var finalStr = A2($elm$core$String$dropLeft, matchModel.b4, rawText);
 			return $elm$core$String$isEmpty(finalStr) ? _List_fromArray(
 				[updtMatch]) : _List_fromArray(
 				[
@@ -27771,15 +24188,15 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$parseTextMatch = F3(
 					$pablohirafuji$elm_markdown$Markdown$InlineParser$normalMatch(finalStr)
 				]);
 		} else {
-			var matchHead = parsedMatches.a.a;
+			var matchHead = parsedMatches.a;
 			var matchesTail = parsedMatches.b;
-			return _Utils_eq(matchHead.type_, $pablohirafuji$elm_markdown$Markdown$InlineParser$NormalType) ? A2($elm$core$List$cons, updtMatch, parsedMatches) : (_Utils_eq(matchModel.end, matchHead.start) ? A2($elm$core$List$cons, updtMatch, parsedMatches) : ((_Utils_cmp(matchModel.end, matchHead.start) < 0) ? A2(
+			return _Utils_eq(matchHead.bM, $pablohirafuji$elm_markdown$Markdown$InlineParser$NormalType) ? A2($elm$core$List$cons, updtMatch, parsedMatches) : (_Utils_eq(matchModel.b4, matchHead.bG) ? A2($elm$core$List$cons, updtMatch, parsedMatches) : ((_Utils_cmp(matchModel.b4, matchHead.bG) < 0) ? A2(
 				$elm$core$List$cons,
 				updtMatch,
 				A2(
 					$elm$core$List$cons,
 					$pablohirafuji$elm_markdown$Markdown$InlineParser$normalMatch(
-						A3($elm$core$String$slice, matchModel.end, matchHead.start, rawText)),
+						A3($elm$core$String$slice, matchModel.b4, matchHead.bG, rawText)),
 					parsedMatches)) : parsedMatches));
 		}
 	});
@@ -27794,11 +24211,11 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$parseTextMatches = F3(
 							$pablohirafuji$elm_markdown$Markdown$InlineParser$normalMatch(rawText)
 						]);
 				} else {
-					var matchModel = parsedMatches.a.a;
-					return (matchModel.start > 0) ? A2(
+					var matchModel = parsedMatches.a;
+					return (matchModel.bG > 0) ? A2(
 						$elm$core$List$cons,
 						$pablohirafuji$elm_markdown$Markdown$InlineParser$normalMatch(
-							A2($elm$core$String$left, matchModel.start, rawText)),
+							A2($elm$core$String$left, matchModel.bG, rawText)),
 						parsedMatches) : parsedMatches;
 				}
 			} else {
@@ -27818,7 +24235,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$parseText = function (mode
 	return _Utils_update(
 		model,
 		{
-			matches: A3($pablohirafuji$elm_markdown$Markdown$InlineParser$parseTextMatches, model.rawText, _List_Nil, model.matches)
+			d: A3($pablohirafuji$elm_markdown$Markdown$InlineParser$parseTextMatches, model.x, _List_Nil, model.d)
 		});
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$angleBracketLTokenRegex = A2(
@@ -27827,14 +24244,14 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$angleBracketLTokenRegex = 
 	$elm$regex$Regex$fromString('(\\\\*)(\\<)'));
 var $elm$regex$Regex$find = _Regex_findAtMost(_Regex_infinity);
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$CharToken = function (a) {
-	return {$: 'CharToken', a: a};
+	return {$: 3, a: a};
 };
 var $pablohirafuji$elm_markdown$Markdown$Helpers$isEven = function (_int) {
 	return !A2($elm$core$Basics$modBy, 2, _int);
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToAngleBracketLToken = function (regMatch) {
-	var _v0 = regMatch.submatches;
-	if ((_v0.b && _v0.b.b) && (_v0.b.a.$ === 'Just')) {
+	var _v0 = regMatch.en;
+	if ((_v0.b && _v0.b.b) && (!_v0.b.a.$)) {
 		var maybeBackslashes = _v0.a;
 		var _v1 = _v0.b;
 		var delimiter = _v1.a.a;
@@ -27844,10 +24261,9 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToAngleBracketLTok
 			A2($elm$core$Maybe$map, $elm$core$String$length, maybeBackslashes));
 		return $pablohirafuji$elm_markdown$Markdown$Helpers$isEven(backslashesLength) ? $elm$core$Maybe$Just(
 			{
-				index: regMatch.index + backslashesLength,
-				length: 1,
-				meaning: $pablohirafuji$elm_markdown$Markdown$InlineParser$CharToken(
-					_Utils_chr('<'))
+				cj: regMatch.cj + backslashesLength,
+				m: 1,
+				g: $pablohirafuji$elm_markdown$Markdown$InlineParser$CharToken('<')
 			}) : $elm$core$Maybe$Nothing;
 	} else {
 		return $elm$core$Maybe$Nothing;
@@ -27864,11 +24280,11 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$angleBracketRTokenRegex = 
 	$elm$regex$Regex$never,
 	$elm$regex$Regex$fromString('(\\\\*)(\\>)'));
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$RightAngleBracket = function (a) {
-	return {$: 'RightAngleBracket', a: a};
+	return {$: 4, a: a};
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToAngleBracketRToken = function (regMatch) {
-	var _v0 = regMatch.submatches;
-	if ((_v0.b && _v0.b.b) && (_v0.b.a.$ === 'Just')) {
+	var _v0 = regMatch.en;
+	if ((_v0.b && _v0.b.b) && (!_v0.b.a.$)) {
 		var maybeBackslashes = _v0.a;
 		var _v1 = _v0.b;
 		var backslashesLength = A2(
@@ -27877,9 +24293,9 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToAngleBracketRTok
 			A2($elm$core$Maybe$map, $elm$core$String$length, maybeBackslashes));
 		return $elm$core$Maybe$Just(
 			{
-				index: regMatch.index + backslashesLength,
-				length: 1,
-				meaning: $pablohirafuji$elm_markdown$Markdown$InlineParser$RightAngleBracket(
+				cj: regMatch.cj + backslashesLength,
+				m: 1,
+				g: $pablohirafuji$elm_markdown$Markdown$InlineParser$RightAngleBracket(
 					!$pablohirafuji$elm_markdown$Markdown$Helpers$isEven(backslashesLength))
 			});
 	} else {
@@ -27898,7 +24314,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$asteriskEmphasisTokenRegex
 	$elm$regex$Regex$fromString('(\\\\*)([^*])?(\\*+)([^*])?'));
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$EmphasisToken = F2(
 	function (a, b) {
-		return {$: 'EmphasisToken', a: a, b: b};
+		return {$: 6, a: a, b: b};
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$punctuationRegex = A2(
 	$elm$core$Maybe$withDefault,
@@ -27933,8 +24349,8 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$getFringeRank = A2(
 	$elm$core$Maybe$withDefault(0));
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToEmphasisToken = F3(
 	function (_char, rawText, regMatch) {
-		var _v0 = regMatch.submatches;
-		if ((((_v0.b && _v0.b.b) && _v0.b.b.b) && (_v0.b.b.a.$ === 'Just')) && _v0.b.b.b.b) {
+		var _v0 = regMatch.en;
+		if ((((_v0.b && _v0.b.b) && _v0.b.b.b) && (!_v0.b.b.a.$)) && _v0.b.b.b.b) {
 			var maybeBackslashes = _v0.a;
 			var _v1 = _v0.b;
 			var maybeLeftFringe = _v1.a;
@@ -27946,8 +24362,8 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToEmphasisToken = 
 				$elm$core$Maybe$withDefault,
 				0,
 				A2($elm$core$Maybe$map, $elm$core$String$length, maybeLeftFringe));
-			var mLeftFringe = ((!(!regMatch.index)) && (!leftFringeLength)) ? $elm$core$Maybe$Just(
-				A3($elm$core$String$slice, regMatch.index - 1, regMatch.index, rawText)) : maybeLeftFringe;
+			var mLeftFringe = ((!(!regMatch.cj)) && (!leftFringeLength)) ? $elm$core$Maybe$Just(
+				A3($elm$core$String$slice, regMatch.cj - 1, regMatch.cj, rawText)) : maybeLeftFringe;
 			var backslashesLength = A2(
 				$elm$core$Maybe$withDefault,
 				0,
@@ -27959,16 +24375,14 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToEmphasisToken = 
 			var fringeRank = _Utils_Tuple2(
 				isEscaped ? 1 : $pablohirafuji$elm_markdown$Markdown$InlineParser$getFringeRank(mLeftFringe),
 				$pablohirafuji$elm_markdown$Markdown$InlineParser$getFringeRank(maybeRightFringe));
-			var index = ((regMatch.index + backslashesLength) + leftFringeLength) + (isEscaped ? 1 : 0);
-			return ((delimiterLength <= 0) || (_Utils_eq(
-				_char,
-				_Utils_chr('_')) && _Utils_eq(
+			var index = ((regMatch.cj + backslashesLength) + leftFringeLength) + (isEscaped ? 1 : 0);
+			return ((delimiterLength <= 0) || ((_char === '_') && _Utils_eq(
 				fringeRank,
 				_Utils_Tuple2(2, 2)))) ? $elm$core$Maybe$Nothing : $elm$core$Maybe$Just(
 				{
-					index: index,
-					length: delimiterLength,
-					meaning: A2($pablohirafuji$elm_markdown$Markdown$InlineParser$EmphasisToken, _char, fringeRank)
+					cj: index,
+					m: delimiterLength,
+					g: A2($pablohirafuji$elm_markdown$Markdown$InlineParser$EmphasisToken, _char, fringeRank)
 				});
 		} else {
 			return $elm$core$Maybe$Nothing;
@@ -27977,10 +24391,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToEmphasisToken = 
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$findAsteriskEmphasisTokens = function (str) {
 	return A2(
 		$elm$core$List$filterMap,
-		A2(
-			$pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToEmphasisToken,
-			_Utils_chr('*'),
-			str),
+		A2($pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToEmphasisToken, '*', str),
 		A2($elm$regex$Regex$find, $pablohirafuji$elm_markdown$Markdown$InlineParser$asteriskEmphasisTokenRegex, str));
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$codeTokenRegex = A2(
@@ -27988,11 +24399,11 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$codeTokenRegex = A2(
 	$elm$regex$Regex$never,
 	$elm$regex$Regex$fromString('(\\\\*)(\\`+)'));
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$CodeToken = function (a) {
-	return {$: 'CodeToken', a: a};
+	return {$: 0, a: a};
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToCodeToken = function (regMatch) {
-	var _v0 = regMatch.submatches;
-	if ((_v0.b && _v0.b.b) && (_v0.b.a.$ === 'Just')) {
+	var _v0 = regMatch.en;
+	if ((_v0.b && _v0.b.b) && (!_v0.b.a.$)) {
 		var maybeBackslashes = _v0.a;
 		var _v1 = _v0.b;
 		var backtick = _v1.a.a;
@@ -28002,9 +24413,9 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToCodeToken = func
 			A2($elm$core$Maybe$map, $elm$core$String$length, maybeBackslashes));
 		return $elm$core$Maybe$Just(
 			{
-				index: regMatch.index + backslashesLength,
-				length: $elm$core$String$length(backtick),
-				meaning: $pablohirafuji$elm_markdown$Markdown$InlineParser$CodeToken(
+				cj: regMatch.cj + backslashesLength,
+				m: $elm$core$String$length(backtick),
+				g: $pablohirafuji$elm_markdown$Markdown$InlineParser$CodeToken(
 					!$pablohirafuji$elm_markdown$Markdown$Helpers$isEven(backslashesLength))
 			});
 	} else {
@@ -28021,25 +24432,25 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$hardBreakTokenRegex = A2(
 	$elm$core$Maybe$withDefault,
 	$elm$regex$Regex$never,
 	$elm$regex$Regex$fromString('(?:(\\\\+)|( {2,}))\\n'));
-var $pablohirafuji$elm_markdown$Markdown$InlineParser$HardLineBreakToken = {$: 'HardLineBreakToken'};
+var $pablohirafuji$elm_markdown$Markdown$InlineParser$HardLineBreakToken = {$: 8};
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToHardBreakToken = function (regMatch) {
-	var _v0 = regMatch.submatches;
+	var _v0 = regMatch.en;
 	_v0$2:
 	while (true) {
 		if (_v0.b) {
-			if (_v0.a.$ === 'Just') {
+			if (!_v0.a.$) {
 				var backslashes = _v0.a.a;
 				var backslashesLength = $elm$core$String$length(backslashes);
 				return (!$pablohirafuji$elm_markdown$Markdown$Helpers$isEven(backslashesLength)) ? $elm$core$Maybe$Just(
-					{index: (regMatch.index + backslashesLength) - 1, length: 2, meaning: $pablohirafuji$elm_markdown$Markdown$InlineParser$HardLineBreakToken}) : $elm$core$Maybe$Nothing;
+					{cj: (regMatch.cj + backslashesLength) - 1, m: 2, g: $pablohirafuji$elm_markdown$Markdown$InlineParser$HardLineBreakToken}) : $elm$core$Maybe$Nothing;
 			} else {
-				if (_v0.b.b && (_v0.b.a.$ === 'Just')) {
+				if (_v0.b.b && (!_v0.b.a.$)) {
 					var _v1 = _v0.b;
 					return $elm$core$Maybe$Just(
 						{
-							index: regMatch.index,
-							length: $elm$core$String$length(regMatch.match),
-							meaning: $pablohirafuji$elm_markdown$Markdown$InlineParser$HardLineBreakToken
+							cj: regMatch.cj,
+							m: $elm$core$String$length(regMatch.dS),
+							g: $pablohirafuji$elm_markdown$Markdown$InlineParser$HardLineBreakToken
 						});
 				} else {
 					break _v0$2;
@@ -28052,25 +24463,25 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToHardBreakToken =
 	return $elm$core$Maybe$Nothing;
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToSoftHardBreakToken = function (regMatch) {
-	var _v0 = regMatch.submatches;
+	var _v0 = regMatch.en;
 	_v0$2:
 	while (true) {
 		if (_v0.b) {
-			if (_v0.a.$ === 'Just') {
+			if (!_v0.a.$) {
 				var backslashes = _v0.a.a;
 				var backslashesLength = $elm$core$String$length(backslashes);
 				return $pablohirafuji$elm_markdown$Markdown$Helpers$isEven(backslashesLength) ? $elm$core$Maybe$Just(
-					{index: regMatch.index + backslashesLength, length: 1, meaning: $pablohirafuji$elm_markdown$Markdown$InlineParser$HardLineBreakToken}) : $elm$core$Maybe$Just(
-					{index: (regMatch.index + backslashesLength) - 1, length: 2, meaning: $pablohirafuji$elm_markdown$Markdown$InlineParser$HardLineBreakToken});
+					{cj: regMatch.cj + backslashesLength, m: 1, g: $pablohirafuji$elm_markdown$Markdown$InlineParser$HardLineBreakToken}) : $elm$core$Maybe$Just(
+					{cj: (regMatch.cj + backslashesLength) - 1, m: 2, g: $pablohirafuji$elm_markdown$Markdown$InlineParser$HardLineBreakToken});
 			} else {
 				if (_v0.b.b) {
 					var _v1 = _v0.b;
 					var maybeSpaces = _v1.a;
 					return $elm$core$Maybe$Just(
 						{
-							index: regMatch.index,
-							length: $elm$core$String$length(regMatch.match),
-							meaning: $pablohirafuji$elm_markdown$Markdown$InlineParser$HardLineBreakToken
+							cj: regMatch.cj,
+							m: $elm$core$String$length(regMatch.dS),
+							g: $pablohirafuji$elm_markdown$Markdown$InlineParser$HardLineBreakToken
 						});
 				} else {
 					break _v0$2;
@@ -28101,8 +24512,8 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$linkImageCloseTokenRegex =
 	$elm$regex$Regex$never,
 	$elm$regex$Regex$fromString('(\\\\*)(\\])'));
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToLinkImageCloseToken = function (regMatch) {
-	var _v0 = regMatch.submatches;
-	if ((_v0.b && _v0.b.b) && (_v0.b.a.$ === 'Just')) {
+	var _v0 = regMatch.en;
+	if ((_v0.b && _v0.b.b) && (!_v0.b.a.$)) {
 		var maybeBackslashes = _v0.a;
 		var _v1 = _v0.b;
 		var delimiter = _v1.a.a;
@@ -28112,10 +24523,9 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToLinkImageCloseTo
 			A2($elm$core$Maybe$map, $elm$core$String$length, maybeBackslashes));
 		return $pablohirafuji$elm_markdown$Markdown$Helpers$isEven(backslashesLength) ? $elm$core$Maybe$Just(
 			{
-				index: regMatch.index + backslashesLength,
-				length: 1,
-				meaning: $pablohirafuji$elm_markdown$Markdown$InlineParser$CharToken(
-					_Utils_chr(']'))
+				cj: regMatch.cj + backslashesLength,
+				m: 1,
+				g: $pablohirafuji$elm_markdown$Markdown$InlineParser$CharToken(']')
 			}) : $elm$core$Maybe$Nothing;
 	} else {
 		return $elm$core$Maybe$Nothing;
@@ -28131,13 +24541,13 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$linkImageOpenTokenRegex = 
 	$elm$core$Maybe$withDefault,
 	$elm$regex$Regex$never,
 	$elm$regex$Regex$fromString('(\\\\*)(\\!)?(\\[)'));
-var $pablohirafuji$elm_markdown$Markdown$InlineParser$ImageOpenToken = {$: 'ImageOpenToken'};
+var $pablohirafuji$elm_markdown$Markdown$InlineParser$ImageOpenToken = {$: 2};
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$LinkOpenToken = function (a) {
-	return {$: 'LinkOpenToken', a: a};
+	return {$: 1, a: a};
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToLinkImageOpenToken = function (regMatch) {
-	var _v0 = regMatch.submatches;
-	if (((_v0.b && _v0.b.b) && _v0.b.b.b) && (_v0.b.b.a.$ === 'Just')) {
+	var _v0 = regMatch.en;
+	if (((_v0.b && _v0.b.b) && _v0.b.b.b) && (!_v0.b.b.a.$)) {
 		var maybeBackslashes = _v0.a;
 		var _v1 = _v0.b;
 		var maybeImageOpen = _v1.a;
@@ -28148,7 +24558,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToLinkImageOpenTok
 			0,
 			A2($elm$core$Maybe$map, $elm$core$String$length, maybeBackslashes));
 		var isEscaped = !$pablohirafuji$elm_markdown$Markdown$Helpers$isEven(backslashesLength);
-		var index = (regMatch.index + backslashesLength) + ((isEscaped && _Utils_eq(
+		var index = (regMatch.cj + backslashesLength) + ((isEscaped && _Utils_eq(
 			maybeImageOpen,
 			$elm$core$Maybe$Just('!'))) ? 1 : 0);
 		var meaning = isEscaped ? A2(
@@ -28170,7 +24580,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToLinkImageOpenTok
 			meaning,
 			$elm$core$Maybe$Just($pablohirafuji$elm_markdown$Markdown$InlineParser$ImageOpenToken)) ? 2 : 1;
 		var toModel = function (m) {
-			return {index: index, length: length, meaning: m};
+			return {cj: index, m: length, g: m};
 		};
 		return A2($elm$core$Maybe$map, toModel, meaning);
 	} else {
@@ -28190,57 +24600,54 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$underlineEmphasisTokenRege
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$findUnderlineEmphasisTokens = function (str) {
 	return A2(
 		$elm$core$List$filterMap,
-		A2(
-			$pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToEmphasisToken,
-			_Utils_chr('_'),
-			str),
+		A2($pablohirafuji$elm_markdown$Markdown$InlineParser$regMatchToEmphasisToken, '_', str),
 		A2($elm$regex$Regex$find, $pablohirafuji$elm_markdown$Markdown$InlineParser$underlineEmphasisTokenRegex, str));
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$tokenize = function (model) {
 	return _Utils_update(
 		model,
 		{
-			tokens: A2(
+			i: A2(
 				$elm$core$List$sortBy,
 				function ($) {
-					return $.index;
+					return $.cj;
 				},
 				_Utils_ap(
-					$pablohirafuji$elm_markdown$Markdown$InlineParser$findAngleBracketRTokens(model.rawText),
+					$pablohirafuji$elm_markdown$Markdown$InlineParser$findAngleBracketRTokens(model.x),
 					_Utils_ap(
-						$pablohirafuji$elm_markdown$Markdown$InlineParser$findAngleBracketLTokens(model.rawText),
+						$pablohirafuji$elm_markdown$Markdown$InlineParser$findAngleBracketLTokens(model.x),
 						_Utils_ap(
-							A2($pablohirafuji$elm_markdown$Markdown$InlineParser$findHardBreakTokens, model.options.softAsHardLineBreak, model.rawText),
+							A2($pablohirafuji$elm_markdown$Markdown$InlineParser$findHardBreakTokens, model.d6.el, model.x),
 							_Utils_ap(
-								$pablohirafuji$elm_markdown$Markdown$InlineParser$findLinkImageCloseTokens(model.rawText),
+								$pablohirafuji$elm_markdown$Markdown$InlineParser$findLinkImageCloseTokens(model.x),
 								_Utils_ap(
-									$pablohirafuji$elm_markdown$Markdown$InlineParser$findLinkImageOpenTokens(model.rawText),
+									$pablohirafuji$elm_markdown$Markdown$InlineParser$findLinkImageOpenTokens(model.x),
 									_Utils_ap(
-										$pablohirafuji$elm_markdown$Markdown$InlineParser$findUnderlineEmphasisTokens(model.rawText),
+										$pablohirafuji$elm_markdown$Markdown$InlineParser$findUnderlineEmphasisTokens(model.x),
 										_Utils_ap(
-											$pablohirafuji$elm_markdown$Markdown$InlineParser$findAsteriskEmphasisTokens(model.rawText),
-											$pablohirafuji$elm_markdown$Markdown$InlineParser$findCodeTokens(model.rawText)))))))))
+											$pablohirafuji$elm_markdown$Markdown$InlineParser$findAsteriskEmphasisTokens(model.x),
+											$pablohirafuji$elm_markdown$Markdown$InlineParser$findCodeTokens(model.x)))))))))
 		});
 };
-var $pablohirafuji$elm_markdown$Markdown$InlineParser$CodeType = {$: 'CodeType'};
+var $pablohirafuji$elm_markdown$Markdown$InlineParser$CodeType = {$: 2};
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$EmphasisType = function (a) {
-	return {$: 'EmphasisType', a: a};
+	return {$: 7, a: a};
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$HtmlType = function (a) {
-	return {$: 'HtmlType', a: a};
+	return {$: 6, a: a};
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$ImageType = function (a) {
-	return {$: 'ImageType', a: a};
+	return {$: 5, a: a};
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$LinkType = function (a) {
-	return {$: 'LinkType', a: a};
+	return {$: 4, a: a};
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$addMatch = F2(
 	function (model, match) {
 		return _Utils_update(
 			model,
 			{
-				matches: A2($elm$core$List$cons, match, model.matches)
+				d: A2($elm$core$List$cons, match, model.d)
 			});
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$addToken = F2(
@@ -28248,20 +24655,20 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$addToken = F2(
 		return _Utils_update(
 			model,
 			{
-				tokens: A2($elm$core$List$cons, token, model.tokens)
+				i: A2($elm$core$List$cons, token, model.i)
 			});
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$applyTTM = F2(
 	function (finderFunction, model) {
 		return finderFunction(
 			_Utils_Tuple2(
-				model.tokens,
+				model.i,
 				_Utils_update(
 					model,
-					{tokens: _List_Nil})));
+					{i: _List_Nil})));
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$AutolinkType = function (a) {
-	return {$: 'AutolinkType', a: a};
+	return {$: 3, a: a};
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$decodeUrlRegex = A2(
 	$elm$core$Maybe$withDefault,
@@ -28277,26 +24684,24 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$encodeUrl = A2(
 		function (match) {
 			return A2(
 				$elm$core$Maybe$withDefault,
-				match.match,
-				$elm$url$Url$percentDecode(match.match));
+				match.dS,
+				$elm$url$Url$percentDecode(match.dS));
 		}));
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$urlRegex = A2(
 	$elm$core$Maybe$withDefault,
 	$elm$regex$Regex$never,
 	$elm$regex$Regex$fromString('^([A-Za-z][A-Za-z0-9.+\\-]{1,31}:[^<>\\x00-\\x20]*)$'));
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$autolinkToMatch = function (_v0) {
-	var match = _v0.a;
-	return A2($elm$regex$Regex$contains, $pablohirafuji$elm_markdown$Markdown$InlineParser$urlRegex, match.text) ? $elm$core$Result$Ok(
-		$pablohirafuji$elm_markdown$Markdown$InlineParser$Match(
-			_Utils_update(
-				match,
-				{
-					type_: $pablohirafuji$elm_markdown$Markdown$InlineParser$AutolinkType(
-						_Utils_Tuple2(
-							match.text,
-							$pablohirafuji$elm_markdown$Markdown$InlineParser$encodeUrl(match.text)))
-				}))) : $elm$core$Result$Err(
-		$pablohirafuji$elm_markdown$Markdown$InlineParser$Match(match));
+	var match = _v0;
+	return A2($elm$regex$Regex$contains, $pablohirafuji$elm_markdown$Markdown$InlineParser$urlRegex, match.aP) ? $elm$core$Result$Ok(
+		_Utils_update(
+			match,
+			{
+				bM: $pablohirafuji$elm_markdown$Markdown$InlineParser$AutolinkType(
+					_Utils_Tuple2(
+						match.aP,
+						$pablohirafuji$elm_markdown$Markdown$InlineParser$encodeUrl(match.aP)))
+			})) : $elm$core$Result$Err(match);
 };
 var $pablohirafuji$elm_markdown$Markdown$Helpers$whiteSpaceChars = ' \\t\\f\\v\\r\\n';
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$hrefRegex = '(?:<([^<>' + ($pablohirafuji$elm_markdown$Markdown$Helpers$whiteSpaceChars + (']*)>|([^' + ($pablohirafuji$elm_markdown$Markdown$Helpers$whiteSpaceChars + ('\\(\\)\\\\]*(?:\\\\.[^' + ($pablohirafuji$elm_markdown$Markdown$Helpers$whiteSpaceChars + '\\(\\)\\\\]*)*))')))));
@@ -28316,7 +24721,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$prepareUrlAndTitle = funct
 var $pablohirafuji$elm_markdown$Markdown$Helpers$returnFirstJust = function (maybes) {
 	var process = F2(
 		function (a, maybeFound) {
-			if (maybeFound.$ === 'Just') {
+			if (!maybeFound.$) {
 				var found = maybeFound.a;
 				return $elm$core$Maybe$Just(found);
 			} else {
@@ -28327,7 +24732,7 @@ var $pablohirafuji$elm_markdown$Markdown$Helpers$returnFirstJust = function (may
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$inlineLinkTypeOrImageTypeRegexToMatch = F3(
 	function (matchModel, model, regexMatch) {
-		var _v0 = regexMatch.submatches;
+		var _v0 = regexMatch.en;
 		if ((((_v0.b && _v0.b.b) && _v0.b.b.b) && _v0.b.b.b.b) && _v0.b.b.b.b.b) {
 			var maybeRawUrlAngleBrackets = _v0.a;
 			var _v1 = _v0.b;
@@ -28342,22 +24747,21 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$inlineLinkTypeOrImageTypeR
 				_List_fromArray(
 					[maybeTitleSingleQuotes, maybeTitleDoubleQuotes, maybeTitleParenthesis]));
 			var toMatch = function (rawUrl) {
-				return $pablohirafuji$elm_markdown$Markdown$InlineParser$Match(
-					_Utils_update(
-						matchModel,
-						{
-							end: matchModel.end + $elm$core$String$length(regexMatch.match),
-							type_: function () {
-								var _v5 = matchModel.type_;
-								if (_v5.$ === 'ImageType') {
-									return $pablohirafuji$elm_markdown$Markdown$InlineParser$ImageType;
-								} else {
-									return $pablohirafuji$elm_markdown$Markdown$InlineParser$LinkType;
-								}
-							}()(
-								$pablohirafuji$elm_markdown$Markdown$InlineParser$prepareUrlAndTitle(
-									_Utils_Tuple2(rawUrl, maybeTitle)))
-						}));
+				return _Utils_update(
+					matchModel,
+					{
+						b4: matchModel.b4 + $elm$core$String$length(regexMatch.dS),
+						bM: function () {
+							var _v5 = matchModel.bM;
+							if (_v5.$ === 5) {
+								return $pablohirafuji$elm_markdown$Markdown$InlineParser$ImageType;
+							} else {
+								return $pablohirafuji$elm_markdown$Markdown$InlineParser$LinkType;
+							}
+						}()(
+							$pablohirafuji$elm_markdown$Markdown$InlineParser$prepareUrlAndTitle(
+								_Utils_Tuple2(rawUrl, maybeTitle)))
+					});
 			};
 			var maybeRawUrl = $pablohirafuji$elm_markdown$Markdown$Helpers$returnFirstJust(
 				_List_fromArray(
@@ -28371,14 +24775,11 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$inlineLinkTypeOrImageTypeR
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$checkForInlineLinkTypeOrImageType = function (_v0) {
 	var remainText = _v0.a;
-	var tempMatch = _v0.b.a;
+	var tempMatch = _v0.b;
 	var model = _v0.c;
 	return A2(
 		$elm$core$Result$fromMaybe,
-		_Utils_Tuple3(
-			remainText,
-			$pablohirafuji$elm_markdown$Markdown$InlineParser$Match(tempMatch),
-			model),
+		_Utils_Tuple3(remainText, tempMatch, model),
 		A2(
 			$elm$core$Maybe$map,
 			$pablohirafuji$elm_markdown$Markdown$InlineParser$addMatch(model),
@@ -28417,33 +24818,32 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$refRegexToMatch = F3(
 				A2(
 					$elm$core$Basics$composeR,
 					function ($) {
-						return $.match;
+						return $.dS;
 					},
 					$elm$core$String$length),
 				maybeRegexMatch));
 		var toMatch = function (urlTitle) {
-			return $pablohirafuji$elm_markdown$Markdown$InlineParser$Match(
-				_Utils_update(
-					matchModel,
-					{
-						end: matchModel.end + regexMatchLength,
-						type_: function () {
-							var _v0 = matchModel.type_;
-							if (_v0.$ === 'ImageType') {
-								return $pablohirafuji$elm_markdown$Markdown$InlineParser$ImageType;
-							} else {
-								return $pablohirafuji$elm_markdown$Markdown$InlineParser$LinkType;
-							}
-						}()(
-							$pablohirafuji$elm_markdown$Markdown$InlineParser$prepareUrlAndTitle(urlTitle))
-					}));
+			return _Utils_update(
+				matchModel,
+				{
+					b4: matchModel.b4 + regexMatchLength,
+					bM: function () {
+						var _v0 = matchModel.bM;
+						if (_v0.$ === 5) {
+							return $pablohirafuji$elm_markdown$Markdown$InlineParser$ImageType;
+						} else {
+							return $pablohirafuji$elm_markdown$Markdown$InlineParser$LinkType;
+						}
+					}()(
+						$pablohirafuji$elm_markdown$Markdown$InlineParser$prepareUrlAndTitle(urlTitle))
+				});
 		};
 		var refLabel = function (str) {
-			return $elm$core$String$isEmpty(str) ? matchModel.text : str;
+			return $elm$core$String$isEmpty(str) ? matchModel.aP : str;
 		}(
 			A2(
 				$elm$core$Maybe$withDefault,
-				matchModel.text,
+				matchModel.aP,
 				A2(
 					$elm$core$Maybe$withDefault,
 					$elm$core$Maybe$Nothing,
@@ -28455,26 +24855,23 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$refRegexToMatch = F3(
 							A2(
 								$elm$core$Basics$composeR,
 								function ($) {
-									return $.submatches;
+									return $.en;
 								},
 								$elm$core$List$head),
 							maybeRegexMatch)))));
 		var maybeRefItem = A2(
 			$elm$core$Dict$get,
 			$pablohirafuji$elm_markdown$Markdown$Helpers$prepareRefLabel(refLabel),
-			model.refs);
+			model.eb);
 		return A2($elm$core$Maybe$map, toMatch, maybeRefItem);
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$checkForRefLinkTypeOrImageType = function (_v0) {
 	var remainText = _v0.a;
-	var tempMatch = _v0.b.a;
+	var tempMatch = _v0.b;
 	var model = _v0.c;
 	return A2(
 		$elm$core$Result$fromMaybe,
-		_Utils_Tuple3(
-			remainText,
-			$pablohirafuji$elm_markdown$Markdown$InlineParser$Match(tempMatch),
-			model),
+		_Utils_Tuple3(remainText, tempMatch, model),
 		A2(
 			$elm$core$Maybe$map,
 			$pablohirafuji$elm_markdown$Markdown$InlineParser$addMatch(model),
@@ -28486,20 +24883,20 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$checkForRefLinkTypeOrImage
 					A3($elm$regex$Regex$findAtMost, 1, $pablohirafuji$elm_markdown$Markdown$InlineParser$refLabelRegex, remainText)))));
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$checkParsedAheadOverlapping = function (parser) {
-	var _v0 = parser.matches;
+	var _v0 = parser.d;
 	if (!_v0.b) {
-		return $elm$core$Result$Err(_Utils_Tuple0);
+		return $elm$core$Result$Err(0);
 	} else {
-		var match = _v0.a.a;
+		var match = _v0.a;
 		var remainMatches = _v0.b;
 		var overlappingMatches = A2(
 			$elm$core$List$filter,
 			function (_v1) {
-				var testMatch = _v1.a;
-				return (_Utils_cmp(match.end, testMatch.start) > 0) && (_Utils_cmp(match.end, testMatch.end) < 0);
+				var testMatch = _v1;
+				return (_Utils_cmp(match.b4, testMatch.bG) > 0) && (_Utils_cmp(match.b4, testMatch.b4) < 0);
 			},
 			remainMatches);
-		return ($elm$core$List$isEmpty(remainMatches) || $elm$core$List$isEmpty(overlappingMatches)) ? $elm$core$Result$Ok(parser) : $elm$core$Result$Err(_Utils_Tuple0);
+		return ($elm$core$List$isEmpty(remainMatches) || $elm$core$List$isEmpty(overlappingMatches)) ? $elm$core$Result$Ok(parser) : $elm$core$Result$Err(0);
 	}
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$emailRegex = A2(
@@ -28507,25 +24904,23 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$emailRegex = A2(
 	$elm$regex$Regex$never,
 	$elm$regex$Regex$fromString('^([a-zA-Z0-9.!#$%&\'*+\\/=?^_`{|}~\\-]+@[a-zA-Z0-9](?:[a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?)*)$'));
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$emailAutolinkTypeToMatch = function (_v0) {
-	var match = _v0.a;
-	return A2($elm$regex$Regex$contains, $pablohirafuji$elm_markdown$Markdown$InlineParser$emailRegex, match.text) ? $elm$core$Result$Ok(
-		$pablohirafuji$elm_markdown$Markdown$InlineParser$Match(
-			_Utils_update(
-				match,
-				{
-					type_: $pablohirafuji$elm_markdown$Markdown$InlineParser$AutolinkType(
-						_Utils_Tuple2(
-							match.text,
-							'mailto:' + $pablohirafuji$elm_markdown$Markdown$InlineParser$encodeUrl(match.text)))
-				}))) : $elm$core$Result$Err(
-		$pablohirafuji$elm_markdown$Markdown$InlineParser$Match(match));
+	var match = _v0;
+	return A2($elm$regex$Regex$contains, $pablohirafuji$elm_markdown$Markdown$InlineParser$emailRegex, match.aP) ? $elm$core$Result$Ok(
+		_Utils_update(
+			match,
+			{
+				bM: $pablohirafuji$elm_markdown$Markdown$InlineParser$AutolinkType(
+					_Utils_Tuple2(
+						match.aP,
+						'mailto:' + $pablohirafuji$elm_markdown$Markdown$InlineParser$encodeUrl(match.aP)))
+			})) : $elm$core$Result$Err(match);
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$filterTokens = F2(
 	function (filter, model) {
 		return _Utils_update(
 			model,
 			{
-				tokens: A2($elm$core$List$filter, filter, model.tokens)
+				i: A2($elm$core$List$filter, filter, model.i)
 			});
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$findToken = F2(
@@ -28535,7 +24930,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$findToken = F2(
 				var maybeToken = _v2.a;
 				var innerTokens = _v2.b;
 				var remainTokens = _v2.c;
-				if (maybeToken.$ === 'Nothing') {
+				if (maybeToken.$ === 1) {
 					return isToken(token) ? _Utils_Tuple3(
 						$elm$core$Maybe$Just(token),
 						innerTokens,
@@ -28573,17 +24968,17 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$findToken = F2(
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$HtmlModel = F2(
 	function (tag, attributes) {
-		return {attributes: attributes, tag: tag};
+		return {V: attributes, bJ: tag};
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$HtmlToken = F2(
 	function (a, b) {
-		return {$: 'HtmlToken', a: a, b: b};
+		return {$: 5, a: a, b: b};
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$attributesFromRegex = function (regexMatch) {
-	var _v0 = regexMatch.submatches;
+	var _v0 = regexMatch.en;
 	_v0$2:
 	while (true) {
-		if (_v0.b && (_v0.a.$ === 'Just')) {
+		if (_v0.b && (!_v0.a.$)) {
 			if (_v0.a.a === '') {
 				return $elm$core$Maybe$Nothing;
 			} else {
@@ -28620,8 +25015,8 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$applyAttributesRegex = A2(
 	$elm$core$List$filterMap($pablohirafuji$elm_markdown$Markdown$InlineParser$attributesFromRegex));
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$htmlFromRegex = F3(
 	function (model, match, regexMatch) {
-		var _v0 = regexMatch.submatches;
-		if ((((_v0.b && _v0.b.b) && (_v0.b.a.$ === 'Just')) && _v0.b.b.b) && _v0.b.b.b.b) {
+		var _v0 = regexMatch.en;
+		if ((((_v0.b && _v0.b.b) && (!_v0.b.a.$)) && _v0.b.b.b) && _v0.b.b.b.b) {
 			var maybeClose = _v0.a;
 			var _v1 = _v0.b;
 			var tag = _v1.a.a;
@@ -28634,9 +25029,9 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$htmlFromRegex = F3(
 					$pablohirafuji$elm_markdown$Markdown$InlineParser$addToken,
 					model,
 					{
-						index: match.start,
-						length: match.end - match.start,
-						meaning: A2(
+						cj: match.bG,
+						m: match.b4 - match.bG,
+						g: A2(
 							$pablohirafuji$elm_markdown$Markdown$InlineParser$HtmlToken,
 							_Utils_eq(maybeClose, $elm$core$Maybe$Nothing) && _Utils_eq(maybeSelfClosing, $elm$core$Maybe$Nothing),
 							A2($pablohirafuji$elm_markdown$Markdown$InlineParser$HtmlModel, tag, attrs))
@@ -28656,14 +25051,14 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$htmlFromRegex = F3(
 				_List_Nil,
 				A2($elm$core$Maybe$map, $pablohirafuji$elm_markdown$Markdown$InlineParser$applyAttributesRegex, maybeAttributes));
 			var noAttributesInCloseTag = _Utils_eq(maybeClose, $elm$core$Maybe$Nothing) || ((!_Utils_eq(maybeClose, $elm$core$Maybe$Nothing)) && _Utils_eq(attributes, _List_Nil));
-			var _v4 = model.options.rawHtml;
+			var _v4 = model.d6.ea;
 			switch (_v4.$) {
-				case 'ParseUnsafe':
+				case 0:
 					return noAttributesInCloseTag ? $elm$core$Maybe$Just(
 						updateModel(attributes)) : $elm$core$Maybe$Nothing;
-				case 'Sanitize':
-					var allowedHtmlElements = _v4.a.allowedHtmlElements;
-					var allowedHtmlAttributes = _v4.a.allowedHtmlAttributes;
+				case 1:
+					var allowedHtmlElements = _v4.a.bS;
+					var allowedHtmlAttributes = _v4.a.bR;
 					return (A2($elm$core$List$member, tag, allowedHtmlElements) && noAttributesInCloseTag) ? $elm$core$Maybe$Just(
 						updateModel(
 							A2(filterAttributes, attributes, allowedHtmlAttributes))) : $elm$core$Maybe$Nothing;
@@ -28680,44 +25075,44 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$htmlRegex = A2(
 	$elm$regex$Regex$fromString('^(\\/)?([a-zA-Z][a-zA-Z0-9\\-]*)(?:\\s+([^<>]*?))?(\\/)?$'));
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$htmlToToken = F2(
 	function (model, _v0) {
-		var match = _v0.a;
-		var _v1 = model.options.rawHtml;
-		if (_v1.$ === 'DontParse') {
+		var match = _v0;
+		var _v1 = model.d6.ea;
+		if (_v1.$ === 2) {
 			return $elm$core$Maybe$Nothing;
 		} else {
 			return A2(
 				$elm$core$Maybe$andThen,
 				A2($pablohirafuji$elm_markdown$Markdown$InlineParser$htmlFromRegex, model, match),
 				$elm$core$List$head(
-					A3($elm$regex$Regex$findAtMost, 1, $pablohirafuji$elm_markdown$Markdown$InlineParser$htmlRegex, match.text)));
+					A3($elm$regex$Regex$findAtMost, 1, $pablohirafuji$elm_markdown$Markdown$InlineParser$htmlRegex, match.aP)));
 		}
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$isCloseToken = F2(
 	function (htmlModel, token) {
-		var _v0 = token.meaning;
-		if ((_v0.$ === 'HtmlToken') && (!_v0.a)) {
+		var _v0 = token.g;
+		if ((_v0.$ === 5) && (!_v0.a)) {
 			var htmlModel_ = _v0.b;
-			return _Utils_eq(htmlModel.tag, htmlModel_.tag);
+			return _Utils_eq(htmlModel.bJ, htmlModel_.bJ);
 		} else {
 			return false;
 		}
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$isCodeTokenPair = F2(
 	function (closeToken, openToken) {
-		var _v0 = openToken.meaning;
-		if (_v0.$ === 'CodeToken') {
+		var _v0 = openToken.g;
+		if (!_v0.$) {
 			var isEscaped = _v0.a;
-			return isEscaped ? _Utils_eq(openToken.length - 1, closeToken.length) : _Utils_eq(openToken.length, closeToken.length);
+			return isEscaped ? _Utils_eq(openToken.m - 1, closeToken.m) : _Utils_eq(openToken.m, closeToken.m);
 		} else {
 			return false;
 		}
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$isLinkTypeOrImageOpenToken = function (token) {
-	var _v0 = token.meaning;
+	var _v0 = token.g;
 	switch (_v0.$) {
-		case 'LinkOpenToken':
+		case 1:
 			return true;
-		case 'ImageOpenToken':
+		case 2:
 			return true;
 		default:
 			return false;
@@ -28725,19 +25120,19 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$isLinkTypeOrImageOpenToken
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$isOpenEmphasisToken = F2(
 	function (closeToken, openToken) {
-		var _v0 = openToken.meaning;
-		if (_v0.$ === 'EmphasisToken') {
+		var _v0 = openToken.g;
+		if (_v0.$ === 6) {
 			var openChar = _v0.a;
 			var _v1 = _v0.b;
 			var openLR = _v1.a;
 			var openRR = _v1.b;
-			var _v2 = closeToken.meaning;
-			if (_v2.$ === 'EmphasisToken') {
+			var _v2 = closeToken.g;
+			if (_v2.$ === 6) {
 				var closeChar = _v2.a;
 				var _v3 = _v2.b;
 				var closeLR = _v3.a;
 				var closeRR = _v3.b;
-				return _Utils_eq(openChar, closeChar) ? ((_Utils_eq(openLR, openRR) || _Utils_eq(closeLR, closeRR)) ? (!(!A2($elm$core$Basics$modBy, 3, closeToken.length + openToken.length))) : true) : false;
+				return _Utils_eq(openChar, closeChar) ? ((_Utils_eq(openLR, openRR) || _Utils_eq(closeLR, closeRR)) ? (!(!A2($elm$core$Basics$modBy, 3, closeToken.m + openToken.m))) : true) : false;
 			} else {
 				return false;
 			}
@@ -28748,21 +25143,20 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$isOpenEmphasisToken = F2(
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$voidHtmlTags = _List_fromArray(
 	['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$isVoidTag = function (htmlModel) {
-	return A2($elm$core$List$member, htmlModel.tag, $pablohirafuji$elm_markdown$Markdown$InlineParser$voidHtmlTags);
+	return A2($elm$core$List$member, htmlModel.bJ, $pablohirafuji$elm_markdown$Markdown$InlineParser$voidHtmlTags);
 };
-var $pablohirafuji$elm_markdown$Markdown$InlineParser$HardLineBreakType = {$: 'HardLineBreakType'};
-var $pablohirafuji$elm_markdown$Markdown$InlineParser$SoftLineBreakToken = {$: 'SoftLineBreakToken'};
+var $pablohirafuji$elm_markdown$Markdown$InlineParser$HardLineBreakType = {$: 1};
+var $pablohirafuji$elm_markdown$Markdown$InlineParser$SoftLineBreakToken = {$: 7};
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$reverseTokens = function (model) {
 	return _Utils_update(
 		model,
 		{
-			tokens: $elm$core$List$reverse(model.tokens)
+			i: $elm$core$List$reverse(model.i)
 		});
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$tokenToMatch = F2(
 	function (token, type_) {
-		return $pablohirafuji$elm_markdown$Markdown$InlineParser$Match(
-			{end: token.index + token.length, matches: _List_Nil, start: token.index, text: '', textEnd: 0, textStart: 0, type_: type_});
+		return {b4: token.cj + token.m, d: _List_Nil, bG: token.cj, aP: '', aw: 0, O: 0, bM: type_};
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$lineBreakTTM = function (_v0) {
 	lineBreakTTM:
@@ -28774,7 +25168,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$lineBreakTTM = function (_
 		} else {
 			var token = tokens.a;
 			var tokensTail = tokens.b;
-			if (_Utils_eq(token.meaning, $pablohirafuji$elm_markdown$Markdown$InlineParser$HardLineBreakToken) || (_Utils_eq(token.meaning, $pablohirafuji$elm_markdown$Markdown$InlineParser$SoftLineBreakToken) && model.options.softAsHardLineBreak)) {
+			if (_Utils_eq(token.g, $pablohirafuji$elm_markdown$Markdown$InlineParser$HardLineBreakToken) || (_Utils_eq(token.g, $pablohirafuji$elm_markdown$Markdown$InlineParser$SoftLineBreakToken) && model.d6.el)) {
 				return $pablohirafuji$elm_markdown$Markdown$InlineParser$lineBreakTTM(
 					function (b) {
 						return _Utils_Tuple2(tokensTail, b);
@@ -28782,10 +25176,10 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$lineBreakTTM = function (_
 						_Utils_update(
 							model,
 							{
-								matches: A2(
+								d: A2(
 									$elm$core$List$cons,
 									A2($pablohirafuji$elm_markdown$Markdown$InlineParser$tokenToMatch, token, $pablohirafuji$elm_markdown$Markdown$InlineParser$HardLineBreakType),
-									model.matches)
+									model.d)
 							})));
 			} else {
 				var $temp$_v0 = _Utils_Tuple2(
@@ -28799,23 +25193,23 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$lineBreakTTM = function (_
 };
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$removeParsedAheadTokens = F2(
 	function (tokensTail, parser) {
-		var _v0 = parser.matches;
+		var _v0 = parser.d;
 		if (!_v0.b) {
 			return _Utils_Tuple2(tokensTail, parser);
 		} else {
-			var match = _v0.a.a;
+			var match = _v0.a;
 			return _Utils_Tuple2(
 				A2(
 					$elm$core$List$filter,
 					function (token) {
-						return _Utils_cmp(token.index, match.end) > -1;
+						return _Utils_cmp(token.cj, match.b4) > -1;
 					},
 					tokensTail),
 				parser);
 		}
 	});
 var $elm$core$Result$toMaybe = function (result) {
-	if (result.$ === 'Ok') {
+	if (!result.$) {
 		var v = result.a;
 		return $elm$core$Maybe$Just(v);
 	} else {
@@ -28827,13 +25221,13 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$angleBracketsToMatch = F4(
 		var openToken = _v24.a;
 		var remainTokens = _v24.c;
 		return function (result) {
-			if (result.$ === 'Err') {
+			if (result.$ === 1) {
 				var tempMatch = result.a;
 				return (!isEscaped) ? A2(
 					$pablohirafuji$elm_markdown$Markdown$InlineParser$htmlToToken,
 					_Utils_update(
 						model,
-						{tokens: remainTokens}),
+						{i: remainTokens}),
 					tempMatch) : $elm$core$Result$toMaybe(result);
 			} else {
 				return $elm$core$Result$toMaybe(result);
@@ -28845,8 +25239,8 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$angleBracketsToMatch = F4(
 					return _Utils_update(
 						model,
 						{
-							matches: A2($elm$core$List$cons, newMatch, model.matches),
-							tokens: remainTokens
+							d: A2($elm$core$List$cons, newMatch, model.d),
+							i: remainTokens
 						});
 				},
 				A2(
@@ -28874,9 +25268,9 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$codeAutolinkTypeHtmlTagTTM
 		} else {
 			var token = tokens.a;
 			var tokensTail = tokens.b;
-			var _v23 = token.meaning;
+			var _v23 = token.g;
 			switch (_v23.$) {
-				case 'CodeToken':
+				case 0:
 					var isEscaped = _v23.a;
 					return $pablohirafuji$elm_markdown$Markdown$InlineParser$codeAutolinkTypeHtmlTagTTM(
 						function (b) {
@@ -28891,8 +25285,8 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$codeAutolinkTypeHtmlTagTTM
 									A2(
 										$pablohirafuji$elm_markdown$Markdown$InlineParser$findToken,
 										$pablohirafuji$elm_markdown$Markdown$InlineParser$isCodeTokenPair(token),
-										model.tokens)))));
-				case 'RightAngleBracket':
+										model.i)))));
+				case 4:
 					var isEscaped = _v23.a;
 					return $pablohirafuji$elm_markdown$Markdown$InlineParser$codeAutolinkTypeHtmlTagTTM(
 						function (b) {
@@ -28903,11 +25297,10 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$codeAutolinkTypeHtmlTagTTM
 								A2(
 									$elm$core$Basics$composeR,
 									function ($) {
-										return $.meaning;
+										return $.g;
 									},
 									$elm$core$Basics$neq(
-										$pablohirafuji$elm_markdown$Markdown$InlineParser$CharToken(
-											_Utils_chr('<')))),
+										$pablohirafuji$elm_markdown$Markdown$InlineParser$CharToken('<'))),
 								A2(
 									$elm$core$Maybe$withDefault,
 									model,
@@ -28919,12 +25312,11 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$codeAutolinkTypeHtmlTagTTM
 											A2(
 												$elm$core$Basics$composeR,
 												function ($) {
-													return $.meaning;
+													return $.g;
 												},
 												$elm$core$Basics$eq(
-													$pablohirafuji$elm_markdown$Markdown$InlineParser$CharToken(
-														_Utils_chr('<')))),
-											model.tokens))))));
+													$pablohirafuji$elm_markdown$Markdown$InlineParser$CharToken('<'))),
+											model.i))))));
 				default:
 					var $temp$_v21 = _Utils_Tuple2(
 						tokensTail,
@@ -28940,18 +25332,18 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$codeToMatch = F3(
 		var openToken = _v20.a;
 		var remainTokens = _v20.c;
 		var updtOpenToken = _Utils_eq(
-			openToken.meaning,
+			openToken.g,
 			$pablohirafuji$elm_markdown$Markdown$InlineParser$CodeToken(true)) ? _Utils_update(
 			openToken,
-			{index: openToken.index + 1, length: openToken.length - 1}) : openToken;
+			{cj: openToken.cj + 1, m: openToken.m - 1}) : openToken;
 		return _Utils_update(
 			model,
 			{
-				matches: A2(
+				d: A2(
 					$elm$core$List$cons,
 					A6($pablohirafuji$elm_markdown$Markdown$InlineParser$tokenPairToMatch, model, $pablohirafuji$elm_markdown$Markdown$Helpers$cleanWhitespaces, $pablohirafuji$elm_markdown$Markdown$InlineParser$CodeType, updtOpenToken, closeToken, _List_Nil),
-					model.matches),
-				tokens: remainTokens
+					model.d),
+				i: remainTokens
 			});
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$emphasisTTM = function (_v16) {
@@ -28964,16 +25356,14 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$emphasisTTM = function (_v
 		} else {
 			var token = tokens.a;
 			var tokensTail = tokens.b;
-			var _v18 = token.meaning;
-			if (_v18.$ === 'EmphasisToken') {
+			var _v18 = token.g;
+			if (_v18.$ === 6) {
 				var _char = _v18.a;
 				var _v19 = _v18.b;
 				var leftRank = _v19.a;
 				var rightRank = _v19.b;
 				if (_Utils_eq(leftRank, rightRank)) {
-					if ((!(!rightRank)) && ((!_Utils_eq(
-						_char,
-						_Utils_chr('_'))) || (rightRank === 1))) {
+					if ((!(!rightRank)) && ((_char !== '_') || (rightRank === 1))) {
 						return $pablohirafuji$elm_markdown$Markdown$InlineParser$emphasisTTM(
 							A2(
 								$elm$core$Maybe$withDefault,
@@ -28986,7 +25376,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$emphasisTTM = function (_v
 									A2(
 										$pablohirafuji$elm_markdown$Markdown$InlineParser$findToken,
 										$pablohirafuji$elm_markdown$Markdown$InlineParser$isOpenEmphasisToken(token),
-										model.tokens))));
+										model.i))));
 					} else {
 						var $temp$_v16 = _Utils_Tuple2(tokensTail, model);
 						_v16 = $temp$_v16;
@@ -29010,7 +25400,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$emphasisTTM = function (_v
 									A2(
 										$pablohirafuji$elm_markdown$Markdown$InlineParser$findToken,
 										$pablohirafuji$elm_markdown$Markdown$InlineParser$isOpenEmphasisToken(token),
-										model.tokens))));
+										model.i))));
 					}
 				}
 			} else {
@@ -29028,30 +25418,30 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$emphasisToMatch = F4(
 		var openToken = _v15.a;
 		var innerTokens = _v15.b;
 		var remainTokens = _v15.c;
-		var remainLength = openToken.length - closeToken.length;
-		var updt = (!remainLength) ? {closeToken: closeToken, openToken: openToken, remainTokens: remainTokens, tokensTail: tokensTail} : ((remainLength > 0) ? {
-			closeToken: closeToken,
-			openToken: _Utils_update(
+		var remainLength = openToken.m - closeToken.m;
+		var updt = (!remainLength) ? {aX: closeToken, aJ: openToken, a9: remainTokens, bg: tokensTail} : ((remainLength > 0) ? {
+			aX: closeToken,
+			aJ: _Utils_update(
 				openToken,
-				{index: openToken.index + remainLength, length: closeToken.length}),
-			remainTokens: A2(
+				{cj: openToken.cj + remainLength, m: closeToken.m}),
+			a9: A2(
 				$elm$core$List$cons,
 				_Utils_update(
 					openToken,
-					{length: remainLength}),
+					{m: remainLength}),
 				remainTokens),
-			tokensTail: tokensTail
+			bg: tokensTail
 		} : {
-			closeToken: _Utils_update(
+			aX: _Utils_update(
 				closeToken,
-				{length: openToken.length}),
-			openToken: openToken,
-			remainTokens: remainTokens,
-			tokensTail: A2(
+				{m: openToken.m}),
+			aJ: openToken,
+			a9: remainTokens,
+			bg: A2(
 				$elm$core$List$cons,
 				_Utils_update(
 					closeToken,
-					{index: closeToken.index + openToken.length, length: -remainLength}),
+					{cj: closeToken.cj + openToken.m, m: -remainLength}),
 				tokensTail)
 		});
 		var match = A6(
@@ -29060,17 +25450,17 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$emphasisToMatch = F4(
 			function (s) {
 				return s;
 			},
-			$pablohirafuji$elm_markdown$Markdown$InlineParser$EmphasisType(updt.openToken.length),
-			updt.openToken,
-			updt.closeToken,
+			$pablohirafuji$elm_markdown$Markdown$InlineParser$EmphasisType(updt.aJ.m),
+			updt.aJ,
+			updt.aX,
 			$elm$core$List$reverse(innerTokens));
 		return _Utils_Tuple2(
-			updt.tokensTail,
+			updt.bg,
 			_Utils_update(
 				model,
 				{
-					matches: A2($elm$core$List$cons, match, model.matches),
-					tokens: updt.remainTokens
+					d: A2($elm$core$List$cons, match, model.d),
+					i: updt.a9
 				}));
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$htmlElementTTM = function (_v12) {
@@ -29083,8 +25473,8 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$htmlElementTTM = function 
 		} else {
 			var token = tokens.a;
 			var tokensTail = tokens.b;
-			var _v14 = token.meaning;
-			if (_v14.$ === 'HtmlToken') {
+			var _v14 = token.g;
+			if (_v14.$ === 5) {
 				var isOpen = _v14.a;
 				var htmlModel = _v14.b;
 				return ($pablohirafuji$elm_markdown$Markdown$InlineParser$isVoidTag(htmlModel) || (!isOpen)) ? $pablohirafuji$elm_markdown$Markdown$InlineParser$htmlElementTTM(
@@ -29137,7 +25527,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$htmlElementToMatch = F4(
 			_Utils_update(
 				model,
 				{
-					matches: A2(
+					d: A2(
 						$elm$core$List$cons,
 						A6(
 							$pablohirafuji$elm_markdown$Markdown$InlineParser$tokenPairToMatch,
@@ -29149,7 +25539,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$htmlElementToMatch = F4(
 							openToken,
 							closeToken,
 							innerTokens),
-						model.matches)
+						model.d)
 				}));
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$linkImageTypeTTM = function (_v8) {
@@ -29162,8 +25552,8 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$linkImageTypeTTM = functio
 		} else {
 			var token = tokens.a;
 			var tokensTail = tokens.b;
-			var _v10 = token.meaning;
-			if ((_v10.$ === 'CharToken') && (']' === _v10.a.valueOf())) {
+			var _v10 = token.g;
+			if ((_v10.$ === 3) && (']' === _v10.a)) {
 				return $pablohirafuji$elm_markdown$Markdown$InlineParser$linkImageTypeTTM(
 					A2(
 						$elm$core$Maybe$withDefault,
@@ -29171,7 +25561,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$linkImageTypeTTM = functio
 						A2(
 							$elm$core$Maybe$andThen,
 							A3($pablohirafuji$elm_markdown$Markdown$InlineParser$linkOrImageTypeToMatch, token, tokensTail, model),
-							A2($pablohirafuji$elm_markdown$Markdown$InlineParser$findToken, $pablohirafuji$elm_markdown$Markdown$InlineParser$isLinkTypeOrImageOpenToken, model.tokens))));
+							A2($pablohirafuji$elm_markdown$Markdown$InlineParser$findToken, $pablohirafuji$elm_markdown$Markdown$InlineParser$isLinkTypeOrImageOpenToken, model.i))));
 			} else {
 				var $temp$_v8 = _Utils_Tuple2(
 					tokensTail,
@@ -29206,17 +25596,17 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$linkOrImageTypeToMatch = F
 			_Utils_update(
 				model,
 				{
-					tokens: _Utils_ap(innerTokens, remainTokens)
+					i: _Utils_ap(innerTokens, remainTokens)
 				}));
-		var remainText = A2($elm$core$String$dropLeft, closeToken.index + 1, model.rawText);
+		var remainText = A2($elm$core$String$dropLeft, closeToken.cj + 1, model.x);
 		var linkOpenTokenToInactive = function (model_) {
 			var process = function (token) {
-				var _v7 = token.meaning;
-				if (_v7.$ === 'LinkOpenToken') {
+				var _v7 = token.g;
+				if (_v7.$ === 1) {
 					return _Utils_update(
 						token,
 						{
-							meaning: $pablohirafuji$elm_markdown$Markdown$InlineParser$LinkOpenToken(false)
+							g: $pablohirafuji$elm_markdown$Markdown$InlineParser$LinkOpenToken(false)
 						});
 				} else {
 					return token;
@@ -29225,7 +25615,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$linkOrImageTypeToMatch = F
 			return _Utils_update(
 				model_,
 				{
-					tokens: A2($elm$core$List$map, process, model_.tokens)
+					i: A2($elm$core$List$map, process, model_.i)
 				});
 		};
 		var args = function (isLinkType) {
@@ -29234,11 +25624,11 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$linkOrImageTypeToMatch = F
 				tempMatch(isLinkType),
 				_Utils_update(
 					model,
-					{tokens: remainTokens}));
+					{i: remainTokens}));
 		};
-		var _v2 = openToken.meaning;
+		var _v2 = openToken.g;
 		switch (_v2.$) {
-			case 'ImageOpenToken':
+			case 2:
 				return $elm$core$Result$toMaybe(
 					A2(
 						$pablohirafuji$elm_markdown$Markdown$Helpers$ifError,
@@ -29254,14 +25644,14 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$linkOrImageTypeToMatch = F
 								A2(
 									$elm$core$Result$mapError,
 									function (_v3) {
-										return _Utils_Tuple0;
+										return 0;
 									},
 									A2(
 										$pablohirafuji$elm_markdown$Markdown$Helpers$ifError,
 										$pablohirafuji$elm_markdown$Markdown$InlineParser$checkForRefLinkTypeOrImageType,
 										$pablohirafuji$elm_markdown$Markdown$InlineParser$checkForInlineLinkTypeOrImageType(
 											args(false))))))));
-			case 'LinkOpenToken':
+			case 1:
 				if (_v2.a) {
 					return $elm$core$Result$toMaybe(
 						A2(
@@ -29281,7 +25671,7 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$linkOrImageTypeToMatch = F
 										A2(
 											$elm$core$Result$mapError,
 											function (_v5) {
-												return _Utils_Tuple0;
+												return 0;
 											},
 											A2(
 												$pablohirafuji$elm_markdown$Markdown$Helpers$ifError,
@@ -29297,34 +25687,33 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$linkOrImageTypeToMatch = F
 	});
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$tokenPairToMatch = F6(
 	function (model, processText, type_, openToken, closeToken, innerTokens) {
-		var textStart = openToken.index + openToken.length;
-		var textEnd = closeToken.index;
-		var start = openToken.index;
-		var end = closeToken.index + closeToken.length;
+		var textStart = openToken.cj + openToken.m;
+		var textEnd = closeToken.cj;
+		var start = openToken.cj;
+		var end = closeToken.cj + closeToken.m;
 		var match = {
-			end: end,
-			matches: _List_Nil,
-			start: start,
-			text: processText(
-				A3($elm$core$String$slice, textStart, textEnd, model.rawText)),
-			textEnd: textEnd,
-			textStart: textStart,
-			type_: type_
+			b4: end,
+			d: _List_Nil,
+			bG: start,
+			aP: processText(
+				A3($elm$core$String$slice, textStart, textEnd, model.x)),
+			aw: textEnd,
+			O: textStart,
+			bM: type_
 		};
 		var matches = A2(
 			$elm$core$List$map,
 			function (_v0) {
-				var matchModel = _v0.a;
+				var matchModel = _v0;
 				return A2($pablohirafuji$elm_markdown$Markdown$InlineParser$prepareChildMatch, match, matchModel);
 			},
 			$pablohirafuji$elm_markdown$Markdown$InlineParser$cyclic$tokensToMatches()(
 				_Utils_update(
 					model,
-					{matches: _List_Nil, tokens: innerTokens})).matches);
-		return $pablohirafuji$elm_markdown$Markdown$InlineParser$Match(
-			_Utils_update(
-				match,
-				{matches: matches}));
+					{d: _List_Nil, i: innerTokens})).d);
+		return _Utils_update(
+			match,
+			{d: matches});
 	});
 function $pablohirafuji$elm_markdown$Markdown$InlineParser$cyclic$tokensToMatches() {
 	return A2(
@@ -29341,13 +25730,10 @@ function $pablohirafuji$elm_markdown$Markdown$InlineParser$cyclic$tokensToMatche
 					$pablohirafuji$elm_markdown$Markdown$InlineParser$applyTTM($pablohirafuji$elm_markdown$Markdown$InlineParser$emphasisTTM),
 					$pablohirafuji$elm_markdown$Markdown$InlineParser$applyTTM($pablohirafuji$elm_markdown$Markdown$InlineParser$lineBreakTTM)))));
 }
-try {
-	var $pablohirafuji$elm_markdown$Markdown$InlineParser$tokensToMatches = $pablohirafuji$elm_markdown$Markdown$InlineParser$cyclic$tokensToMatches();
-	$pablohirafuji$elm_markdown$Markdown$InlineParser$cyclic$tokensToMatches = function () {
-		return $pablohirafuji$elm_markdown$Markdown$InlineParser$tokensToMatches;
-	};
-} catch ($) {
-	throw 'Some top-level definitions from `Markdown.InlineParser` are causing infinite recursion:\n\n  ┌─────┐\n  │    angleBracketsToMatch\n  │     ↓\n  │    tokensToMatches\n  │     ↓\n  │    codeAutolinkTypeHtmlTagTTM\n  │     ↓\n  │    codeToMatch\n  │     ↓\n  │    emphasisTTM\n  │     ↓\n  │    emphasisToMatch\n  │     ↓\n  │    htmlElementTTM\n  │     ↓\n  │    htmlElementToMatch\n  │     ↓\n  │    linkImageTypeTTM\n  │     ↓\n  │    linkOrImageTypeToMatch\n  │     ↓\n  │    tokenPairToMatch\n  └─────┘\n\nThese errors are very tricky, so read https://elm-lang.org/0.19.1/bad-recursion to learn how to fix it!';}
+var $pablohirafuji$elm_markdown$Markdown$InlineParser$tokensToMatches = $pablohirafuji$elm_markdown$Markdown$InlineParser$cyclic$tokensToMatches();
+$pablohirafuji$elm_markdown$Markdown$InlineParser$cyclic$tokensToMatches = function () {
+	return $pablohirafuji$elm_markdown$Markdown$InlineParser$tokensToMatches;
+};
 var $pablohirafuji$elm_markdown$Markdown$InlineParser$parse = F3(
 	function (options, refs, rawText) {
 		return $pablohirafuji$elm_markdown$Markdown$InlineParser$matchesToInlines(
@@ -29359,13 +25745,13 @@ var $pablohirafuji$elm_markdown$Markdown$InlineParser$parse = F3(
 								$pablohirafuji$elm_markdown$Markdown$InlineParser$initParser,
 								options,
 								refs,
-								$elm$core$String$trim(rawText)))))).matches);
+								$elm$core$String$trim(rawText)))))).d);
 	});
 var $pablohirafuji$elm_markdown$Markdown$Block$parseInline = F4(
 	function (maybeOptions, textAsParagraph, refs, block) {
 		var options = A2($elm$core$Maybe$withDefault, $pablohirafuji$elm_markdown$Markdown$Config$defaultOptions, maybeOptions);
 		switch (block.$) {
-			case 'Heading':
+			case 2:
 				var rawText = block.a;
 				var lvl = block.b;
 				return A3(
@@ -29373,16 +25759,16 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseInline = F4(
 					rawText,
 					lvl,
 					A3($pablohirafuji$elm_markdown$Markdown$InlineParser$parse, options, refs, rawText));
-			case 'Paragraph':
+			case 4:
 				var rawText = block.a;
 				var inlines = A3($pablohirafuji$elm_markdown$Markdown$InlineParser$parse, options, refs, rawText);
-				if ((inlines.b && (inlines.a.$ === 'HtmlInline')) && (!inlines.b.b)) {
+				if ((inlines.b && (inlines.a.$ === 5)) && (!inlines.b.b)) {
 					var _v3 = inlines.a;
 					return $pablohirafuji$elm_markdown$Markdown$Block$PlainInlines(inlines);
 				} else {
 					return textAsParagraph ? A2($pablohirafuji$elm_markdown$Markdown$Block$Paragraph, rawText, inlines) : $pablohirafuji$elm_markdown$Markdown$Block$PlainInlines(inlines);
 				}
-			case 'BlockQuote':
+			case 5:
 				var blocks = block.a;
 				return $pablohirafuji$elm_markdown$Markdown$Block$BlockQuote(
 					A3(
@@ -29390,7 +25776,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseInline = F4(
 						maybeOptions,
 						true,
 						_Utils_Tuple2(refs, blocks)));
-			case 'List':
+			case 6:
 				var model = block.a;
 				var items = block.b;
 				return A2(
@@ -29401,11 +25787,11 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseInline = F4(
 					}(
 						A2(
 							$elm$core$Basics$composeL,
-							A2($pablohirafuji$elm_markdown$Markdown$Block$parseInlines, maybeOptions, model.isLoose),
+							A2($pablohirafuji$elm_markdown$Markdown$Block$parseInlines, maybeOptions, model.dN),
 							function (b) {
 								return _Utils_Tuple2(refs, b);
 							})));
-			case 'Custom':
+			case 8:
 				var customBlock = block.a;
 				var blocks = block.b;
 				return A2(
@@ -29431,20 +25817,20 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseInlines = F3(
 	});
 var $pablohirafuji$elm_markdown$Markdown$Block$dropRefString = F2(
 	function (rawText, inlineMatch) {
-		var strippedText = A2($elm$core$String$dropLeft, inlineMatch.matchLength, rawText);
+		var strippedText = A2($elm$core$String$dropLeft, inlineMatch.bu, rawText);
 		return A2($elm$regex$Regex$contains, $pablohirafuji$elm_markdown$Markdown$Block$blankLineRegex, strippedText) ? $elm$core$Maybe$Nothing : $elm$core$Maybe$Just(strippedText);
 	});
 var $pablohirafuji$elm_markdown$Markdown$Block$insertLinkMatch = F2(
 	function (refs, linkMatch) {
-		return A2($elm$core$Dict$member, linkMatch.inside, refs) ? refs : A3(
+		return A2($elm$core$Dict$member, linkMatch.ak, refs) ? refs : A3(
 			$elm$core$Dict$insert,
-			linkMatch.inside,
-			_Utils_Tuple2(linkMatch.url, linkMatch.maybeTitle),
+			linkMatch.ak,
+			_Utils_Tuple2(linkMatch.bk, linkMatch.bv),
 			refs);
 	});
 var $pablohirafuji$elm_markdown$Markdown$Block$extractUrlTitleRegex = function (regexMatch) {
-	var _v0 = regexMatch.submatches;
-	if ((((((_v0.b && (_v0.a.$ === 'Just')) && _v0.b.b) && _v0.b.b.b) && _v0.b.b.b.b) && _v0.b.b.b.b.b) && _v0.b.b.b.b.b.b) {
+	var _v0 = regexMatch.en;
+	if ((((((_v0.b && (!_v0.a.$)) && _v0.b.b) && _v0.b.b.b) && _v0.b.b.b.b) && _v0.b.b.b.b.b) && _v0.b.b.b.b.b.b) {
 		var rawText = _v0.a.a;
 		var _v1 = _v0.b;
 		var maybeRawUrlAngleBrackets = _v1.a;
@@ -29458,12 +25844,12 @@ var $pablohirafuji$elm_markdown$Markdown$Block$extractUrlTitleRegex = function (
 		var maybeTitleParenthesis = _v5.a;
 		var toReturn = function (rawUrl) {
 			return {
-				inside: rawText,
-				matchLength: $elm$core$String$length(regexMatch.match),
-				maybeTitle: $pablohirafuji$elm_markdown$Markdown$Helpers$returnFirstJust(
+				ak: rawText,
+				bu: $elm$core$String$length(regexMatch.dS),
+				bv: $pablohirafuji$elm_markdown$Markdown$Helpers$returnFirstJust(
 					_List_fromArray(
 						[maybeTitleSingleQuotes, maybeTitleDoubleQuotes, maybeTitleParenthesis])),
-				url: rawUrl
+				bk: rawUrl
 			};
 		};
 		var maybeRawUrl = $pablohirafuji$elm_markdown$Markdown$Helpers$returnFirstJust(
@@ -29483,7 +25869,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$maybeLinkMatch = function (rawTex
 	return A2(
 		$elm$core$Maybe$andThen,
 		function (linkMatch) {
-			return ((linkMatch.url === '') || (linkMatch.inside === '')) ? $elm$core$Maybe$Nothing : $elm$core$Maybe$Just(linkMatch);
+			return ((linkMatch.bk === '') || (linkMatch.ak === '')) ? $elm$core$Maybe$Nothing : $elm$core$Maybe$Just(linkMatch);
 		},
 		A2(
 			$elm$core$Maybe$map,
@@ -29491,7 +25877,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$maybeLinkMatch = function (rawTex
 				return _Utils_update(
 					linkMatch,
 					{
-						inside: $pablohirafuji$elm_markdown$Markdown$Helpers$prepareRefLabel(linkMatch.inside)
+						ak: $pablohirafuji$elm_markdown$Markdown$Helpers$prepareRefLabel(linkMatch.ak)
 					});
 			},
 			A2(
@@ -29505,11 +25891,11 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseReference = F2(
 		parseReference:
 		while (true) {
 			var _v0 = $pablohirafuji$elm_markdown$Markdown$Block$maybeLinkMatch(rawText);
-			if (_v0.$ === 'Just') {
+			if (!_v0.$) {
 				var linkMatch = _v0.a;
 				var updtRefs = A2($pablohirafuji$elm_markdown$Markdown$Block$insertLinkMatch, refs, linkMatch);
 				var maybeStrippedText = A2($pablohirafuji$elm_markdown$Markdown$Block$dropRefString, rawText, linkMatch);
-				if (maybeStrippedText.$ === 'Just') {
+				if (!maybeStrippedText.$) {
 					var strippedText = maybeStrippedText.a;
 					var $temp$refs = updtRefs,
 						$temp$rawText = strippedText;
@@ -29541,13 +25927,13 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseReferencesHelp = F2(
 		var refs = _v0.a;
 		var parsedAST = _v0.b;
 		switch (block.$) {
-			case 'Paragraph':
+			case 4:
 				var rawText = block.a;
 				var _v2 = A2($pablohirafuji$elm_markdown$Markdown$Block$parseReference, $elm$core$Dict$empty, rawText);
 				var paragraphRefs = _v2.a;
 				var maybeUpdtText = _v2.b;
 				var updtRefs = A2($elm$core$Dict$union, paragraphRefs, refs);
-				if (maybeUpdtText.$ === 'Just') {
+				if (!maybeUpdtText.$) {
 					var updtText = maybeUpdtText.a;
 					return _Utils_Tuple2(
 						updtRefs,
@@ -29558,7 +25944,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseReferencesHelp = F2(
 				} else {
 					return _Utils_Tuple2(updtRefs, parsedAST);
 				}
-			case 'List':
+			case 6:
 				var model = block.a;
 				var items = block.b;
 				var _v4 = A3(
@@ -29584,7 +25970,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseReferencesHelp = F2(
 						$elm$core$List$cons,
 						A2($pablohirafuji$elm_markdown$Markdown$Block$List, model, updtItems),
 						parsedAST));
-			case 'BlockQuote':
+			case 5:
 				var blocks = block.a;
 				return A2(
 					$elm$core$Tuple$mapSecond,
@@ -29595,7 +25981,7 @@ var $pablohirafuji$elm_markdown$Markdown$Block$parseReferencesHelp = F2(
 						$elm$core$Tuple$mapSecond,
 						$pablohirafuji$elm_markdown$Markdown$Block$BlockQuote,
 						A2($pablohirafuji$elm_markdown$Markdown$Block$parseReferences, refs, blocks)));
-			case 'Custom':
+			case 8:
 				var customBlock = block.a;
 				var blocks = block.b;
 				return A2(
@@ -29631,35 +26017,35 @@ var $author$project$Page$Markdown$changeEditorTypeToWYSIWYG = function (model) {
 	var markdownNodes = A2(
 		$pablohirafuji$elm_markdown$Markdown$Block$parse,
 		$elm$core$Maybe$Just(
-			{rawHtml: $pablohirafuji$elm_markdown$Markdown$Config$DontParse, softAsHardLineBreak: false}),
-		model.textMarkdown);
+			{ea: $pablohirafuji$elm_markdown$Markdown$Config$DontParse, el: false}),
+		model.ap);
 	var result = $author$project$Page$Markdown$markdownToBlock(
 		$author$project$Page$Markdown$filterBlankLines(markdownNodes));
-	if (result.$ === 'Err') {
+	if (result.$ === 1) {
 		var e = result.a;
 		return _Utils_update(
 			model,
 			{
-				markdownError: $elm$core$Maybe$Just(e)
+				al: $elm$core$Maybe$Just(e)
 			});
 	} else {
 		var root = result.a;
 		return _Utils_update(
 			model,
 			{
-				editor: $author$project$Page$Markdown$initializeEditor(
+				b: $author$project$Page$Markdown$initializeEditor(
 					A2($author$project$RichText$Model$State$state, root, $elm$core$Maybe$Nothing)),
-				editorType: $author$project$Page$Markdown$WYSIWYG,
-				markdownError: $elm$core$Maybe$Nothing
+				Y: 1,
+				al: $elm$core$Maybe$Nothing
 			});
 	}
 };
 var $author$project$Page$Markdown$changeEditorType = F2(
 	function (type_, model) {
-		if (_Utils_eq(type_, model.editorType)) {
+		if (_Utils_eq(type_, model.Y)) {
 			return model;
 		} else {
-			if (type_.$ === 'WYSIWYG') {
+			if (type_ === 1) {
 				return $author$project$Page$Markdown$changeEditorTypeToWYSIWYG(model);
 			} else {
 				return $author$project$Page$Markdown$changeEditorTypeToMarkdown(model);
@@ -29668,34 +26054,34 @@ var $author$project$Page$Markdown$changeEditorType = F2(
 	});
 var $author$project$Page$Markdown$config = $author$project$RichText$Editor$config(
 	{
-		commandMap: $author$project$Editor$commandBindings($author$project$RichText$Definitions$markdown),
-		decorations: $author$project$Editor$decorations,
-		spec: $author$project$RichText$Definitions$markdown,
-		toMsg: $author$project$Controls$InternalMsg
+		dn: $author$project$Editor$commandBindings($author$project$RichText$Definitions$markdown),
+		du: $author$project$Editor$decorations,
+		em: $author$project$RichText$Definitions$markdown,
+		er: $author$project$Controls$InternalMsg
 	});
 var $author$project$Page$Markdown$update = F2(
 	function (msg, model) {
 		switch (msg.$) {
-			case 'EditorMsg':
+			case 0:
 				var editorMsg = msg.a;
-				var _v1 = A3($author$project$Editor$update, $author$project$Page$Markdown$config, editorMsg, model.editor);
+				var _v1 = A3($author$project$Editor$update, $author$project$Page$Markdown$config, editorMsg, model.b);
 				var e = _v1.a;
 				return _Utils_Tuple2(
 					_Utils_update(
 						model,
-						{editor: e}),
+						{b: e}),
 					$elm$core$Platform$Cmd$none);
-			case 'EditorChange':
+			case 1:
 				var type_ = msg.a;
 				return _Utils_Tuple2(
 					A2($author$project$Page$Markdown$changeEditorType, type_, model),
 					$elm$core$Platform$Cmd$none);
-			case 'TextAreaChange':
+			case 2:
 				var value = msg.a;
 				return _Utils_Tuple2(
 					_Utils_update(
 						model,
-						{textMarkdown: value}),
+						{ap: value}),
 					$elm$core$Platform$Cmd$none);
 			default:
 				return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
@@ -29734,7 +26120,7 @@ var $author$project$Page$SpecExtension$commandBindings = function (spec) {
 						$author$project$RichText$Commands$toggleMark,
 						markOrder,
 						A2($author$project$RichText$Model$Mark$mark, $author$project$ExtraMarks$strikethrough, _List_Nil),
-						$author$project$RichText$Model$Mark$Flip)))
+						2)))
 			]),
 		A3(
 			$author$project$RichText$Config$Command$set,
@@ -29754,20 +26140,20 @@ var $author$project$Page$SpecExtension$commandBindings = function (spec) {
 							$author$project$RichText$Commands$toggleMark,
 							markOrder,
 							A2($author$project$RichText$Model$Mark$mark, $author$project$ExtraMarks$underline, _List_Nil),
-							$author$project$RichText$Model$Mark$Flip)))
+							2)))
 				]),
 			$author$project$Editor$commandBindings($author$project$Page$SpecExtension$customSpec)));
 };
 var $author$project$Controls$CaptionedImage = F2(
 	function (a, b) {
-		return {$: 'CaptionedImage', a: a, b: b};
+		return {$: 16, a: a, b: b};
 	});
-var $author$project$Controls$Noop = {$: 'Noop'};
+var $author$project$Controls$Noop = {$: 15};
 var $elm$html$Html$Events$alwaysStop = function (x) {
 	return _Utils_Tuple2(x, true);
 };
 var $elm$virtual_dom$VirtualDom$MayStopPropagation = function (a) {
-	return {$: 'MayStopPropagation', a: a};
+	return {$: 1, a: a};
 };
 var $elm$html$Html$Events$stopPropagationOn = F2(
 	function (event, decoder) {
@@ -29818,16 +26204,16 @@ var $author$project$Page$SpecExtension$preventKeyDownPropagationDecoration = F3(
 var $author$project$Page$SpecExtension$newDecorations = A3($author$project$RichText$Config$Decorations$addElementDecoration, $author$project$Page$SpecExtension$captionedImage, $author$project$Page$SpecExtension$preventKeyDownPropagationDecoration, $author$project$Editor$decorations);
 var $author$project$Page$SpecExtension$config = $author$project$RichText$Editor$config(
 	{
-		commandMap: $author$project$Page$SpecExtension$commandBindings($author$project$Page$SpecExtension$customSpec),
-		decorations: $author$project$Page$SpecExtension$newDecorations,
-		spec: $author$project$Page$SpecExtension$customSpec,
-		toMsg: $author$project$Controls$InternalMsg
+		dn: $author$project$Page$SpecExtension$commandBindings($author$project$Page$SpecExtension$customSpec),
+		du: $author$project$Page$SpecExtension$newDecorations,
+		em: $author$project$Page$SpecExtension$customSpec,
+		er: $author$project$Controls$InternalMsg
 	});
 var $author$project$RichText$Internal$Editor$applyCommandNoForceSelection = F3(
 	function (_v0, spec, editor_) {
 		var name = _v0.a;
 		var command = _v0.b;
-		if (command.$ === 'InternalCommand') {
+		if (command.$ === 1) {
 			var action = command.a;
 			return A2($author$project$RichText$Internal$Editor$applyInternalCommand, action, editor_);
 		} else {
@@ -29837,7 +26223,7 @@ var $author$project$RichText$Internal$Editor$applyCommandNoForceSelection = F3(
 				$author$project$RichText$State$validate(spec),
 				transform(
 					$author$project$RichText$Internal$Editor$state(editor_)));
-			if (_v2.$ === 'Err') {
+			if (_v2.$ === 1) {
 				var s = _v2.a;
 				return $elm$core$Result$Err(s);
 			} else {
@@ -29852,7 +26238,7 @@ var $author$project$RichText$Editor$applyNoForceSelection = $author$project$Rich
 var $author$project$RichText$Model$Attribute$replaceOrAddStringAttribute = F3(
 	function (name, value, attributes) {
 		var _v0 = A2($author$project$RichText$Model$Attribute$findStringAttribute, name, attributes);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return A2(
 				$elm$core$List$cons,
 				A2($author$project$RichText$Model$Attribute$StringAttribute, name, value),
@@ -29861,7 +26247,7 @@ var $author$project$RichText$Model$Attribute$replaceOrAddStringAttribute = F3(
 			return A2(
 				$elm$core$List$map,
 				function (x) {
-					if (x.$ === 'StringAttribute') {
+					if (!x.$) {
 						var k = x.a;
 						return _Utils_eq(k, name) ? A2($author$project$RichText$Model$Attribute$StringAttribute, name, value) : x;
 					} else {
@@ -29873,11 +26259,10 @@ var $author$project$RichText$Model$Attribute$replaceOrAddStringAttribute = F3(
 	});
 var $author$project$RichText$Internal$Definitions$elementWithAttributes = F2(
 	function (attrs, parameters) {
-		var c = parameters.a;
-		return $author$project$RichText$Internal$Definitions$ElementParameters(
-			_Utils_update(
-				c,
-				{attributes: attrs}));
+		var c = parameters;
+		return _Utils_update(
+			c,
+			{V: attrs});
 	});
 var $author$project$RichText$Model$Element$withAttributes = $author$project$RichText$Internal$Definitions$elementWithAttributes;
 var $author$project$Page$SpecExtension$updateCaptionedImageText = F3(
@@ -29887,11 +26272,11 @@ var $author$project$Page$SpecExtension$updateCaptionedImageText = F3(
 			$author$project$RichText$Node$nodeAt,
 			path,
 			$author$project$RichText$Model$State$root(state));
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('There is no node at the given path');
 		} else {
 			var node = _v0.a;
-			if (node.$ === 'Inline') {
+			if (node.$ === 1) {
 				return $elm$core$Result$Err('I can only update captioned images, but I received an inline node');
 			} else {
 				var bn = node.a;
@@ -29908,7 +26293,7 @@ var $author$project$Page$SpecExtension$updateCaptionedImageText = F3(
 						path,
 						$author$project$RichText$Node$Block(newBlockNode),
 						r);
-					if (_v2.$ === 'Err') {
+					if (_v2.$ === 1) {
 						var s = _v2.a;
 						return $elm$core$Result$Err(s);
 					} else {
@@ -29925,9 +26310,9 @@ var $author$project$Page$SpecExtension$handleCaptionedImageText = F3(
 		return _Utils_update(
 			model,
 			{
-				editor: A2(
+				b: A2(
 					$elm$core$Result$withDefault,
-					model.editor,
+					model.b,
 					A3(
 						$author$project$RichText$Editor$applyNoForceSelection,
 						_Utils_Tuple2(
@@ -29935,16 +26320,16 @@ var $author$project$Page$SpecExtension$handleCaptionedImageText = F3(
 							$author$project$RichText$Config$Command$transform(
 								A2($author$project$Page$SpecExtension$updateCaptionedImageText, path, value))),
 						$author$project$Page$SpecExtension$customSpec,
-						model.editor))
+						model.b))
 			});
 	});
 var $author$project$Page$SpecExtension$handleInsertCaptionedImage = F2(
 	function (spec, model) {
-		var insertImageModal = model.insertCaptionedImageModal;
+		var insertImageModal = model.v;
 		var newEditor = function () {
-			var _v0 = insertImageModal.editorState;
-			if (_v0.$ === 'Nothing') {
-				return model.editor.editor;
+			var _v0 = insertImageModal.b3;
+			if (_v0.$ === 1) {
+				return model.b.b;
 			} else {
 				var state_ = _v0.a;
 				var params = A2(
@@ -29952,14 +26337,14 @@ var $author$project$Page$SpecExtension$handleInsertCaptionedImage = F2(
 					$author$project$Page$SpecExtension$captionedImage,
 					_List_fromArray(
 						[
-							A2($author$project$RichText$Model$Attribute$StringAttribute, 'src', insertImageModal.src),
-							A2($author$project$RichText$Model$Attribute$StringAttribute, 'alt', insertImageModal.alt),
-							A2($author$project$RichText$Model$Attribute$StringAttribute, 'caption', insertImageModal.caption)
+							A2($author$project$RichText$Model$Attribute$StringAttribute, 'src', insertImageModal.cW),
+							A2($author$project$RichText$Model$Attribute$StringAttribute, 'alt', insertImageModal.bT),
+							A2($author$project$RichText$Model$Attribute$StringAttribute, 'caption', insertImageModal.aC)
 						]));
 				var img = A2($author$project$RichText$Model$Node$block, params, $author$project$RichText$Model$Node$Leaf);
 				return A2(
 					$elm$core$Result$withDefault,
-					model.editor.editor,
+					model.b.b,
 					A3(
 						$author$project$RichText$Editor$apply,
 						_Utils_Tuple2(
@@ -29968,112 +26353,112 @@ var $author$project$Page$SpecExtension$handleInsertCaptionedImage = F2(
 								$author$project$Editor$setResult(
 									A2($author$project$RichText$Commands$insertBlock, img, state_)))),
 						spec,
-						model.editor.editor));
+						model.b.b));
 			}
 		}();
-		var editor = model.editor;
+		var editor = model.b;
 		return _Utils_update(
 			model,
 			{
-				editor: _Utils_update(
+				b: _Utils_update(
 					editor,
-					{editor: newEditor}),
-				insertCaptionedImageModal: _Utils_update(
+					{b: newEditor}),
+				v: _Utils_update(
 					insertImageModal,
-					{alt: '', caption: '', editorState: $elm$core$Maybe$Nothing, src: '', visible: false})
+					{bT: '', aC: '', b3: $elm$core$Maybe$Nothing, cW: '', bl: false})
 			});
 	});
 var $author$project$Page$SpecExtension$handleShowInsertCaptionedImageModal = function (model) {
-	var insertImageModal = model.insertCaptionedImageModal;
+	var insertImageModal = model.v;
 	return _Utils_update(
 		model,
 		{
-			insertCaptionedImageModal: _Utils_update(
+			v: _Utils_update(
 				insertImageModal,
 				{
-					editorState: $elm$core$Maybe$Just(
-						$author$project$RichText$Editor$state(model.editor.editor)),
-					visible: true
+					b3: $elm$core$Maybe$Just(
+						$author$project$RichText$Editor$state(model.b.b)),
+					bl: true
 				})
 		});
 };
 var $author$project$Page$SpecExtension$handleUpdateCaption = F2(
 	function (caption, model) {
-		var insertImageModal = model.insertCaptionedImageModal;
+		var insertImageModal = model.v;
 		return _Utils_update(
 			model,
 			{
-				insertCaptionedImageModal: _Utils_update(
+				v: _Utils_update(
 					insertImageModal,
-					{caption: caption})
+					{aC: caption})
 			});
 	});
 var $author$project$Page$SpecExtension$handleUpdateCaptionedImageAlt = F2(
 	function (alt, model) {
-		var insertImageModal = model.insertCaptionedImageModal;
+		var insertImageModal = model.v;
 		return _Utils_update(
 			model,
 			{
-				insertCaptionedImageModal: _Utils_update(
+				v: _Utils_update(
 					insertImageModal,
-					{alt: alt})
+					{bT: alt})
 			});
 	});
 var $author$project$Page$SpecExtension$handleUpdateCaptionedImageSrc = F2(
 	function (src, model) {
-		var insertImageModal = model.insertCaptionedImageModal;
+		var insertImageModal = model.v;
 		return _Utils_update(
 			model,
 			{
-				insertCaptionedImageModal: _Utils_update(
+				v: _Utils_update(
 					insertImageModal,
-					{src: src})
+					{cW: src})
 			});
 	});
 var $author$project$Page$SpecExtension$update = F2(
 	function (msg, model) {
 		switch (msg.$) {
-			case 'EditorMsg':
+			case 5:
 				var editorMsg = msg.a;
-				if (editorMsg.$ === 'CaptionedImage') {
+				if (editorMsg.$ === 16) {
 					var path = editorMsg.a;
 					var s = editorMsg.b;
 					return _Utils_Tuple2(
 						_Utils_update(
 							model,
 							{
-								editor: A3($author$project$Page$SpecExtension$handleCaptionedImageText, path, s, model.editor)
+								b: A3($author$project$Page$SpecExtension$handleCaptionedImageText, path, s, model.b)
 							}),
 						$elm$core$Platform$Cmd$none);
 				} else {
-					var _v2 = A3($author$project$Editor$update, $author$project$Page$SpecExtension$config, editorMsg, model.editor);
+					var _v2 = A3($author$project$Editor$update, $author$project$Page$SpecExtension$config, editorMsg, model.b);
 					var e = _v2.a;
 					return _Utils_Tuple2(
 						_Utils_update(
 							model,
-							{editor: e}),
+							{b: e}),
 						$elm$core$Platform$Cmd$none);
 				}
-			case 'ShowUpdateCaptionedImageModel':
+			case 0:
 				return _Utils_Tuple2(
 					$author$project$Page$SpecExtension$handleShowInsertCaptionedImageModal(model),
 					$elm$core$Platform$Cmd$none);
-			case 'UpdateCaptionedImageSrc':
+			case 1:
 				var s = msg.a;
 				return _Utils_Tuple2(
 					A2($author$project$Page$SpecExtension$handleUpdateCaptionedImageSrc, s, model),
 					$elm$core$Platform$Cmd$none);
-			case 'UpdateCaptionedImageAlt':
+			case 2:
 				var s = msg.a;
 				return _Utils_Tuple2(
 					A2($author$project$Page$SpecExtension$handleUpdateCaptionedImageAlt, s, model),
 					$elm$core$Platform$Cmd$none);
-			case 'UpdateCaption':
+			case 3:
 				var s = msg.a;
 				return _Utils_Tuple2(
 					A2($author$project$Page$SpecExtension$handleUpdateCaption, s, model),
 					$elm$core$Platform$Cmd$none);
-			case 'InsertCaptionedImage':
+			case 4:
 				return _Utils_Tuple2(
 					A2($author$project$Page$SpecExtension$handleInsertCaptionedImage, $author$project$Page$SpecExtension$customSpec, model),
 					$elm$core$Platform$Cmd$none);
@@ -30082,12 +26467,12 @@ var $author$project$Page$SpecExtension$update = F2(
 		}
 	});
 var $author$project$Page$SpecFromScratch$InternalMsg = function (a) {
-	return {$: 'InternalMsg', a: a};
+	return {$: 0, a: a};
 };
 var $author$project$Page$SpecFromScratch$commandBindings = $author$project$RichText$Commands$defaultCommandMap;
 var $author$project$Page$SpecFromScratch$ToggleCheckedTodoItem = F2(
 	function (a, b) {
-		return {$: 'ToggleCheckedTodoItem', a: a, b: b};
+		return {$: 1, a: a, b: b};
 	});
 var $author$project$Page$SpecFromScratch$toggleCheckboxDecoration = F3(
 	function (editorNodePath, elementParameters, p) {
@@ -30120,11 +26505,11 @@ var $author$project$Page$SpecFromScratch$todoSpec = A2(
 		[$author$project$Page$SpecFromScratch$todoList, $author$project$Page$SpecFromScratch$item, $author$project$RichText$Definitions$hardBreak]),
 	$author$project$RichText$Config$Spec$emptySpec);
 var $author$project$Page$SpecFromScratch$config = $author$project$RichText$Editor$config(
-	{commandMap: $author$project$Page$SpecFromScratch$commandBindings, decorations: $author$project$Page$SpecFromScratch$decorations, spec: $author$project$Page$SpecFromScratch$todoSpec, toMsg: $author$project$Page$SpecFromScratch$InternalMsg});
+	{dn: $author$project$Page$SpecFromScratch$commandBindings, du: $author$project$Page$SpecFromScratch$decorations, em: $author$project$Page$SpecFromScratch$todoSpec, er: $author$project$Page$SpecFromScratch$InternalMsg});
 var $author$project$RichText$Model$Attribute$replaceOrAddBoolAttribute = F3(
 	function (name, value, attributes) {
 		var _v0 = A2($author$project$RichText$Model$Attribute$findStringAttribute, name, attributes);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return A2(
 				$elm$core$List$cons,
 				A2($author$project$RichText$Model$Attribute$BoolAttribute, name, value),
@@ -30133,7 +26518,7 @@ var $author$project$RichText$Model$Attribute$replaceOrAddBoolAttribute = F3(
 			return A2(
 				$elm$core$List$map,
 				function (x) {
-					if (x.$ === 'BoolAttribute') {
+					if (x.$ === 2) {
 						var k = x.a;
 						return _Utils_eq(k, name) ? A2($author$project$RichText$Model$Attribute$BoolAttribute, name, value) : x;
 					} else {
@@ -30150,11 +26535,11 @@ var $author$project$Page$SpecFromScratch$updateTodoListItem = F3(
 			$author$project$RichText$Node$nodeAt,
 			path,
 			$author$project$RichText$Model$State$root(state));
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Result$Err('There is no node at the given path');
 		} else {
 			var node = _v0.a;
-			if (node.$ === 'Inline') {
+			if (node.$ === 1) {
 				return $elm$core$Result$Err('I can only update todo item, but I received an inline node');
 			} else {
 				var bn = node.a;
@@ -30171,7 +26556,7 @@ var $author$project$Page$SpecFromScratch$updateTodoListItem = F3(
 						path,
 						$author$project$RichText$Node$Block(newBlockNode),
 						r);
-					if (_v2.$ === 'Err') {
+					if (_v2.$ === 1) {
 						var s = _v2.a;
 						return $elm$core$Result$Err(s);
 					} else {
@@ -30188,9 +26573,9 @@ var $author$project$Page$SpecFromScratch$handleTodoListChecked = F3(
 		return _Utils_update(
 			model,
 			{
-				editor: A2(
+				b: A2(
 					$elm$core$Result$withDefault,
-					model.editor,
+					model.b,
 					A3(
 						$author$project$RichText$Editor$apply,
 						_Utils_Tuple2(
@@ -30198,22 +26583,22 @@ var $author$project$Page$SpecFromScratch$handleTodoListChecked = F3(
 							$author$project$RichText$Config$Command$transform(
 								A2($author$project$Page$SpecFromScratch$updateTodoListItem, path, value))),
 						$author$project$Page$SpecFromScratch$todoSpec,
-						model.editor))
+						model.b))
 			});
 	});
 var $author$project$Page$SpecFromScratch$update = F2(
 	function (msg, model) {
 		switch (msg.$) {
-			case 'InternalMsg':
+			case 0:
 				var editorMsg = msg.a;
 				return _Utils_Tuple2(
 					_Utils_update(
 						model,
 						{
-							editor: A3($author$project$RichText$Editor$update, $author$project$Page$SpecFromScratch$config, editorMsg, model.editor)
+							b: A3($author$project$RichText$Editor$update, $author$project$Page$SpecFromScratch$config, editorMsg, model.b)
 						}),
 					$elm$core$Platform$Cmd$none);
-			case 'ToggleCheckedTodoItem':
+			case 1:
 				var path = msg.a;
 				var value = msg.b;
 				return _Utils_Tuple2(
@@ -30229,12 +26614,12 @@ var $author$project$Main$update = F2(
 		_v0$7:
 		while (true) {
 			switch (_v0.a.$) {
-				case 'ClickedLink':
+				case 1:
 					var urlRequest = _v0.a.a;
-					if (urlRequest.$ === 'Internal') {
+					if (!urlRequest.$) {
 						var url = urlRequest.a;
-						var _v2 = url.fragment;
-						if (_v2.$ === 'Nothing') {
+						var _v2 = url.dF;
+						if (_v2.$ === 1) {
 							return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 						} else {
 							return _Utils_Tuple2(
@@ -30251,14 +26636,14 @@ var $author$project$Main$update = F2(
 							model,
 							$elm$browser$Browser$Navigation$load(href));
 					}
-				case 'ChangedUrl':
+				case 0:
 					var url = _v0.a.a;
 					return A2(
 						$author$project$Main$changeRouteTo,
 						$author$project$Route$fromUrl(url),
 						model);
-				case 'GotHomeMsg':
-					if (_v0.b.$ === 'Home') {
+				case 7:
+					if (_v0.b.$ === 6) {
 						var subMsg = _v0.a.a;
 						var home = _v0.b.a;
 						return A4(
@@ -30270,8 +26655,8 @@ var $author$project$Main$update = F2(
 					} else {
 						break _v0$7;
 					}
-				case 'GotMarkdownMsg':
-					if (_v0.b.$ === 'Markdown') {
+				case 3:
+					if (_v0.b.$ === 5) {
 						var subMsg = _v0.a.a;
 						var md = _v0.b.a;
 						return A4(
@@ -30283,8 +26668,8 @@ var $author$project$Main$update = F2(
 					} else {
 						break _v0$7;
 					}
-				case 'GotBasicMsg':
-					if (_v0.b.$ === 'Basic') {
+				case 2:
+					if (_v0.b.$ === 2) {
 						var subMsg = _v0.a.a;
 						var basic = _v0.b.a;
 						return A4(
@@ -30296,8 +26681,8 @@ var $author$project$Main$update = F2(
 					} else {
 						break _v0$7;
 					}
-				case 'GotSpecExtensionMsg':
-					if (_v0.b.$ === 'SpecExtension') {
+				case 4:
+					if (_v0.b.$ === 3) {
 						var subMsg = _v0.a.a;
 						var md = _v0.b.a;
 						return A4(
@@ -30309,8 +26694,8 @@ var $author$project$Main$update = F2(
 					} else {
 						break _v0$7;
 					}
-				case 'GotSpecFromScratchMsg':
-					if (_v0.b.$ === 'SpecFromScratch') {
+				case 5:
+					if (_v0.b.$ === 4) {
 						var subMsg = _v0.a.a;
 						var basic = _v0.b.a;
 						return A4(
@@ -30328,19 +26713,19 @@ var $author$project$Main$update = F2(
 		}
 		return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 	});
-var $author$project$Page$Basic = {$: 'Basic'};
-var $author$project$Page$Examples = {$: 'Examples'};
-var $author$project$Page$Home = {$: 'Home'};
-var $author$project$Page$Markdown = {$: 'Markdown'};
-var $author$project$Page$SpecExtension = {$: 'SpecExtension'};
-var $author$project$Page$SpecFromScratch = {$: 'SpecFromScratch'};
+var $author$project$Page$Basic = 0;
+var $author$project$Page$Examples = 5;
+var $author$project$Page$Home = 4;
+var $author$project$Page$Markdown = 1;
+var $author$project$Page$SpecExtension = 2;
+var $author$project$Page$SpecFromScratch = 3;
 var $elm$virtual_dom$VirtualDom$map = _VirtualDom_map;
 var $elm$html$Html$map = $elm$virtual_dom$VirtualDom$map;
 var $elm$html$Html$p = _VirtualDom_node('p');
 var $elm$virtual_dom$VirtualDom$text = _VirtualDom_text;
 var $elm$html$Html$text = $elm$virtual_dom$VirtualDom$text;
 var $author$project$Page$Home$notFoundView = {
-	content: _List_fromArray(
+	$7: _List_fromArray(
 		[
 			A2(
 			$elm$html$Html$p,
@@ -30353,7 +26738,7 @@ var $author$project$Page$Home$notFoundView = {
 					$elm$html$Html$text('I\'m sorry, I couldn\'t find the content you were looking for.')
 				]))
 		]),
-	title: 'Not found'
+	c$: 'Not found'
 };
 var $elm$virtual_dom$VirtualDom$node = function (tag) {
 	return _VirtualDom_node(
@@ -30425,19 +26810,19 @@ var $author$project$Page$viewFooter = A2(
 		]));
 var $elm$html$Html$header = _VirtualDom_node('header');
 var $author$project$Route$routeToPieces = function (page) {
-	switch (page.$) {
-		case 'Home':
+	switch (page) {
+		case 4:
 			return _List_Nil;
-		case 'Basic':
+		case 0:
 			return _List_fromArray(
 				['examples', 'basic']);
-		case 'Markdown':
+		case 1:
 			return _List_fromArray(
 				['examples', 'markdown']);
-		case 'SpecExtension':
+		case 2:
 			return _List_fromArray(
 				['examples', 'spec-extension']);
-		case 'SpecFromScratch':
+		case 3:
 			return _List_fromArray(
 				['examples', 'spec-from-scratch']);
 		default:
@@ -30471,25 +26856,25 @@ var $author$project$Page$isActive = F2(
 		var _v0 = _Utils_Tuple2(page, route);
 		_v0$3:
 		while (true) {
-			switch (_v0.a.$) {
-				case 'Home':
-					if (_v0.b.$ === 'Home') {
+			switch (_v0.a) {
+				case 4:
+					if (_v0.b === 4) {
 						var _v1 = _v0.a;
 						var _v2 = _v0.b;
 						return true;
 					} else {
 						break _v0$3;
 					}
-				case 'Basic':
-					if (_v0.b.$ === 'Basic') {
+				case 0:
+					if (!_v0.b) {
 						var _v3 = _v0.a;
 						var _v4 = _v0.b;
 						return true;
 					} else {
 						break _v0$3;
 					}
-				case 'Markdown':
-					if (_v0.b.$ === 'Markdown') {
+				case 1:
+					if (_v0.b === 1) {
 						var _v5 = _v0.a;
 						var _v6 = _v0.b;
 						return true;
@@ -30537,7 +26922,7 @@ var $author$project$Page$viewMenu = function (page) {
 		[
 			A2(
 			linkTo,
-			$author$project$Route$Examples,
+			5,
 			_List_fromArray(
 				[
 					$elm$html$Html$text('Examples')
@@ -30567,7 +26952,7 @@ var $author$project$Page$viewHeader = function (page) {
 						_List_fromArray(
 							[
 								$elm$html$Html$Attributes$class('logo'),
-								$author$project$Route$href($author$project$Route$Home)
+								$author$project$Route$href(4)
 							]),
 						_List_fromArray(
 							[
@@ -30584,7 +26969,7 @@ var $author$project$Page$viewHeader = function (page) {
 							A3(
 								$author$project$Page$navbarLink,
 								page,
-								$author$project$Route$Home,
+								4,
 								_List_fromArray(
 									[
 										$elm$html$Html$text('Home')
@@ -30595,10 +26980,10 @@ var $author$project$Page$viewHeader = function (page) {
 };
 var $author$project$Page$view = F2(
 	function (page, _v0) {
-		var title = _v0.title;
-		var content = _v0.content;
+		var title = _v0.c$;
+		var content = _v0.$7;
 		return {
-			body: A2(
+			bW: A2(
 				$elm$core$List$cons,
 				$author$project$Page$fontAwesomeStyle,
 				A2(
@@ -30609,18 +26994,18 @@ var $author$project$Page$view = F2(
 						$author$project$Page$viewContent(content),
 						_List_fromArray(
 							[$author$project$Page$viewFooter])))),
-			title: title
+			c$: title
 		};
 	});
 var $author$project$Page$Basic$EditorMsg = function (a) {
-	return {$: 'EditorMsg', a: a};
+	return {$: 0, a: a};
 };
 var $elm$html$Html$h1 = _VirtualDom_node('h1');
 var $author$project$Links$rteToolkit = 'https://github.com/wolfadex/elm-rte-toolkit';
 var $elm$html$Html$Attributes$title = $elm$html$Html$Attributes$stringProperty('title');
-var $author$project$Controls$Disabled = {$: 'Disabled'};
-var $author$project$Controls$Enabled = {$: 'Enabled'};
-var $author$project$RichText$List$Unordered = {$: 'Unordered'};
+var $author$project$Controls$Disabled = 2;
+var $author$project$Controls$Enabled = 1;
+var $author$project$RichText$List$Unordered = 1;
 var $elm$svg$Svg$Attributes$class = _VirtualDom_attribute('class');
 var $elm$svg$Svg$Attributes$id = _VirtualDom_attribute('id');
 var $elm$virtual_dom$VirtualDom$mapAttribute = _VirtualDom_mapAttribute;
@@ -30630,19 +27015,19 @@ var $elm$svg$Svg$svg = $elm$svg$Svg$trustedNode('svg');
 var $elm$svg$Svg$text = $elm$virtual_dom$VirtualDom$text;
 var $elm$svg$Svg$title = $elm$svg$Svg$trustedNode('title');
 var $lattyware$elm_fontawesome$FontAwesome$Internal$topLevelDimensions = function (_v1) {
-	var icon = _v1.a.icon;
-	var outer = _v1.a.outer;
+	var icon = _v1.ci;
+	var outer = _v1.bB;
 	return A2(
 		$elm$core$Maybe$withDefault,
-		icon.size,
+		icon.ek,
 		A2($elm$core$Maybe$map, $lattyware$elm_fontawesome$FontAwesome$Internal$topLevelDimensionsInternal, outer));
 };
 var $lattyware$elm_fontawesome$FontAwesome$Internal$topLevelDimensionsInternal = function (_v0) {
-	var icon = _v0.a.icon;
-	var outer = _v0.a.outer;
+	var icon = _v0.ci;
+	var outer = _v0.bB;
 	return A2(
 		$elm$core$Maybe$withDefault,
-		icon.size,
+		icon.ek,
 		A2($elm$core$Maybe$map, $lattyware$elm_fontawesome$FontAwesome$Internal$topLevelDimensions, outer));
 };
 var $elm$svg$Svg$defs = $elm$svg$Svg$trustedNode('defs');
@@ -30666,16 +27051,16 @@ var $elm$svg$Svg$Attributes$maskUnits = _VirtualDom_attribute('maskUnits');
 var $lattyware$elm_fontawesome$FontAwesome$Transforms$Internal$add = F2(
 	function (transform, combined) {
 		switch (transform.$) {
-			case 'Scale':
+			case 0:
 				var by = transform.a;
 				return _Utils_update(
 					combined,
-					{size: combined.size + by});
-			case 'Reposition':
+					{ek: combined.ek + by});
+			case 1:
 				var axis = transform.a;
 				var by = transform.b;
 				var _v1 = function () {
-					if (axis.$ === 'Vertical') {
+					if (!axis) {
 						return _Utils_Tuple2(0, by);
 					} else {
 						return _Utils_Tuple2(by, 0);
@@ -30685,27 +27070,27 @@ var $lattyware$elm_fontawesome$FontAwesome$Transforms$Internal$add = F2(
 				var y = _v1.b;
 				return _Utils_update(
 					combined,
-					{x: combined.x + x, y: combined.y + y});
-			case 'Rotate':
+					{c6: combined.c6 + x, c7: combined.c7 + y});
+			case 2:
 				var rotation = transform.a;
 				return _Utils_update(
 					combined,
-					{rotate: combined.rotate + rotation});
+					{eh: combined.eh + rotation});
 			default:
 				var axis = transform.a;
-				if (axis.$ === 'Vertical') {
+				if (!axis) {
 					return _Utils_update(
 						combined,
-						{flipY: !combined.flipY});
+						{dE: !combined.dE});
 				} else {
 					return _Utils_update(
 						combined,
-						{flipX: !combined.flipX});
+						{dD: !combined.dD});
 				}
 		}
 	});
 var $lattyware$elm_fontawesome$FontAwesome$Transforms$Internal$baseSize = 16;
-var $lattyware$elm_fontawesome$FontAwesome$Transforms$Internal$meaninglessTransform = {flipX: false, flipY: false, rotate: 0, size: $lattyware$elm_fontawesome$FontAwesome$Transforms$Internal$baseSize, x: 0, y: 0};
+var $lattyware$elm_fontawesome$FontAwesome$Transforms$Internal$meaninglessTransform = {dD: false, dE: false, eh: 0, ek: $lattyware$elm_fontawesome$FontAwesome$Transforms$Internal$baseSize, c6: 0, c7: 0};
 var $lattyware$elm_fontawesome$FontAwesome$Transforms$Internal$combine = function (transforms) {
 	return A3($elm$core$List$foldl, $lattyware$elm_fontawesome$FontAwesome$Transforms$Internal$add, $lattyware$elm_fontawesome$FontAwesome$Transforms$Internal$meaninglessTransform, transforms);
 };
@@ -30720,20 +27105,20 @@ var $lattyware$elm_fontawesome$FontAwesome$Transforms$Internal$transformForSvg =
 	function (containerWidth, iconWidth, transform) {
 		var path = 'translate(' + ($elm$core$String$fromFloat((iconWidth / 2) * (-1)) + ' -256)');
 		var outer = 'translate(' + ($elm$core$String$fromFloat(containerWidth / 2) + ' 256)');
-		var innerTranslate = 'translate(' + ($elm$core$String$fromFloat(transform.x * 32) + (',' + ($elm$core$String$fromFloat(transform.y * 32) + ') ')));
-		var innerRotate = 'rotate(' + ($elm$core$String$fromFloat(transform.rotate) + ' 0 0)');
-		var flipY = transform.flipY ? (-1) : 1;
-		var scaleY = (transform.size / $lattyware$elm_fontawesome$FontAwesome$Transforms$Internal$baseSize) * flipY;
-		var flipX = transform.flipX ? (-1) : 1;
-		var scaleX = (transform.size / $lattyware$elm_fontawesome$FontAwesome$Transforms$Internal$baseSize) * flipX;
+		var innerTranslate = 'translate(' + ($elm$core$String$fromFloat(transform.c6 * 32) + (',' + ($elm$core$String$fromFloat(transform.c7 * 32) + ') ')));
+		var innerRotate = 'rotate(' + ($elm$core$String$fromFloat(transform.eh) + ' 0 0)');
+		var flipY = transform.dE ? (-1) : 1;
+		var scaleY = (transform.ek / $lattyware$elm_fontawesome$FontAwesome$Transforms$Internal$baseSize) * flipY;
+		var flipX = transform.dD ? (-1) : 1;
+		var scaleX = (transform.ek / $lattyware$elm_fontawesome$FontAwesome$Transforms$Internal$baseSize) * flipX;
 		var innerScale = 'scale(' + ($elm$core$String$fromFloat(scaleX) + (', ' + ($elm$core$String$fromFloat(scaleY) + ') ')));
 		return {
-			inner: $elm$svg$Svg$Attributes$transform(
+			cl: $elm$svg$Svg$Attributes$transform(
 				_Utils_ap(
 					innerTranslate,
 					_Utils_ap(innerScale, innerRotate))),
-			outer: $elm$svg$Svg$Attributes$transform(outer),
-			path: $elm$svg$Svg$Attributes$transform(path)
+			bB: $elm$svg$Svg$Attributes$transform(outer),
+			d7: $elm$svg$Svg$Attributes$transform(path)
 		};
 	});
 var $elm$svg$Svg$Attributes$d = _VirtualDom_attribute('d');
@@ -30750,8 +27135,8 @@ var $lattyware$elm_fontawesome$FontAwesome$Svg$viewPath = F2(
 	});
 var $lattyware$elm_fontawesome$FontAwesome$Svg$viewPaths = F2(
 	function (attrs, _v0) {
-		var paths = _v0.paths;
-		if (paths.b.$ === 'Nothing') {
+		var paths = _v0.d8;
+		if (paths.b.$ === 1) {
 			var only = paths.a;
 			var _v2 = paths.b;
 			return A2($lattyware$elm_fontawesome$FontAwesome$Svg$viewPath, attrs, only);
@@ -30785,9 +27170,9 @@ var $lattyware$elm_fontawesome$FontAwesome$Svg$viewPaths = F2(
 	});
 var $lattyware$elm_fontawesome$FontAwesome$Svg$viewWithTransform = F3(
 	function (color, _v0, icon) {
-		var outer = _v0.outer;
-		var inner = _v0.inner;
-		var path = _v0.path;
+		var outer = _v0.bB;
+		var inner = _v0.cl;
+		var path = _v0.d7;
 		return A2(
 			$elm$svg$Svg$g,
 			_List_fromArray(
@@ -30813,19 +27198,19 @@ var $lattyware$elm_fontawesome$FontAwesome$Svg$viewWithTransform = F3(
 	});
 var $lattyware$elm_fontawesome$FontAwesome$Svg$viewInColor = F2(
 	function (color, fullIcon) {
-		var icon = fullIcon.a.icon;
-		var transforms = fullIcon.a.transforms;
-		var id = fullIcon.a.id;
-		var outer = fullIcon.a.outer;
+		var icon = fullIcon.ci;
+		var transforms = fullIcon.bi;
+		var id = fullIcon.br;
+		var outer = fullIcon.bB;
 		var combinedTransforms = $lattyware$elm_fontawesome$FontAwesome$Transforms$Internal$meaningfulTransform(transforms);
-		var _v0 = icon.size;
+		var _v0 = icon.ek;
 		var width = _v0.a;
 		var _v1 = $lattyware$elm_fontawesome$FontAwesome$Internal$topLevelDimensions(fullIcon);
 		var topLevelWidth = _v1.a;
-		if (combinedTransforms.$ === 'Just') {
+		if (!combinedTransforms.$) {
 			var meaningfulTransform = combinedTransforms.a;
 			var svgTransform = A3($lattyware$elm_fontawesome$FontAwesome$Transforms$Internal$transformForSvg, topLevelWidth, width, meaningfulTransform);
-			if (outer.$ === 'Just') {
+			if (!outer.$) {
 				var outerIcon = outer.a;
 				return A4($lattyware$elm_fontawesome$FontAwesome$Svg$viewMaskedWithTransform, color, svgTransform, icon, outerIcon);
 			} else {
@@ -30843,7 +27228,7 @@ var $lattyware$elm_fontawesome$FontAwesome$Svg$viewInColor = F2(
 	});
 var $lattyware$elm_fontawesome$FontAwesome$Svg$viewMaskedWithTransform = F4(
 	function (color, transforms, exclude, include) {
-		var id = include.a.id;
+		var id = include.br;
 		var alwaysId = A2($elm$core$Maybe$withDefault, '', id);
 		var clipId = 'clip-' + alwaysId;
 		var maskId = 'mask-' + alwaysId;
@@ -30889,16 +27274,16 @@ var $lattyware$elm_fontawesome$FontAwesome$Svg$view = $lattyware$elm_fontawesome
 var $elm$svg$Svg$Attributes$viewBox = _VirtualDom_attribute('viewBox');
 var $lattyware$elm_fontawesome$FontAwesome$internalView = F2(
 	function (fullIcon, extraAttributes) {
-		var icon = fullIcon.a.icon;
-		var transforms = fullIcon.a.transforms;
-		var role = fullIcon.a.role;
-		var id = fullIcon.a.id;
-		var title = fullIcon.a.title;
-		var outer = fullIcon.a.outer;
-		var attributes = fullIcon.a.attributes;
+		var icon = fullIcon.ci;
+		var transforms = fullIcon.bi;
+		var role = fullIcon.bE;
+		var id = fullIcon.br;
+		var title = fullIcon.c$;
+		var outer = fullIcon.bB;
+		var attributes = fullIcon.V;
 		var contents = $lattyware$elm_fontawesome$FontAwesome$Svg$view(fullIcon);
 		var _v0 = function () {
-			if (title.$ === 'Just') {
+			if (!title.$) {
 				var givenTitle = title.a;
 				var titleId = A2($elm$core$Maybe$withDefault, '', id) + '-title';
 				return _Utils_Tuple2(
@@ -30933,7 +27318,7 @@ var $lattyware$elm_fontawesome$FontAwesome$internalView = F2(
 		var classes = _List_fromArray(
 			[
 				'svg-inline--fa',
-				'fa-' + icon.name,
+				'fa-' + icon.ct,
 				'fa-w-' + $elm$core$String$fromInt(aspectRatio)
 			]);
 		return A2(
@@ -30973,13 +27358,13 @@ var $author$project$Controls$createButton = F4(
 						$elm$html$Html$Attributes$class('rte-button')
 					]),
 				function () {
-					switch (status.$) {
-						case 'Active':
+					switch (status) {
+						case 0:
 							return _List_fromArray(
 								[
 									$elm$html$Html$Attributes$class('rte-active')
 								]);
-						case 'Disabled':
+						case 2:
 							return _List_fromArray(
 								[
 									$elm$html$Html$Attributes$class('rte-disabled')
@@ -30998,7 +27383,7 @@ var $author$project$Controls$createButton = F4(
 	});
 var $lattyware$elm_fontawesome$FontAwesome$IconDef = F4(
 	function (prefix, name, size, paths) {
-		return {name: name, paths: paths, prefix: prefix, size: size};
+		return {ct: name, d8: paths, d9: prefix, ek: size};
 	});
 var $lattyware$elm_fontawesome$FontAwesome$Solid$Definitions$listOl = A4(
 	$lattyware$elm_fontawesome$FontAwesome$IconDef,
@@ -31006,12 +27391,9 @@ var $lattyware$elm_fontawesome$FontAwesome$Solid$Definitions$listOl = A4(
 	'list-ol',
 	_Utils_Tuple2(512, 512),
 	_Utils_Tuple2('M24 56c0-13.3 10.7-24 24-24H80c13.3 0 24 10.7 24 24V176h16c13.3 0 24 10.7 24 24s-10.7 24-24 24H40c-13.3 0-24-10.7-24-24s10.7-24 24-24H56V80H48C34.7 80 24 69.3 24 56zM86.7 341.2c-6.5-7.4-18.3-6.9-24 1.2L51.5 357.9c-7.7 10.8-22.7 13.3-33.5 5.6s-13.3-22.7-5.6-33.5l11.1-15.6c23.7-33.2 72.3-35.6 99.2-4.9c21.3 24.4 20.8 60.9-1.1 84.7L86.8 432H120c13.3 0 24 10.7 24 24s-10.7 24-24 24H32c-9.5 0-18.2-5.6-22-14.4s-2.1-18.9 4.3-25.9l72-78c5.3-5.8 5.4-14.6 .3-20.5zM224 64H480c17.7 0 32 14.3 32 32s-14.3 32-32 32H224c-17.7 0-32-14.3-32-32s14.3-32 32-32zm0 160H480c17.7 0 32 14.3 32 32s-14.3 32-32 32H224c-17.7 0-32-14.3-32-32s14.3-32 32-32zm0 160H480c17.7 0 32 14.3 32 32s-14.3 32-32 32H224c-17.7 0-32-14.3-32-32s14.3-32 32-32z', $elm$core$Maybe$Nothing));
-var $lattyware$elm_fontawesome$FontAwesome$Internal$Icon = function (a) {
-	return {$: 'Icon', a: a};
-};
+var $lattyware$elm_fontawesome$FontAwesome$Internal$Icon = $elm$core$Basics$identity;
 var $lattyware$elm_fontawesome$FontAwesome$present = function (icon) {
-	return $lattyware$elm_fontawesome$FontAwesome$Internal$Icon(
-		{attributes: _List_Nil, icon: icon, id: $elm$core$Maybe$Nothing, outer: $elm$core$Maybe$Nothing, role: 'img', title: $elm$core$Maybe$Nothing, transforms: _List_Nil});
+	return {V: _List_Nil, ci: icon, br: $elm$core$Maybe$Nothing, bB: $elm$core$Maybe$Nothing, bE: 'img', c$: $elm$core$Maybe$Nothing, bi: _List_Nil};
 };
 var $lattyware$elm_fontawesome$FontAwesome$Solid$listOl = $lattyware$elm_fontawesome$FontAwesome$present($lattyware$elm_fontawesome$FontAwesome$Solid$Definitions$listOl);
 var $lattyware$elm_fontawesome$FontAwesome$Solid$Definitions$listUl = A4(
@@ -31028,9 +27410,9 @@ var $lattyware$elm_fontawesome$FontAwesome$Solid$Definitions$minus = A4(
 	_Utils_Tuple2(448, 512),
 	_Utils_Tuple2('M432 256c0 17.7-14.3 32-32 32L48 288c-17.7 0-32-14.3-32-32s14.3-32 32-32l352 0c17.7 0 32 14.3 32 32z', $elm$core$Maybe$Nothing));
 var $lattyware$elm_fontawesome$FontAwesome$Solid$minus = $lattyware$elm_fontawesome$FontAwesome$present($lattyware$elm_fontawesome$FontAwesome$Solid$Definitions$minus);
-var $author$project$Controls$InsertHorizontalRule = {$: 'InsertHorizontalRule'};
+var $author$project$Controls$InsertHorizontalRule = {$: 12};
 var $elm$virtual_dom$VirtualDom$MayPreventDefault = function (a) {
-	return {$: 'MayPreventDefault', a: a};
+	return {$: 2, a: a};
 };
 var $elm$html$Html$Events$preventDefaultOn = F2(
 	function (event, decoder) {
@@ -31044,14 +27426,14 @@ var $author$project$Controls$onButtonPressInsertHR = A2(
 	'mousedown',
 	$elm$json$Json$Decode$succeed(
 		_Utils_Tuple2($author$project$Controls$InsertHorizontalRule, true)));
-var $author$project$Controls$LiftOutOfBlock = {$: 'LiftOutOfBlock'};
+var $author$project$Controls$LiftOutOfBlock = {$: 14};
 var $author$project$Controls$onButtonPressLiftOutOfBlock = A2(
 	$elm$html$Html$Events$preventDefaultOn,
 	'mousedown',
 	$elm$json$Json$Decode$succeed(
 		_Utils_Tuple2($author$project$Controls$LiftOutOfBlock, true)));
 var $author$project$Controls$WrapInList = function (a) {
-	return {$: 'WrapInList', a: a};
+	return {$: 7, a: a};
 };
 var $author$project$Controls$onButtonPressToggleList = function (listType) {
 	return A2(
@@ -31062,7 +27444,7 @@ var $author$project$Controls$onButtonPressToggleList = function (listType) {
 				$author$project$Controls$WrapInList(listType),
 				true)));
 };
-var $author$project$Controls$WrapInBlockQuote = {$: 'WrapInBlockQuote'};
+var $author$project$Controls$WrapInBlockQuote = {$: 13};
 var $author$project$Controls$onButtonPressWrapBlockquote = A2(
 	$elm$html$Html$Events$preventDefaultOn,
 	'mousedown',
@@ -31083,20 +27465,20 @@ var $lattyware$elm_fontawesome$FontAwesome$Solid$Definitions$quoteRight = A4(
 	_Utils_Tuple2('M448 296c0 66.3-53.7 120-120 120h-8c-17.7 0-32-14.3-32-32s14.3-32 32-32h8c30.9 0 56-25.1 56-56v-8H320c-35.3 0-64-28.7-64-64V160c0-35.3 28.7-64 64-64h64c35.3 0 64 28.7 64 64v32 32 72zm-256 0c0 66.3-53.7 120-120 120H64c-17.7 0-32-14.3-32-32s14.3-32 32-32h8c30.9 0 56-25.1 56-56v-8H64c-35.3 0-64-28.7-64-64V160c0-35.3 28.7-64 64-64h64c35.3 0 64 28.7 64 64v32 32 72z', $elm$core$Maybe$Nothing));
 var $lattyware$elm_fontawesome$FontAwesome$Solid$quoteRight = $lattyware$elm_fontawesome$FontAwesome$present($lattyware$elm_fontawesome$FontAwesome$Solid$Definitions$quoteRight);
 var $author$project$Controls$blockElements = function (controlStatus) {
-	var liftStatus = controlStatus.canLift ? $author$project$Controls$Enabled : $author$project$Controls$Disabled;
-	var blockStatus = controlStatus.hasSelection ? $author$project$Controls$Enabled : $author$project$Controls$Disabled;
+	var liftStatus = controlStatus.aW ? 1 : 2;
+	var blockStatus = controlStatus.a1 ? 1 : 2;
 	return _List_fromArray(
 		[
 			A4(
 			$author$project$Controls$createButton,
 			blockStatus,
-			$author$project$Controls$onButtonPressToggleList($author$project$RichText$List$Ordered),
+			$author$project$Controls$onButtonPressToggleList(0),
 			$lattyware$elm_fontawesome$FontAwesome$Solid$listOl,
 			'ordered list'),
 			A4(
 			$author$project$Controls$createButton,
 			blockStatus,
-			$author$project$Controls$onButtonPressToggleList($author$project$RichText$List$Unordered),
+			$author$project$Controls$onButtonPressToggleList(1),
 			$lattyware$elm_fontawesome$FontAwesome$Solid$listUl,
 			'unordered list'),
 			A4($author$project$Controls$createButton, blockStatus, $author$project$Controls$onButtonPressInsertHR, $lattyware$elm_fontawesome$FontAwesome$Solid$minus, 'horizontal rule'),
@@ -31105,7 +27487,7 @@ var $author$project$Controls$blockElements = function (controlStatus) {
 		]);
 };
 var $author$project$Controls$ToggleStyle = function (a) {
-	return {$: 'ToggleStyle', a: a};
+	return {$: 1, a: a};
 };
 var $author$project$Controls$onButtonPressToggleStyle = function (style) {
 	return A2(
@@ -31116,16 +27498,16 @@ var $author$project$Controls$onButtonPressToggleStyle = function (style) {
 				$author$project$Controls$ToggleStyle(style),
 				true)));
 };
-var $author$project$Controls$Active = {$: 'Active'};
+var $author$project$Controls$Active = 0;
 var $author$project$Controls$styleToString = function (style) {
-	switch (style.$) {
-		case 'Bold':
+	switch (style) {
+		case 0:
 			return 'bold';
-		case 'Italic':
+		case 1:
 			return 'italic';
-		case 'Code':
+		case 2:
 			return 'code';
-		case 'Strikethrough':
+		case 3:
 			return 'strikethrough';
 		default:
 			return 'underline';
@@ -31133,20 +27515,20 @@ var $author$project$Controls$styleToString = function (style) {
 };
 var $author$project$Controls$statusForStyle = F2(
 	function (style, controlState) {
-		return ((!controlState.hasInline) || A2($elm$core$Set$member, 'code_block', controlState.nodes)) ? $author$project$Controls$Disabled : (A2(
+		return ((!controlState.Z) || A2($elm$core$Set$member, 'code_block', controlState.ac)) ? 2 : (A2(
 			$elm$core$Set$member,
 			$author$project$Controls$styleToString(style),
-			controlState.marks) ? $author$project$Controls$Active : $author$project$Controls$Enabled);
+			controlState.am) ? 0 : 1);
 	});
 var $author$project$Controls$titleForStyle = function (style) {
-	switch (style.$) {
-		case 'Bold':
+	switch (style) {
+		case 0:
 			return 'bold';
-		case 'Italic':
+		case 1:
 			return 'italic';
-		case 'Code':
+		case 2:
 			return 'code';
-		case 'Underline':
+		case 4:
 			return 'underline';
 		default:
 			return 'strikethrough';
@@ -31165,23 +27547,22 @@ var $author$project$Controls$createButtonForStyle = F3(
 	});
 var $elm$core$Set$union = F2(
 	function (_v0, _v1) {
-		var dict1 = _v0.a;
-		var dict2 = _v1.a;
-		return $elm$core$Set$Set_elm_builtin(
-			A2($elm$core$Dict$union, dict1, dict2));
+		var dict1 = _v0;
+		var dict2 = _v1;
+		return A2($elm$core$Dict$union, dict1, dict2);
 	});
 var $author$project$Controls$accumulateControlState = F2(
 	function (node, controlState) {
-		if (node.$ === 'Block') {
+		if (!node.$) {
 			var n = node.a;
 			return _Utils_update(
 				controlState,
 				{
-					nodes: A2(
+					ac: A2(
 						$elm$core$Set$insert,
 						$author$project$RichText$Model$Element$name(
 							$author$project$RichText$Model$Node$element(n)),
-						controlState.nodes)
+						controlState.ac)
 				});
 		} else {
 			var inline = node.a;
@@ -31192,11 +27573,11 @@ var $author$project$Controls$accumulateControlState = F2(
 			return _Utils_update(
 				controlState,
 				{
-					hasInline: true,
-					marks: A2(
+					Z: true,
+					am: A2(
 						$elm$core$Set$union,
 						$elm$core$Set$fromList(names),
-						controlState.marks)
+						controlState.am)
 				});
 		}
 	});
@@ -31209,7 +27590,7 @@ var $author$project$RichText$Node$foldlRangeRec = F6(
 			} else {
 				var result = A2(func, node, acc);
 				var _v0 = A2($author$project$RichText$Node$next, start, root);
-				if (_v0.$ === 'Nothing') {
+				if (_v0.$ === 1) {
 					return result;
 				} else {
 					var _v1 = _v0.a;
@@ -31235,7 +27616,7 @@ var $author$project$RichText$Node$foldlRangeRec = F6(
 var $author$project$RichText$Node$foldlRange = F5(
 	function (start, end, func, acc, root) {
 		var _v0 = A2($author$project$RichText$Node$nodeAt, start, root);
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return acc;
 		} else {
 			var node = _v0.a;
@@ -31255,23 +27636,23 @@ var $author$project$Controls$accumulateControlStateWithRanges = F3(
 			controlState,
 			ranges);
 	});
-var $author$project$Controls$emptyControlState = {canLift: false, hasInline: false, hasRedo: false, hasSelection: false, hasUndo: false, marks: $elm$core$Set$empty, nodes: $elm$core$Set$empty};
+var $author$project$Controls$emptyControlState = {aW: false, Z: false, a0: false, a1: false, a2: false, am: $elm$core$Set$empty, ac: $elm$core$Set$empty};
 var $author$project$RichText$Editor$history = $author$project$RichText$Internal$Editor$history;
 var $author$project$RichText$Internal$History$peek = function (history) {
-	var c = history.a;
-	return $folkertdev$elm_deque$BoundedDeque$first(c.undoDeque);
+	var c = history;
+	return $folkertdev$elm_deque$BoundedDeque$first(c.S);
 };
 var $author$project$RichText$Model$History$peek = $author$project$RichText$Internal$History$peek;
 var $author$project$RichText$Internal$History$redoList = function (history) {
-	var c = history.a;
-	return c.redoStack;
+	var c = history;
+	return c.aK;
 };
 var $author$project$RichText$Model$History$redoList = $author$project$RichText$Internal$History$redoList;
 var $author$project$Controls$deriveControlState = function (editor) {
 	var state_ = $author$project$RichText$Editor$state(editor);
 	var history_ = $author$project$RichText$Editor$history(editor);
 	var _v0 = $author$project$RichText$Model$State$selection(state_);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return $author$project$Controls$emptyControlState;
 	} else {
 		var selection = _v0.a;
@@ -31298,15 +27679,15 @@ var $author$project$Controls$deriveControlState = function (editor) {
 			$author$project$RichText$Model$State$root(state_),
 			_Utils_update(
 				$author$project$Controls$emptyControlState,
-				{hasSelection: true}));
+				{a1: true}));
 		return _Utils_update(
 			controlState,
 			{
-				canLift: ($elm$core$List$length(
+				aW: ($elm$core$List$length(
 					$author$project$RichText$Model$Selection$anchorNode(normalizedSelection)) > 2) || (($elm$core$List$length(
-					$author$project$RichText$Model$Selection$focusNode(normalizedSelection)) > 2) || (A2($elm$core$Set$member, 'blockquote', controlState.nodes) || A2($elm$core$Set$member, 'li', controlState.nodes))),
-				hasRedo: hasRedo,
-				hasUndo: hasUndo
+					$author$project$RichText$Model$Selection$focusNode(normalizedSelection)) > 2) || (A2($elm$core$Set$member, 'blockquote', controlState.ac) || A2($elm$core$Set$member, 'li', controlState.ac))),
+				a0: hasRedo,
+				a2: hasUndo
 			});
 	}
 };
@@ -31326,7 +27707,7 @@ var $lattyware$elm_fontawesome$FontAwesome$Solid$Definitions$heading = A4(
 var $lattyware$elm_fontawesome$FontAwesome$Solid$heading = $lattyware$elm_fontawesome$FontAwesome$present($lattyware$elm_fontawesome$FontAwesome$Solid$Definitions$heading);
 var $elm$core$List$map3 = _List_map3;
 var $author$project$Controls$ToggleBlock = function (a) {
-	return {$: 'ToggleBlock', a: a};
+	return {$: 6, a: a};
 };
 var $author$project$Controls$onButtonPressToggleBlock = function (action) {
 	return A2(
@@ -31344,10 +27725,10 @@ var $author$project$Controls$headerElements = function (controlState) {
 			function (block, icon, title) {
 				return A4(
 					$author$project$Controls$createButton,
-					controlState.hasInline ? (A2(
+					controlState.Z ? (A2(
 						$elm$core$Set$member,
 						A3($elm$core$String$replace, ' ', '_', title),
-						controlState.nodes) ? $author$project$Controls$Active : $author$project$Controls$Enabled) : $author$project$Controls$Disabled,
+						controlState.ac) ? 0 : 1) : 2,
 					$author$project$Controls$onButtonPressToggleBlock(block),
 					icon,
 					title);
@@ -31380,30 +27761,30 @@ var $lattyware$elm_fontawesome$FontAwesome$Solid$Definitions$link = A4(
 	_Utils_Tuple2(640, 512),
 	_Utils_Tuple2('M579.8 267.7c56.5-56.5 56.5-148 0-204.5c-50-50-128.8-56.5-186.3-15.4l-1.6 1.1c-14.4 10.3-17.7 30.3-7.4 44.6s30.3 17.7 44.6 7.4l1.6-1.1c32.1-22.9 76-19.3 103.8 8.6c31.5 31.5 31.5 82.5 0 114L422.3 334.8c-31.5 31.5-82.5 31.5-114 0c-27.9-27.9-31.5-71.8-8.6-103.8l1.1-1.6c10.3-14.4 6.9-34.4-7.4-44.6s-34.4-6.9-44.6 7.4l-1.1 1.6C206.5 251.2 213 330 263 380c56.5 56.5 148 56.5 204.5 0L579.8 267.7zM60.2 244.3c-56.5 56.5-56.5 148 0 204.5c50 50 128.8 56.5 186.3 15.4l1.6-1.1c14.4-10.3 17.7-30.3 7.4-44.6s-30.3-17.7-44.6-7.4l-1.6 1.1c-32.1 22.9-76 19.3-103.8-8.6C74 372 74 321 105.5 289.5L217.7 177.2c31.5-31.5 82.5-31.5 114 0c27.9 27.9 31.5 71.8 8.6 103.9l-1.1 1.6c-10.3 14.4-6.9 34.4 7.4 44.6s34.4 6.9 44.6-7.4l1.1-1.6C433.5 260.8 427 182 377 132c-56.5-56.5-148-56.5-204.5 0L60.2 244.3z', $elm$core$Maybe$Nothing));
 var $lattyware$elm_fontawesome$FontAwesome$Solid$link = $lattyware$elm_fontawesome$FontAwesome$present($lattyware$elm_fontawesome$FontAwesome$Solid$Definitions$link);
-var $author$project$Controls$Code = {$: 'Code'};
+var $author$project$Controls$Code = 2;
 var $author$project$Controls$onButtonPressInsertCode = A2(
 	$elm$html$Html$Events$preventDefaultOn,
 	'mousedown',
 	$elm$json$Json$Decode$succeed(
 		_Utils_Tuple2(
-			$author$project$Controls$ToggleStyle($author$project$Controls$Code),
+			$author$project$Controls$ToggleStyle(2),
 			true)));
-var $author$project$Controls$ShowInsertImageModal = {$: 'ShowInsertImageModal'};
+var $author$project$Controls$ShowInsertImageModal = {$: 8};
 var $author$project$Controls$onButtonPressInsertImage = A2(
 	$elm$html$Html$Events$preventDefaultOn,
 	'mousedown',
 	$elm$json$Json$Decode$succeed(
 		_Utils_Tuple2($author$project$Controls$ShowInsertImageModal, true)));
-var $author$project$Controls$ShowInsertLinkModal = {$: 'ShowInsertLinkModal'};
+var $author$project$Controls$ShowInsertLinkModal = {$: 2};
 var $author$project$Controls$onButtonPressInsertLink = A2(
 	$elm$html$Html$Events$preventDefaultOn,
 	'mousedown',
 	$elm$json$Json$Decode$succeed(
 		_Utils_Tuple2($author$project$Controls$ShowInsertLinkModal, true)));
 var $author$project$Controls$inlineElementButtons = function (controlState) {
-	var linkStatus = (!controlState.hasInline) ? $author$project$Controls$Disabled : (A2($elm$core$Set$member, 'link', controlState.marks) ? $author$project$Controls$Active : $author$project$Controls$Enabled);
-	var imageStatus = (!controlState.hasInline) ? $author$project$Controls$Disabled : $author$project$Controls$Enabled;
-	var codeStatus = (!controlState.hasInline) ? $author$project$Controls$Disabled : (A2($elm$core$Set$member, 'code', controlState.marks) ? $author$project$Controls$Active : $author$project$Controls$Enabled);
+	var linkStatus = (!controlState.Z) ? 2 : (A2($elm$core$Set$member, 'link', controlState.am) ? 0 : 1);
+	var imageStatus = (!controlState.Z) ? 2 : 1;
+	var codeStatus = (!controlState.Z) ? 2 : (A2($elm$core$Set$member, 'code', controlState.am) ? 0 : 1);
 	return _List_fromArray(
 		[
 			A4($author$project$Controls$createButton, codeStatus, $author$project$Controls$onButtonPressInsertCode, $lattyware$elm_fontawesome$FontAwesome$Solid$code, 'code'),
@@ -31440,21 +27821,21 @@ var $lattyware$elm_fontawesome$FontAwesome$Solid$Definitions$underline = A4(
 	_Utils_Tuple2('M16 64c0-17.7 14.3-32 32-32h96c17.7 0 32 14.3 32 32s-14.3 32-32 32H128V224c0 53 43 96 96 96s96-43 96-96V96H304c-17.7 0-32-14.3-32-32s14.3-32 32-32h96c17.7 0 32 14.3 32 32s-14.3 32-32 32H384V224c0 88.4-71.6 160-160 160s-160-71.6-160-160V96H48C30.3 96 16 81.7 16 64zM0 448c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32z', $elm$core$Maybe$Nothing));
 var $lattyware$elm_fontawesome$FontAwesome$Solid$underline = $lattyware$elm_fontawesome$FontAwesome$present($lattyware$elm_fontawesome$FontAwesome$Solid$Definitions$underline);
 var $author$project$Controls$styleToIcon = function (style) {
-	switch (style.$) {
-		case 'Bold':
+	switch (style) {
+		case 0:
 			return $lattyware$elm_fontawesome$FontAwesome$Solid$bold;
-		case 'Italic':
+		case 1:
 			return $lattyware$elm_fontawesome$FontAwesome$Solid$italic;
-		case 'Code':
+		case 2:
 			return $lattyware$elm_fontawesome$FontAwesome$Solid$code;
-		case 'Strikethrough':
+		case 3:
 			return $lattyware$elm_fontawesome$FontAwesome$Solid$strikethrough;
 		default:
 			return $lattyware$elm_fontawesome$FontAwesome$Solid$underline;
 	}
 };
-var $author$project$Controls$Redo = {$: 'Redo'};
-var $author$project$Controls$Undo = {$: 'Undo'};
+var $author$project$Controls$Redo = {$: 18};
+var $author$project$Controls$Undo = {$: 17};
 var $lattyware$elm_fontawesome$FontAwesome$Solid$Definitions$arrowRotateRight = A4(
 	$lattyware$elm_fontawesome$FontAwesome$IconDef,
 	'fas',
@@ -31476,7 +27857,7 @@ var $author$project$Controls$undoRedo = function (controlState) {
 		[
 			A4(
 			$author$project$Controls$createButton,
-			controlState.hasUndo ? $author$project$Controls$Enabled : $author$project$Controls$Disabled,
+			controlState.a2 ? 1 : 2,
 			A2(
 				$elm$html$Html$Events$preventDefaultOn,
 				'mousedown',
@@ -31486,7 +27867,7 @@ var $author$project$Controls$undoRedo = function (controlState) {
 			'undo'),
 			A4(
 			$author$project$Controls$createButton,
-			controlState.hasRedo ? $author$project$Controls$Enabled : $author$project$Controls$Disabled,
+			controlState.a0 ? 1 : 2,
 			A2(
 				$elm$html$Html$Events$preventDefaultOn,
 				'mousedown',
@@ -31543,12 +27924,12 @@ var $author$project$Controls$editorControlPanel = F2(
 					$author$project$Controls$undoRedo(controlState))
 				]));
 	});
-var $author$project$Controls$InsertImage = {$: 'InsertImage'};
+var $author$project$Controls$InsertImage = {$: 9};
 var $author$project$Controls$UpdateImageAlt = function (a) {
-	return {$: 'UpdateImageAlt', a: a};
+	return {$: 11, a: a};
 };
 var $author$project$Controls$UpdateImageSrc = function (a) {
-	return {$: 'UpdateImageSrc', a: a};
+	return {$: 10, a: a};
 };
 var $elm$html$Html$button = _VirtualDom_node('button');
 var $elm$html$Html$h3 = _VirtualDom_node('h3');
@@ -31592,7 +27973,7 @@ var $elm$html$Html$Attributes$value = $elm$html$Html$Attributes$stringProperty('
 var $author$project$Controls$renderInsertImageModal = function (insertImageModal) {
 	return A2(
 		$author$project$Controls$modal,
-		insertImageModal.visible,
+		insertImageModal.bl,
 		_List_fromArray(
 			[
 				A2(
@@ -31613,7 +27994,7 @@ var $author$project$Controls$renderInsertImageModal = function (insertImageModal
 							[
 								$elm$html$Html$Attributes$type_('text'),
 								$elm$html$Html$Attributes$name('src'),
-								$elm$html$Html$Attributes$value(insertImageModal.src),
+								$elm$html$Html$Attributes$value(insertImageModal.cW),
 								$elm$html$Html$Attributes$placeholder('Image URL (ex: https://via.placeholder.com/150.png)'),
 								$elm$html$Html$Events$onInput($author$project$Controls$UpdateImageSrc)
 							]),
@@ -31630,7 +28011,7 @@ var $author$project$Controls$renderInsertImageModal = function (insertImageModal
 							[
 								$elm$html$Html$Attributes$type_('text'),
 								$elm$html$Html$Attributes$name('alt'),
-								$elm$html$Html$Attributes$value(insertImageModal.alt),
+								$elm$html$Html$Attributes$value(insertImageModal.bT),
 								$elm$html$Html$Attributes$placeholder('Alt text'),
 								$elm$html$Html$Events$onInput($author$project$Controls$UpdateImageAlt)
 							]),
@@ -31654,17 +28035,17 @@ var $author$project$Controls$renderInsertImageModal = function (insertImageModal
 					]))
 			]));
 };
-var $author$project$Controls$InsertLink = {$: 'InsertLink'};
+var $author$project$Controls$InsertLink = {$: 5};
 var $author$project$Controls$UpdateLinkHref = function (a) {
-	return {$: 'UpdateLinkHref', a: a};
+	return {$: 3, a: a};
 };
 var $author$project$Controls$UpdateLinkTitle = function (a) {
-	return {$: 'UpdateLinkTitle', a: a};
+	return {$: 4, a: a};
 };
 var $author$project$Controls$renderInsertLinkModal = function (insertLinkModal) {
 	return A2(
 		$author$project$Controls$modal,
-		insertLinkModal.visible,
+		insertLinkModal.bl,
 		_List_fromArray(
 			[
 				A2(
@@ -31685,7 +28066,7 @@ var $author$project$Controls$renderInsertLinkModal = function (insertLinkModal) 
 							[
 								$elm$html$Html$Attributes$type_('text'),
 								$elm$html$Html$Attributes$name('href'),
-								$elm$html$Html$Attributes$value(insertLinkModal.href),
+								$elm$html$Html$Attributes$value(insertLinkModal.ch),
 								$elm$html$Html$Attributes$placeholder('Location'),
 								$elm$html$Html$Events$onInput($author$project$Controls$UpdateLinkHref)
 							]),
@@ -31702,7 +28083,7 @@ var $author$project$Controls$renderInsertLinkModal = function (insertLinkModal) 
 							[
 								$elm$html$Html$Attributes$type_('text'),
 								$elm$html$Html$Attributes$name('title'),
-								$elm$html$Html$Attributes$value(insertLinkModal.title),
+								$elm$html$Html$Attributes$value(insertLinkModal.c$),
 								$elm$html$Html$Attributes$placeholder('Title'),
 								$elm$html$Html$Events$onInput($author$project$Controls$UpdateLinkTitle)
 							]),
@@ -31727,8 +28108,8 @@ var $author$project$Controls$renderInsertLinkModal = function (insertLinkModal) 
 			]));
 };
 var $author$project$RichText$Internal$Editor$completeRerenderCount = function (e) {
-	var c = e.a;
-	return c.completeRerenderCount;
+	var c = e;
+	return c.aE;
 };
 var $elm$json$Json$Encode$bool = _Json_wrap;
 var $elm$html$Html$Attributes$boolProperty = F2(
@@ -31740,7 +28121,7 @@ var $elm$html$Html$Attributes$boolProperty = F2(
 	});
 var $elm$html$Html$Attributes$contenteditable = $elm$html$Html$Attributes$boolProperty('contentEditable');
 var $author$project$RichText$Internal$Path$pathToChildContents = function (node) {
-	if (node.$ === 'ElementNode') {
+	if (!node.$) {
 		var children = node.c;
 		return _Utils_eq(children, $author$project$RichText$Internal$HtmlNode$childNodesPlaceholder) ? $elm$core$Maybe$Just(_List_Nil) : A3(
 			$elm$core$Array$foldl,
@@ -31748,9 +28129,9 @@ var $author$project$RichText$Internal$Path$pathToChildContents = function (node)
 				function (_v1, maybePath) {
 					var i = _v1.a;
 					var childNode = _v1.b;
-					if (maybePath.$ === 'Nothing') {
+					if (maybePath.$ === 1) {
 						var _v3 = $author$project$RichText$Internal$Path$pathToChildContents(childNode);
-						if (_v3.$ === 'Nothing') {
+						if (_v3.$ === 1) {
 							return $elm$core$Maybe$Nothing;
 						} else {
 							var path = _v3.a;
@@ -31787,14 +28168,14 @@ var $author$project$RichText$Internal$Path$pathToChildContentsFromInlineTreePath
 			var x = path.a;
 			var xs = path.b;
 			var _v1 = A2($elm$core$Array$get, x, treeArray);
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return $elm$core$Maybe$Nothing;
 			} else {
 				var tree = _v1.a;
-				if (tree.$ === 'LeafNode') {
+				if (tree.$ === 1) {
 					var i = tree.a;
 					var _v3 = A2($elm$core$Array$get, i, array);
-					if (_v3.$ === 'Nothing') {
+					if (_v3.$ === 1) {
 						return $elm$core$Maybe$Nothing;
 					} else {
 						return $elm$core$Maybe$Just(
@@ -31803,13 +28184,13 @@ var $author$project$RichText$Internal$Path$pathToChildContentsFromInlineTreePath
 					}
 				} else {
 					var n = tree.a;
-					var _v4 = A2($author$project$RichText$Internal$Path$pathToChildContentsFromMark, spec, n.mark);
-					if (_v4.$ === 'Nothing') {
+					var _v4 = A2($author$project$RichText$Internal$Path$pathToChildContentsFromMark, spec, n.cr);
+					if (_v4.$ === 1) {
 						return $elm$core$Maybe$Nothing;
 					} else {
 						var p = _v4.a;
-						var _v5 = A4($author$project$RichText$Internal$Path$pathToChildContentsFromInlineTreePath, spec, array, n.children, xs);
-						if (_v5.$ === 'Nothing') {
+						var _v5 = A4($author$project$RichText$Internal$Path$pathToChildContentsFromInlineTreePath, spec, array, n.dm, xs);
+						if (_v5.$ === 1) {
 							return $elm$core$Maybe$Nothing;
 						} else {
 							var rest = _v5.a;
@@ -31825,8 +28206,8 @@ var $author$project$RichText$Internal$Path$pathToChildContentsFromInlineTreePath
 		}
 	});
 var $author$project$RichText$Model$Node$reverseLookup = function (arr) {
-	var a = arr.a;
-	return a.reverseLookup;
+	var a = arr;
+	return a.bD;
 };
 var $author$project$RichText$Internal$Path$editorToDom = F3(
 	function (spec, node, path) {
@@ -31839,24 +28220,24 @@ var $author$project$RichText$Internal$Path$editorToDom = F3(
 				$author$project$RichText$Internal$Path$pathToChildContentsFromElementParameters,
 				spec,
 				$author$project$RichText$Model$Node$element(node));
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return $elm$core$Maybe$Nothing;
 			} else {
 				var childPath = _v1.a;
 				var _v2 = $author$project$RichText$Model$Node$childNodes(node);
 				switch (_v2.$) {
-					case 'BlockChildren':
+					case 0:
 						var l = _v2.a;
 						var _v3 = A2(
 							$elm$core$Array$get,
 							x,
 							$author$project$RichText$Model$Node$toBlockArray(l));
-						if (_v3.$ === 'Nothing') {
+						if (_v3.$ === 1) {
 							return $elm$core$Maybe$Nothing;
 						} else {
 							var childNode = _v3.a;
 							var _v4 = A3($author$project$RichText$Internal$Path$editorToDom, spec, childNode, xs);
-							if (_v4.$ === 'Nothing') {
+							if (_v4.$ === 1) {
 								return $elm$core$Maybe$Nothing;
 							} else {
 								var p = _v4.a;
@@ -31866,13 +28247,13 @@ var $author$project$RichText$Internal$Path$editorToDom = F3(
 										A2($elm$core$List$cons, x, p)));
 							}
 						}
-					case 'InlineChildren':
+					case 1:
 						var l = _v2.a;
 						var _v5 = A2(
 							$elm$core$Array$get,
 							x,
 							$author$project$RichText$Model$Node$reverseLookup(l));
-						if (_v5.$ === 'Nothing') {
+						if (_v5.$ === 1) {
 							return $elm$core$Maybe$Nothing;
 						} else {
 							var inlineTreePath = _v5.a;
@@ -31882,7 +28263,7 @@ var $author$project$RichText$Internal$Path$editorToDom = F3(
 								$author$project$RichText$Model$Node$toInlineArray(l),
 								$author$project$RichText$Model$Node$toInlineTree(l),
 								inlineTreePath);
-							if (_v6.$ === 'Nothing') {
+							if (_v6.$ === 1) {
 								return $elm$core$Maybe$Nothing;
 							} else {
 								var childInlineTreePath = _v6.a;
@@ -31904,7 +28285,7 @@ var $author$project$RichText$Editor$editorToDomSelection = F2(
 	function (spec_, editor_) {
 		var _v0 = $author$project$RichText$Model$State$selection(
 			$author$project$RichText$Editor$state(editor_));
-		if (_v0.$ === 'Nothing') {
+		if (_v0.$ === 1) {
 			return $elm$core$Maybe$Nothing;
 		} else {
 			var selection = _v0.a;
@@ -31918,7 +28299,7 @@ var $author$project$RichText$Editor$editorToDomSelection = F2(
 	});
 var $author$project$RichText$Editor$markCaretSelectionOnEditorNodes = function (editorState) {
 	var _v0 = $author$project$RichText$Model$State$selection(editorState);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return $author$project$RichText$Model$State$root(editorState);
 	} else {
 		var selection = _v0.a;
@@ -31934,11 +28315,11 @@ var $elm$virtual_dom$VirtualDom$keyedNode = function (tag) {
 };
 var $elm$html$Html$Keyed$node = $elm$virtual_dom$VirtualDom$keyedNode;
 var $author$project$RichText$Internal$Editor$BeforeInputEvent = function (a) {
-	return {$: 'BeforeInputEvent', a: a};
+	return {$: 2, a: a};
 };
 var $author$project$RichText$Internal$Event$InputEvent = F3(
 	function (data, isComposing, inputType) {
-		return {data: data, inputType: inputType, isComposing: isComposing};
+		return {ds: data, dL: inputType, cn: isComposing};
 	});
 var $elm$json$Json$Decode$bool = _Json_decodeBool;
 var $elm$json$Json$Decode$map3 = _Json_map3;
@@ -31960,7 +28341,7 @@ var $author$project$RichText$Internal$BeforeInput$beforeInputDecoder = A2(
 var $author$project$RichText$Internal$BeforeInput$shouldPreventDefault = F4(
 	function (commandMap, spec, editor, inputEvent) {
 		var _v0 = A4($author$project$RichText$Internal$BeforeInput$handleInputEvent, commandMap, spec, editor, inputEvent);
-		if (_v0.$ === 'Err') {
+		if (_v0.$ === 1) {
 			return false;
 		} else {
 			return true;
@@ -31968,9 +28349,9 @@ var $author$project$RichText$Internal$BeforeInput$shouldPreventDefault = F4(
 	});
 var $author$project$RichText$Internal$BeforeInput$preventDefaultOn = F4(
 	function (commandMap, spec, editor, msg) {
-		if (msg.$ === 'BeforeInputEvent') {
+		if (msg.$ === 2) {
 			var inputEvent = msg.a;
-			return (inputEvent.isComposing || $author$project$RichText$Internal$Editor$isComposing(editor)) ? _Utils_Tuple2(msg, false) : _Utils_Tuple2(
+			return (inputEvent.cn || $author$project$RichText$Internal$Editor$isComposing(editor)) ? _Utils_Tuple2(msg, false) : _Utils_Tuple2(
 				msg,
 				A4($author$project$RichText$Internal$BeforeInput$shouldPreventDefault, commandMap, spec, editor, inputEvent));
 		} else {
@@ -32000,7 +28381,7 @@ var $author$project$RichText$Editor$onBeforeInput = F4(
 			'beforeinput',
 			A4($author$project$RichText$Internal$BeforeInput$preventDefaultOnBeforeInputDecoder, tagger, commandMap_, spec_, editor_));
 	});
-var $author$project$RichText$Internal$Editor$CompositionEnd = {$: 'CompositionEnd'};
+var $author$project$RichText$Internal$Editor$CompositionEnd = {$: 5};
 var $author$project$RichText$Editor$onCompositionEnd = function (msgFunc) {
 	return A2(
 		$elm$html$Html$Events$on,
@@ -32008,7 +28389,7 @@ var $author$project$RichText$Editor$onCompositionEnd = function (msgFunc) {
 		$elm$json$Json$Decode$succeed(
 			msgFunc($author$project$RichText$Internal$Editor$CompositionEnd)));
 };
-var $author$project$RichText$Internal$Editor$CompositionStart = {$: 'CompositionStart'};
+var $author$project$RichText$Internal$Editor$CompositionStart = {$: 4};
 var $author$project$RichText$Editor$onCompositionStart = function (msgFunc) {
 	return A2(
 		$elm$html$Html$Events$on,
@@ -32016,7 +28397,7 @@ var $author$project$RichText$Editor$onCompositionStart = function (msgFunc) {
 		$elm$json$Json$Decode$succeed(
 			msgFunc($author$project$RichText$Internal$Editor$CompositionStart)));
 };
-var $author$project$RichText$Internal$Editor$CutEvent = {$: 'CutEvent'};
+var $author$project$RichText$Internal$Editor$CutEvent = {$: 7};
 var $author$project$RichText$Editor$onCut = function (msgFunc) {
 	return A2(
 		$elm$html$Html$Events$on,
@@ -32025,11 +28406,11 @@ var $author$project$RichText$Editor$onCut = function (msgFunc) {
 			msgFunc($author$project$RichText$Internal$Editor$CutEvent)));
 };
 var $author$project$RichText$Internal$Editor$ChangeEvent = function (a) {
-	return {$: 'ChangeEvent', a: a};
+	return {$: 1, a: a};
 };
 var $author$project$RichText$Internal$Event$EditorChange = F5(
 	function (root, selection, characterDataMutations, timestamp, isComposing) {
-		return {characterDataMutations: characterDataMutations, isComposing: isComposing, root: root, selection: selection, timestamp: timestamp};
+		return {dk: characterDataMutations, cn: isComposing, eg: root, cR: selection, c_: timestamp};
 	});
 var $elm$json$Json$Decode$list = _Json_decodeList;
 var $author$project$RichText$Editor$characterDataMutationsDecoder = $elm$json$Json$Decode$list(
@@ -32125,10 +28506,10 @@ var $author$project$RichText$Editor$onEditorSelectionChange = function (msgFunc)
 		A2($elm$json$Json$Decode$map, msgFunc, $author$project$RichText$Editor$editorSelectionChangeDecoder));
 };
 var $author$project$RichText$Internal$Editor$Init = function (a) {
-	return {$: 'Init', a: a};
+	return {$: 8, a: a};
 };
 var $author$project$RichText$Internal$Event$InitEvent = function (shortKey) {
-	return {shortKey: shortKey};
+	return {ej: shortKey};
 };
 var $author$project$RichText$Editor$initDecoder = A2(
 	$elm$json$Json$Decode$map,
@@ -32148,11 +28529,11 @@ var $author$project$RichText$Editor$onInit = function (msgFunc) {
 		A2($elm$json$Json$Decode$map, msgFunc, $author$project$RichText$Editor$initDecoder));
 };
 var $author$project$RichText$Internal$Editor$KeyDownEvent = function (a) {
-	return {$: 'KeyDownEvent', a: a};
+	return {$: 3, a: a};
 };
 var $author$project$RichText$Internal$Event$KeyboardEvent = F7(
 	function (keyCode, key, altKey, metaKey, ctrlKey, shiftKey, isComposing) {
-		return {altKey: altKey, ctrlKey: ctrlKey, isComposing: isComposing, key: key, keyCode: keyCode, metaKey: metaKey, shiftKey: shiftKey};
+		return {dc: altKey, dr: ctrlKey, cn: isComposing, co: key, dO: keyCode, dT: metaKey, cT: shiftKey};
 	});
 var $elm$json$Json$Decode$map7 = _Json_map7;
 var $author$project$RichText$Internal$KeyDown$keyDownDecoder = A2(
@@ -32176,7 +28557,7 @@ var $author$project$RichText$Internal$KeyDown$keyDownDecoder = A2(
 var $author$project$RichText$Internal$KeyDown$shouldPreventDefault = F4(
 	function (comamndMap, spec, editor, keyboardEvent) {
 		var _v0 = A4($author$project$RichText$Internal$KeyDown$handleKeyDownEvent, comamndMap, spec, editor, keyboardEvent);
-		if (_v0.$ === 'Err') {
+		if (_v0.$ === 1) {
 			return false;
 		} else {
 			return true;
@@ -32184,9 +28565,9 @@ var $author$project$RichText$Internal$KeyDown$shouldPreventDefault = F4(
 	});
 var $author$project$RichText$Internal$KeyDown$preventDefaultOn = F4(
 	function (commandMap, spec, editor, msg) {
-		if (msg.$ === 'KeyDownEvent') {
+		if (msg.$ === 3) {
 			var key = msg.a;
-			return (key.isComposing || $author$project$RichText$Internal$Editor$isComposing(editor)) ? _Utils_Tuple2(msg, false) : _Utils_Tuple2(
+			return (key.cn || $author$project$RichText$Internal$Editor$isComposing(editor)) ? _Utils_Tuple2(msg, false) : _Utils_Tuple2(
 				msg,
 				A4($author$project$RichText$Internal$KeyDown$shouldPreventDefault, commandMap, spec, editor, key));
 		} else {
@@ -32218,10 +28599,10 @@ var $author$project$RichText$Editor$onKeyDown = F4(
 	});
 var $author$project$RichText$Internal$Event$PasteEvent = F2(
 	function (text, html) {
-		return {html: html, text: text};
+		return {dI: html, aP: text};
 	});
 var $author$project$RichText$Internal$Editor$PasteWithDataEvent = function (a) {
-	return {$: 'PasteWithDataEvent', a: a};
+	return {$: 6, a: a};
 };
 var $author$project$RichText$Editor$pasteWithDataDecoder = A2(
 	$elm$json$Json$Decode$map,
@@ -32246,12 +28627,12 @@ var $author$project$RichText$Editor$onPasteWithData = function (msgFunc) {
 		A2($elm$json$Json$Decode$map, msgFunc, $author$project$RichText$Editor$pasteWithDataDecoder));
 };
 var $author$project$RichText$Internal$Editor$renderCount = function (e) {
-	var c = e.a;
-	return c.renderCount;
+	var c = e;
+	return c.aL;
 };
 var $author$project$RichText$Editor$selectionAttribute = F3(
 	function (maybeSelection, renderCount, selectionCount) {
-		if (maybeSelection.$ === 'Nothing') {
+		if (maybeSelection.$ === 1) {
 			return 'render-count=' + $elm$core$String$fromInt(renderCount);
 		} else {
 			var selection = maybeSelection.a;
@@ -32274,12 +28655,12 @@ var $author$project$RichText$Editor$selectionAttribute = F3(
 		}
 	});
 var $author$project$RichText$Internal$Editor$selectionCount = function (e) {
-	var c = e.a;
-	return c.selectionCount;
+	var c = e;
+	return c.aN;
 };
 var $author$project$RichText$Editor$shouldHideCaret = function (editorState) {
 	var _v0 = $author$project$RichText$Model$State$selection(editorState);
-	if (_v0.$ === 'Nothing') {
+	if (_v0.$ === 1) {
 		return true;
 	} else {
 		var selection = _v0.a;
@@ -32290,15 +28671,15 @@ var $author$project$RichText$Editor$shouldHideCaret = function (editorState) {
 				$author$project$RichText$Node$nodeAt,
 				$author$project$RichText$Model$Selection$anchorNode(selection),
 				$author$project$RichText$Model$State$root(editorState));
-			if (_v1.$ === 'Nothing') {
+			if (_v1.$ === 1) {
 				return false;
 			} else {
 				var node = _v1.a;
-				if (node.$ === 'Block') {
+				if (!node.$) {
 					return true;
 				} else {
 					var leaf = node.a;
-					if (leaf.$ === 'InlineElement') {
+					if (!leaf.$) {
 						return true;
 					} else {
 						return false;
@@ -32309,12 +28690,12 @@ var $author$project$RichText$Editor$shouldHideCaret = function (editorState) {
 	}
 };
 var $author$project$RichText$Config$Decorations$topLevelAttributes = function (d) {
-	var c = d.a;
-	return c.topLevelAttributes;
+	var c = d;
+	return c.bh;
 };
 var $author$project$RichText$Editor$viewHtmlNode = F4(
 	function (node, decorators, vdomChildren, backwardsRelativePath) {
-		if (node.$ === 'ElementNode') {
+		if (!node.$) {
 			var name = node.a;
 			var attributes = node.b;
 			var children = node.c;
@@ -32383,7 +28764,7 @@ var $author$project$RichText$Editor$viewText = function (text) {
 };
 var $author$project$RichText$Editor$viewInlineLeaf = F4(
 	function (spec_, decorations_, backwardsPath, leaf) {
-		if (leaf.$ === 'InlineElement') {
+		if (!leaf.$) {
 			var l = leaf.a;
 			return A5(
 				$author$project$RichText$Editor$viewElement,
@@ -32399,8 +28780,8 @@ var $author$project$RichText$Editor$viewInlineLeaf = F4(
 		}
 	});
 var $author$project$RichText$Config$Decorations$markDecorations = function (d) {
-	var c = d.a;
-	return c.marks;
+	var c = d;
+	return c.am;
 };
 var $author$project$RichText$Editor$viewMark = F5(
 	function (spec_, decorations_, backwardsNodePath, mark, children) {
@@ -32429,10 +28810,10 @@ var $author$project$RichText$Editor$viewMark = F5(
 	});
 var $author$project$RichText$Editor$viewInlineLeafTree = F5(
 	function (spec_, decorations_, backwardsPath, inlineLeafArray, inlineLeafTree) {
-		if (inlineLeafTree.$ === 'LeafNode') {
+		if (inlineLeafTree.$ === 1) {
 			var i = inlineLeafTree.a;
 			var _v1 = A2($elm$core$Array$get, i, inlineLeafArray);
-			if (_v1.$ === 'Just') {
+			if (!_v1.$) {
 				var l = _v1.a;
 				return A4(
 					$author$project$RichText$Editor$viewInlineLeaf,
@@ -32459,11 +28840,11 @@ var $author$project$RichText$Editor$viewInlineLeafTree = F5(
 				spec_,
 				decorations_,
 				backwardsPath,
-				n.mark,
+				n.cr,
 				A2(
 					$elm$core$Array$map,
 					A4($author$project$RichText$Editor$viewInlineLeafTree, spec_, decorations_, backwardsPath, inlineLeafArray),
-					n.children));
+					n.dm));
 		}
 	});
 var $author$project$RichText$Editor$viewEditorBlockNode = F4(
@@ -32477,7 +28858,7 @@ var $author$project$RichText$Editor$viewEditorBlockNode = F4(
 			function () {
 				var _v0 = $author$project$RichText$Model$Node$childNodes(node);
 				switch (_v0.$) {
-					case 'BlockChildren':
+					case 0:
 						var l = _v0.a;
 						return A2(
 							$elm$core$Array$indexedMap,
@@ -32491,7 +28872,7 @@ var $author$project$RichText$Editor$viewEditorBlockNode = F4(
 										n);
 								}),
 							$author$project$RichText$Model$Node$toBlockArray(l));
-					case 'InlineChildren':
+					case 1:
 						var l = _v0.a;
 						return A2(
 							$elm$core$Array$map,
@@ -32512,12 +28893,12 @@ var $author$project$RichText$Editor$viewEditorBlockNode = F4(
 	});
 var $author$project$RichText$Editor$view = F2(
 	function (cfg, editor_) {
-		var c = cfg.a;
-		var tagger = c.toMsg;
+		var c = cfg;
+		var tagger = c.er;
 		var state_ = $author$project$RichText$Editor$state(editor_);
-		var spec_ = c.spec;
-		var decorations_ = c.decorations;
-		var commandMap_ = c.commandMap;
+		var spec_ = c.em;
+		var decorations_ = c.du;
+		var commandMap_ = c.dn;
 		return A3(
 			$elm$html$Html$Keyed$node,
 			'elm-editor',
@@ -32598,15 +28979,15 @@ var $author$project$Editor$view = F2(
 				]),
 			_List_fromArray(
 				[
-					A2($author$project$Controls$editorControlPanel, model.styles, model.editor),
-					A2($author$project$RichText$Editor$view, cfg, model.editor),
-					$author$project$Controls$renderInsertLinkModal(model.insertLinkModal),
-					$author$project$Controls$renderInsertImageModal(model.insertImageModal)
+					A2($author$project$Controls$editorControlPanel, model.bI, model.b),
+					A2($author$project$RichText$Editor$view, cfg, model.b),
+					$author$project$Controls$renderInsertLinkModal(model.H),
+					$author$project$Controls$renderInsertImageModal(model.G)
 				]));
 	});
 var $author$project$Page$Basic$view = function (model) {
 	return {
-		content: _List_fromArray(
+		$7: _List_fromArray(
 			[
 				A2(
 				$elm$html$Html$h1,
@@ -32643,9 +29024,9 @@ var $author$project$Page$Basic$view = function (model) {
 				A2(
 				$elm$html$Html$map,
 				$author$project$Page$Basic$EditorMsg,
-				A2($author$project$Editor$view, $author$project$Page$Basic$config, model.editor))
+				A2($author$project$Editor$view, $author$project$Page$Basic$config, model.b))
 			]),
-		title: 'Basic'
+		c$: 'Basic'
 	};
 };
 var $elm$html$Html$h2 = _VirtualDom_node('h2');
@@ -32653,14 +29034,14 @@ var $elm$html$Html$li = _VirtualDom_node('li');
 var $elm$html$Html$ul = _VirtualDom_node('ul');
 var $author$project$Page$Examples$values = _List_fromArray(
 	[
-		{route: $author$project$Route$Basic, text: 'This example shows how to set up a minimal ' + 'rich text editor with the default configuration.', title: 'Basics'},
-		{route: $author$project$Route$Markdown, text: 'This example shows how you can switch between a ' + 'plain markdown editor and a fancier rich text editor.', title: 'Markdown'},
-		{route: $author$project$Route$SpecExtension, text: 'This example shows how you can extend the default specification ' + 'with your own mark and element definitions.', title: 'Extend a specification'},
-		{route: $author$project$Route$SpecFromScratch, text: 'This example shows how you can create a new document specification from scratch.', title: 'New specification'}
+		{aM: 0, aP: 'This example shows how to set up a minimal ' + 'rich text editor with the default configuration.', c$: 'Basics'},
+		{aM: 1, aP: 'This example shows how you can switch between a ' + 'plain markdown editor and a fancier rich text editor.', c$: 'Markdown'},
+		{aM: 2, aP: 'This example shows how you can extend the default specification ' + 'with your own mark and element definitions.', c$: 'Extend a specification'},
+		{aM: 3, aP: 'This example shows how you can create a new document specification from scratch.', c$: 'New specification'}
 	]);
 var $author$project$Page$Examples$view = function (_v0) {
 	return {
-		content: _List_fromArray(
+		$7: _List_fromArray(
 			[
 				A2(
 				$elm$html$Html$h1,
@@ -32688,7 +29069,7 @@ var $author$project$Page$Examples$view = function (_v0) {
 									_List_fromArray(
 										[
 											$elm$html$Html$Attributes$class('blocklink'),
-											$author$project$Route$href(v.route)
+											$author$project$Route$href(v.aM)
 										]),
 									_List_fromArray(
 										[
@@ -32697,36 +29078,36 @@ var $author$project$Page$Examples$view = function (_v0) {
 											_List_Nil,
 											_List_fromArray(
 												[
-													$elm$html$Html$text(v.title)
+													$elm$html$Html$text(v.c$)
 												])),
 											A2(
 											$elm$html$Html$p,
 											_List_Nil,
 											_List_fromArray(
 												[
-													$elm$html$Html$text(v.text)
+													$elm$html$Html$text(v.aP)
 												]))
 										]))
 								]));
 					},
 					$author$project$Page$Examples$values))
 			]),
-		title: 'Examples'
+		c$: 'Examples'
 	};
 };
 var $author$project$Page$Home$EditorMsg = function (a) {
-	return {$: 'EditorMsg', a: a};
+	return {$: 0, a: a};
 };
 var $author$project$Page$Home$features = _List_fromArray(
 	[
-		{text: 'Instead of relying on inconsistent contenteditable APIs, the package depends on other web standards, like mutation observers, that are supported in all evergreen browsers on both desktop and mobile', title: 'Cross-browser support'},
-		{text: 'You can define a document with a custom structure, without having to code the rules from scratch.', title: 'Customizable specification'},
-		{text: 'All logic defining the editor is in Elm.  You don\'t need to write any js at all, and the only javascript you need to include are some pre-requisite webcomponents to bridge the gap between Elm and web APIs it doesn\'t natively support yet.', title: '100% functional'},
-		{text: 'This package follows the guidelines of the Elm architecture and can fit seemlessly into your application.', title: 'Fits into the Elm Architecture'}
+		{aP: 'Instead of relying on inconsistent contenteditable APIs, the package depends on other web standards, like mutation observers, that are supported in all evergreen browsers on both desktop and mobile', c$: 'Cross-browser support'},
+		{aP: 'You can define a document with a custom structure, without having to code the rules from scratch.', c$: 'Customizable specification'},
+		{aP: 'All logic defining the editor is in Elm.  You don\'t need to write any js at all, and the only javascript you need to include are some pre-requisite webcomponents to bridge the gap between Elm and web APIs it doesn\'t natively support yet.', c$: '100% functional'},
+		{aP: 'This package follows the guidelines of the Elm architecture and can fit seemlessly into your application.', c$: 'Fits into the Elm Architecture'}
 	]);
 var $author$project$Page$Home$view = function (model) {
 	return {
-		content: _List_fromArray(
+		$7: _List_fromArray(
 			[
 				A2(
 				$elm$html$Html$h1,
@@ -32741,7 +29122,7 @@ var $author$project$Page$Home$view = function (model) {
 				A2(
 				$elm$html$Html$map,
 				$author$project$Page$Home$EditorMsg,
-				A2($author$project$Editor$view, $author$project$Page$Home$config, model.editor)),
+				A2($author$project$Editor$view, $author$project$Page$Home$config, model.b)),
 				A2(
 				$elm$html$Html$h2,
 				_List_Nil,
@@ -32768,14 +29149,14 @@ var $author$project$Page$Home$view = function (model) {
 									_List_Nil,
 									_List_fromArray(
 										[
-											$elm$html$Html$text(v.title)
+											$elm$html$Html$text(v.c$)
 										])),
 									A2(
 									$elm$html$Html$p,
 									_List_Nil,
 									_List_fromArray(
 										[
-											$elm$html$Html$text(v.text)
+											$elm$html$Html$text(v.aP)
 										]))
 								]));
 					},
@@ -32845,21 +29226,21 @@ var $author$project$Page$Home$view = function (model) {
 						$elm$html$Html$text(' for our pledge to contributors.')
 					]))
 			]),
-		title: 'Home'
+		c$: 'Home'
 	};
 };
 var $elm$html$Html$code = _VirtualDom_node('code');
 var $author$project$Page$Markdown$EditorChange = function (a) {
-	return {$: 'EditorChange', a: a};
+	return {$: 1, a: a};
 };
 var $author$project$Page$Markdown$EditorMsg = function (a) {
-	return {$: 'EditorMsg', a: a};
+	return {$: 0, a: a};
 };
 var $elm$html$Html$Attributes$checked = $elm$html$Html$Attributes$boolProperty('checked');
 var $elm$html$Html$Attributes$for = $elm$html$Html$Attributes$stringProperty('htmlFor');
 var $elm$html$Html$label = _VirtualDom_node('label');
 var $author$project$Page$Markdown$TextAreaChange = function (a) {
-	return {$: 'TextAreaChange', a: a};
+	return {$: 2, a: a};
 };
 var $elm$html$Html$textarea = _VirtualDom_node('textarea');
 var $author$project$Page$Markdown$markdownTextArea = function (model) {
@@ -32873,7 +29254,7 @@ var $author$project$Page$Markdown$markdownTextArea = function (model) {
 				_List_fromArray(
 					[
 						$elm$html$Html$Attributes$class('markdown-textarea'),
-						$elm$html$Html$Attributes$value(model.textMarkdown),
+						$elm$html$Html$Attributes$value(model.ap),
 						A2($elm$html$Html$Attributes$attribute, 'data-gramm_editor', 'false'),
 						$elm$html$Html$Events$onInput($author$project$Page$Markdown$TextAreaChange)
 					]),
@@ -32881,10 +29262,10 @@ var $author$project$Page$Markdown$markdownTextArea = function (model) {
 			]));
 };
 var $author$project$Page$Markdown$markdownOrEditorView = function (model) {
-	var editor = _Utils_eq(model.editorType, $author$project$Page$Markdown$WYSIWYG) ? A2(
+	var editor = (model.Y === 1) ? A2(
 		$elm$html$Html$map,
 		$author$project$Page$Markdown$EditorMsg,
-		A2($author$project$Editor$view, $author$project$Page$Markdown$config, model.editor)) : $author$project$Page$Markdown$markdownTextArea(model);
+		A2($author$project$Editor$view, $author$project$Page$Markdown$config, model.b)) : $author$project$Page$Markdown$markdownTextArea(model);
 	return A2(
 		$elm$html$Html$div,
 		_List_Nil,
@@ -32902,9 +29283,8 @@ var $author$project$Page$Markdown$markdownOrEditorView = function (model) {
 								$elm$html$Html$Attributes$type_('radio'),
 								$elm$html$Html$Attributes$name('editorView'),
 								$elm$html$Html$Events$onClick(
-								$author$project$Page$Markdown$EditorChange($author$project$Page$Markdown$WYSIWYG)),
-								$elm$html$Html$Attributes$checked(
-								_Utils_eq(model.editorType, $author$project$Page$Markdown$WYSIWYG))
+								$author$project$Page$Markdown$EditorChange(1)),
+								$elm$html$Html$Attributes$checked(model.Y === 1)
 							]),
 						_List_Nil),
 						A2(
@@ -32924,9 +29304,8 @@ var $author$project$Page$Markdown$markdownOrEditorView = function (model) {
 								$elm$html$Html$Attributes$type_('radio'),
 								$elm$html$Html$Attributes$name('editorView'),
 								$elm$html$Html$Events$onClick(
-								$author$project$Page$Markdown$EditorChange($author$project$Page$Markdown$Markdown)),
-								$elm$html$Html$Attributes$checked(
-								_Utils_eq(model.editorType, $author$project$Page$Markdown$Markdown))
+								$author$project$Page$Markdown$EditorChange(0)),
+								$elm$html$Html$Attributes$checked(!model.Y)
 							]),
 						_List_Nil),
 						A2(
@@ -32957,7 +29336,7 @@ var $author$project$Page$Markdown$markdownOrEditorView = function (model) {
 									$elm$html$Html$text(x)
 								]);
 						},
-						model.markdownError))),
+						model.al))),
 				A2(
 				$elm$html$Html$div,
 				_List_fromArray(
@@ -32970,7 +29349,7 @@ var $author$project$Page$Markdown$markdownOrEditorView = function (model) {
 };
 var $author$project$Page$Markdown$view = function (model) {
 	return {
-		content: _List_fromArray(
+		$7: _List_fromArray(
 			[
 				A2(
 				$elm$html$Html$h1,
@@ -33014,27 +29393,27 @@ var $author$project$Page$Markdown$view = function (model) {
 					])),
 				$author$project$Page$Markdown$markdownOrEditorView(model)
 			]),
-		title: 'Markdown'
+		c$: 'Markdown'
 	};
 };
 var $author$project$Page$SpecExtension$EditorMsg = function (a) {
-	return {$: 'EditorMsg', a: a};
+	return {$: 5, a: a};
 };
-var $author$project$Page$SpecExtension$ShowUpdateCaptionedImageModel = {$: 'ShowUpdateCaptionedImageModel'};
-var $author$project$Page$SpecExtension$InsertCaptionedImage = {$: 'InsertCaptionedImage'};
+var $author$project$Page$SpecExtension$ShowUpdateCaptionedImageModel = {$: 0};
+var $author$project$Page$SpecExtension$InsertCaptionedImage = {$: 4};
 var $author$project$Page$SpecExtension$UpdateCaption = function (a) {
-	return {$: 'UpdateCaption', a: a};
+	return {$: 3, a: a};
 };
 var $author$project$Page$SpecExtension$UpdateCaptionedImageAlt = function (a) {
-	return {$: 'UpdateCaptionedImageAlt', a: a};
+	return {$: 2, a: a};
 };
 var $author$project$Page$SpecExtension$UpdateCaptionedImageSrc = function (a) {
-	return {$: 'UpdateCaptionedImageSrc', a: a};
+	return {$: 1, a: a};
 };
 var $author$project$Page$SpecExtension$renderInsertCaptionedImageModal = function (insertImageModal) {
 	return A2(
 		$author$project$Controls$modal,
-		insertImageModal.visible,
+		insertImageModal.bl,
 		_List_fromArray(
 			[
 				A2(
@@ -33055,7 +29434,7 @@ var $author$project$Page$SpecExtension$renderInsertCaptionedImageModal = functio
 							[
 								$elm$html$Html$Attributes$type_('text'),
 								$elm$html$Html$Attributes$name('src'),
-								$elm$html$Html$Attributes$value(insertImageModal.src),
+								$elm$html$Html$Attributes$value(insertImageModal.cW),
 								$elm$html$Html$Attributes$placeholder('Image URL (ex: https://via.placeholder.com/150.png)'),
 								$elm$html$Html$Events$onInput($author$project$Page$SpecExtension$UpdateCaptionedImageSrc)
 							]),
@@ -33072,7 +29451,7 @@ var $author$project$Page$SpecExtension$renderInsertCaptionedImageModal = functio
 							[
 								$elm$html$Html$Attributes$type_('text'),
 								$elm$html$Html$Attributes$name('alt'),
-								$elm$html$Html$Attributes$value(insertImageModal.alt),
+								$elm$html$Html$Attributes$value(insertImageModal.bT),
 								$elm$html$Html$Attributes$placeholder('Alt text'),
 								$elm$html$Html$Events$onInput($author$project$Page$SpecExtension$UpdateCaptionedImageAlt)
 							]),
@@ -33089,7 +29468,7 @@ var $author$project$Page$SpecExtension$renderInsertCaptionedImageModal = functio
 							[
 								$elm$html$Html$Attributes$type_('text'),
 								$elm$html$Html$Attributes$name('caption'),
-								$elm$html$Html$Attributes$value(insertImageModal.alt),
+								$elm$html$Html$Attributes$value(insertImageModal.bT),
 								$elm$html$Html$Attributes$placeholder('Caption'),
 								$elm$html$Html$Events$onInput($author$project$Page$SpecExtension$UpdateCaption)
 							]),
@@ -33129,12 +29508,12 @@ var $author$project$Page$SpecExtension$captionedImageView = function (model) {
 					[
 						$elm$html$Html$text('Insert captioned image')
 					])),
-				$author$project$Page$SpecExtension$renderInsertCaptionedImageModal(model.insertCaptionedImageModal)
+				$author$project$Page$SpecExtension$renderInsertCaptionedImageModal(model.v)
 			]));
 };
 var $author$project$Page$SpecExtension$view = function (model) {
 	return {
-		content: _List_fromArray(
+		$7: _List_fromArray(
 			[
 				A2(
 				$elm$html$Html$h1,
@@ -33172,14 +29551,14 @@ var $author$project$Page$SpecExtension$view = function (model) {
 				A2(
 				$elm$html$Html$map,
 				$author$project$Page$SpecExtension$EditorMsg,
-				A2($author$project$Editor$view, $author$project$Page$SpecExtension$config, model.editor))
+				A2($author$project$Editor$view, $author$project$Page$SpecExtension$config, model.b))
 			]),
-		title: 'Extending a specification'
+		c$: 'Extending a specification'
 	};
 };
 var $author$project$Page$SpecFromScratch$view = function (model) {
 	return {
-		content: _List_fromArray(
+		$7: _List_fromArray(
 			[
 				A2(
 				$elm$html$Html$h1,
@@ -33213,78 +29592,78 @@ var $author$project$Page$SpecFromScratch$view = function (model) {
 								$elm$html$Html$text('git repo.')
 							]))
 					])),
-				A2($author$project$RichText$Editor$view, $author$project$Page$SpecFromScratch$config, model.editor)
+				A2($author$project$RichText$Editor$view, $author$project$Page$SpecFromScratch$config, model.b)
 			]),
-		title: 'New specification'
+		c$: 'New specification'
 	};
 };
 var $author$project$Main$view = function (model) {
 	var viewPage = F3(
 		function (page, toMsg, config) {
 			var _v1 = A2($author$project$Page$view, page, config);
-			var title = _v1.title;
-			var body = _v1.body;
+			var title = _v1.c$;
+			var body = _v1.bW;
 			return {
-				body: A2(
+				bW: A2(
 					$elm$core$List$map,
 					$elm$html$Html$map(toMsg),
 					body),
-				title: title
+				c$: title
 			};
 		});
 	switch (model.$) {
-		case 'Redirect':
+		case 0:
 			var session = model.a;
-			return A2($author$project$Page$view, $author$project$Page$Home, $author$project$Page$Home$notFoundView);
-		case 'NotFound':
+			return A2($author$project$Page$view, 4, $author$project$Page$Home$notFoundView);
+		case 1:
 			var session = model.a;
-			return A2($author$project$Page$view, $author$project$Page$Home, $author$project$Page$Home$notFoundView);
-		case 'Home':
+			return A2($author$project$Page$view, 4, $author$project$Page$Home$notFoundView);
+		case 6:
 			var home = model.a;
 			return A3(
 				viewPage,
-				$author$project$Page$Home,
+				4,
 				$author$project$Main$GotHomeMsg,
 				$author$project$Page$Home$view(home));
-		case 'Basic':
+		case 2:
 			var basic = model.a;
 			return A3(
 				viewPage,
-				$author$project$Page$Basic,
+				0,
 				$author$project$Main$GotBasicMsg,
 				$author$project$Page$Basic$view(basic));
-		case 'Markdown':
+		case 5:
 			var md = model.a;
 			return A3(
 				viewPage,
-				$author$project$Page$Markdown,
+				1,
 				$author$project$Main$GotMarkdownMsg,
 				$author$project$Page$Markdown$view(md));
-		case 'SpecExtension':
+		case 3:
 			var se = model.a;
 			return A3(
 				viewPage,
-				$author$project$Page$SpecExtension,
+				2,
 				$author$project$Main$GotSpecExtensionMsg,
 				$author$project$Page$SpecExtension$view(se));
-		case 'SpecFromScratch':
+		case 4:
 			var sfs = model.a;
 			return A3(
 				viewPage,
-				$author$project$Page$SpecFromScratch,
+				3,
 				$author$project$Main$GotSpecFromScratchMsg,
 				$author$project$Page$SpecFromScratch$view(sfs));
 		default:
 			var examples = model.a;
 			return A3(
 				viewPage,
-				$author$project$Page$Examples,
+				5,
 				$author$project$Main$GotExamplesMsg,
 				$author$project$Page$Examples$view(examples));
 	}
 };
 var $author$project$Main$main = $elm$browser$Browser$application(
-	{init: $author$project$Main$init, onUrlChange: $author$project$Main$ChangedUrl, onUrlRequest: $author$project$Main$ClickedLink, subscriptions: $author$project$Main$subscriptions, update: $author$project$Main$update, view: $author$project$Main$view});
+	{dK: $author$project$Main$init, d3: $author$project$Main$ChangedUrl, d4: $author$project$Main$ClickedLink, eo: $author$project$Main$subscriptions, es: $author$project$Main$update, et: $author$project$Main$view});
 _Platform_export({'Main':{'init':$author$project$Main$main(
 	$elm$json$Json$Decode$succeed(
 		{}))(0)}});}(this));
