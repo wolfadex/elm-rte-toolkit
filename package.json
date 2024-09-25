@@ -1,8 +1,8 @@
 {
-    "name": "elm-rte-toolkit",
-    "version": "1.0.5",
+    "name": "@wolfadex/elm-rte-toolkit",
+    "version": "1.0.0",
     "description": "Elm toolkit for rich text editors",
-    "main": "elmEditor.js",
+    "main": "elm-rte-toolkit.js",
     "scripts": {
         "build": "babel js -d js-dist",
         "test": "echo \"Error: no test specified\" && exit 1",

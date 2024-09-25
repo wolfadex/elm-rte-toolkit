@@ -16,10 +16,10 @@ This package was heavily inspired by other rich text editor frameworks like Pros
 
 This package requires some webcomponents to get started.
 
-If you can support ES6, you can include [js/elmEditor.js](js/elmEditor.js) in your project and import it.
+If you can support ES6, you can include [js/elm-rte-toolkit.js](js/elm-rte-toolkit.js) in your project and import it.
 
 ```js
-import "elmEditor.js";
+import "elm-rte-toolkit.js";
 ```
 
 The demo in this repository does it that way.
