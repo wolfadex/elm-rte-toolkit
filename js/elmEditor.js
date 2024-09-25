@@ -1,6 +1,8 @@
 const zeroWidthSpace = "\u200B";
 
-const isAndroid = () => { return /(android)/i.test(navigator.userAgent); };
+const isAndroid = () => {
+    return /(android)/i.test(navigator.userAgent);
+};
 
 /**
  * Finds the selection path given the node, editor, and selection offset
@@ -23,11 +25,11 @@ const getSelectionPath = (node, editor, offset) => {
             if (node === editor) {
                 break;
             }
-            node = node.parentNode
+            node = node.parentNode;
         }
 
         if (path[path.length - 1] !== editor) {
-            return null
+            return null;
         }
 
         let indexPath = [];
@@ -46,9 +48,12 @@ const getSelectionPath = (node, editor, offset) => {
         }
 
         if (originalNode.nodeType === Node.ELEMENT_NODE && offset > 0) {
-            indexPath.push(offset - 1)
-        } else if (originalNode.nodeType === Node.ELEMENT_NODE && originalNode.childNodes[0]) {
-            indexPath.push(0)
+            indexPath.push(offset - 1);
+        } else if (
+            originalNode.nodeType === Node.ELEMENT_NODE &&
+            originalNode.childNodes[0]
+        ) {
+            indexPath.push(0);
         }
 
         if (indexPath.length <= 2) {
@@ -92,7 +97,6 @@ const findNodeFromPath = (path, editor) => {
     return node || null;
 };
 
-
 /**
  * Helper method to account for zeroWidthSpace and selection offsets that exceed the actual node
  * length.
@@ -121,14 +125,14 @@ let adjustOffsetReverse = (node, offset) => {
  * @returns {number|*} the new offset
  */
 let adjustOffset = (node, offset) => {
-    if ((node.nodeType === Node.TEXT_NODE && node.nodeValue === zeroWidthSpace)) {
+    if (node.nodeType === Node.TEXT_NODE && node.nodeValue === zeroWidthSpace) {
         return 0;
     }
 
     if (node.nodeType === Node.ELEMENT_NODE) {
         let childNode = node.childNodes[offset - 1];
         if (childNode && childNode.nodeType === Node.TEXT_NODE) {
-            return (childNode.nodeValue || "").length
+            return (childNode.nodeValue || "").length;
         }
     }
 
@@ -157,7 +161,7 @@ class SelectionState extends HTMLElement {
         for (let pair of newValue.split(",")) {
             let splitPair = pair.split("=");
             if (splitPair.length === 2) {
-                selectionObj[splitPair[0]] = splitPair[1]
+                selectionObj[splitPair[0]] = splitPair[1];
             }
         }
 
@@ -172,7 +176,12 @@ class SelectionState extends HTMLElement {
             anchorOffset = adjustOffsetReverse(anchorNode, anchorOffset);
             focusOffset = adjustOffsetReverse(focusNode, focusOffset);
             try {
-                sel.setBaseAndExtent(anchorNode, anchorOffset, focusNode, focusOffset);
+                sel.setBaseAndExtent(
+                    anchorNode,
+                    anchorOffset,
+                    focusNode,
+                    focusOffset,
+                );
             } catch (e) {
                 // ignore selection errors
             }
@@ -180,48 +189,62 @@ class SelectionState extends HTMLElement {
     }
 
     connectedCallback() {
-        document.addEventListener("selectionchange", this.selectionChange)
+        document.addEventListener("selectionchange", this.selectionChange);
     }
 
     disconnectedCallback() {
-        document.removeEventListener("selectionchange", this.selectionChange)
+        document.removeEventListener("selectionchange", this.selectionChange);
     }
 
     getSelectionPath(node, offset) {
-        return getSelectionPath(node, this.parentNode, offset)
+        return getSelectionPath(node, this.parentNode, offset);
     }
 
     findNodeFromPath(path) {
-        return findNodeFromPath(path, this.parentNode)
+        return findNodeFromPath(path, this.parentNode);
     }
 
     getSelectionObject() {
-        const selection = {"selectionExists": false};
-        const selectionObj = getSelection();
+        const selection = { selectionExists: false };
+        const selectionObj = document.getSelection();
         if (!selectionObj) {
-            return selection
+            return selection;
         }
-        const anchorPath = this.getSelectionPath(selectionObj.anchorNode, selectionObj.anchorOffset);
-        const focusPath = this.getSelectionPath(selectionObj.focusNode, selectionObj.focusOffset);
+        const anchorPath = this.getSelectionPath(
+            selectionObj.anchorNode,
+            selectionObj.anchorOffset,
+        );
+        const focusPath = this.getSelectionPath(
+            selectionObj.focusNode,
+            selectionObj.focusOffset,
+        );
         if (!anchorPath || !focusPath) {
-            return selection
+            return selection;
         }
-        const anchorOffset = adjustOffset(selectionObj.anchorNode, selectionObj.anchorOffset);
-        const focusOffset = adjustOffset(selectionObj.focusNode, selectionObj.focusOffset);
+        const anchorOffset = adjustOffset(
+            selectionObj.anchorNode,
+            selectionObj.anchorOffset,
+        );
+        const focusOffset = adjustOffset(
+            selectionObj.focusNode,
+            selectionObj.focusOffset,
+        );
         return {
-            "selectionExists": true,
-            "anchorOffset": anchorOffset,
-            "focusOffset": focusOffset,
-            "anchorNode": anchorPath,
-            "focusNode": focusPath,
-        }
+            selectionExists: true,
+            anchorOffset: anchorOffset,
+            focusOffset: focusOffset,
+            anchorNode: anchorPath,
+            focusNode: focusPath,
+        };
     }
 
     selectionChange(e) {
         let selection = this.getSelectionObject(e);
-        let event = new CustomEvent("editorselectionchange", {detail: selection});
+        let event = new CustomEvent("editorselectionchange", {
+            detail: selection,
+        });
         this.parentNode.dispatchEvent(event);
-    };
+    }
 }
 
 /**
@@ -230,7 +253,6 @@ class SelectionState extends HTMLElement {
  * by Elm event listeners.
  */
 class ElmEditor extends HTMLElement {
-
     compositionStart() {
         this.composing = true;
 
@@ -241,17 +263,19 @@ class ElmEditor extends HTMLElement {
                 clearTimeout(this.lastCompositionTimeout);
             }
             const lastCompositionTimeout = setTimeout(() => {
-                if (this.composing && lastCompositionTimeout === this.lastCompositionTimeout) {
+                if (
+                    this.composing &&
+                    lastCompositionTimeout === this.lastCompositionTimeout
+                ) {
                     this.composing = false;
                     const newEvent = new CustomEvent("editorcompositionend", {
-                        detail: {}
+                        detail: {},
                     });
                     this.dispatchEvent(newEvent);
                 }
             }, 5000);
-            this.lastCompositionTimeout = lastCompositionTimeout
+            this.lastCompositionTimeout = lastCompositionTimeout;
         }
-
     }
 
     compositionEnd() {
@@ -261,24 +285,26 @@ class ElmEditor extends HTMLElement {
         setTimeout(() => {
             if (!this.composing) {
                 const newEvent = new CustomEvent("editorcompositionend", {
-                    detail: {}
+                    detail: {},
                 });
                 this.dispatchEvent(newEvent);
             }
-        },  0)
-
+        }, 0);
     }
 
     constructor() {
         super();
-        this.mutationObserverCallback = this.mutationObserverCallback.bind(this);
+        this.mutationObserverCallback =
+            this.mutationObserverCallback.bind(this);
         this.pasteCallback = this.pasteCallback.bind(this);
         this._observer = new MutationObserver(this.mutationObserverCallback);
         this.addEventListener("paste", this.pasteCallback);
-        this.addEventListener("compositionstart", this.compositionStart.bind(this));
+        this.addEventListener(
+            "compositionstart",
+            this.compositionStart.bind(this),
+        );
         this.addEventListener("compositionend", this.compositionEnd.bind(this));
-        this.dispatchInit = this.dispatchInit.bind(this)
-
+        this.dispatchInit = this.dispatchInit.bind(this);
     }
 
     connectedCallback() {
@@ -288,9 +314,9 @@ class ElmEditor extends HTMLElement {
             attributes: false,
             childList: true,
             subtree: true,
-            characterData: true
+            characterData: true,
         });
-        this.initInterval = setInterval(this.dispatchInit, 1000)
+        this.initInterval = setInterval(this.dispatchInit, 1000);
     }
 
     disconnectedCallback() {
@@ -301,15 +327,15 @@ class ElmEditor extends HTMLElement {
         e.preventDefault();
 
         const clipboardData = e.clipboardData || window.clipboardData;
-        const text = clipboardData.getData('text') || "";
-        const html = clipboardData.getData('text/html') || "";
+        const text = clipboardData.getData("text") || "";
+        const html = clipboardData.getData("text/html") || "";
         const newEvent = new CustomEvent("pastewithdata", {
             detail: {
                 text: text,
-                html: html
-            }
+                html: html,
+            },
         });
-        this.dispatchEvent(newEvent)
+        this.dispatchEvent(newEvent);
     }
 
     /**
@@ -328,7 +354,7 @@ class ElmEditor extends HTMLElement {
             }
             mutations.push({
                 path: getSelectionPath(mutation.target, this, 0),
-                text: mutation.target.nodeValue
+                text: mutation.target.nodeValue,
             });
         }
         return mutations;
@@ -338,18 +364,19 @@ class ElmEditor extends HTMLElement {
         const element = this.querySelector('[data-rte-main="true"]');
         const selection = this.childNodes[1].getSelectionObject();
 
-        const characterDataMutations = this.characterDataMutations(mutationsList);
+        const characterDataMutations =
+            this.characterDataMutations(mutationsList);
         const event = new CustomEvent("editorchange", {
             detail: {
                 root: element,
                 selection: selection,
                 isComposing: this.composing,
                 characterDataMutations: characterDataMutations,
-                timestamp: (new Date()).getTime()
-            }
+                timestamp: new Date().getTime(),
+            },
         });
         this.dispatchEvent(event);
-    };
+    }
 
     dispatchInit() {
         if (!this.isConnected) {
@@ -358,13 +385,13 @@ class ElmEditor extends HTMLElement {
         const isMacLike = /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform);
         const event = new CustomEvent("editorinit", {
             detail: {
-                shortKey: isMacLike ? "Meta" : "Control"
-            }
+                shortKey: isMacLike ? "Meta" : "Control",
+            },
         });
         this.dispatchEvent(event);
-        clearInterval(this.initInterval)
+        clearInterval(this.initInterval);
     }
 }
 
-customElements.define('elm-editor', ElmEditor);
-customElements.define('selection-state', SelectionState);
+customElements.define("elm-editor", ElmEditor);
+customElements.define("selection-state", SelectionState);
