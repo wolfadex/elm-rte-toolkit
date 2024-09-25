@@ -1,3 +1,3 @@
 #!/bin/bash -e
 
-cp -r ./public/* ../public
+cp -r ./public/* ../docs
