@@ -11,7 +11,8 @@
     },
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
-        "dev": "elm-watch hot"
+        "dev": "elm-watch hot",
+        "build": "elm-watch make --optimize && ./build.sh"
     },
     "author": "",
     "license": "ISC",
