@@ -16,29 +16,23 @@ This package was heavily inspired by other rich text editor frameworks like Pros
 
 This package requires some webcomponents to get started.
 
-If you can support ES6, you can include [js/elmEditor.js](js/elmEditor.js) in your project and import it
-along with your favorite webcomponent polyfill.
+If you can support ES6, you can include [js/elmEditor.js](js/elmEditor.js) in your project and import it.
 
 ```js
-import "@webcomponents/webcomponentsjs/webcomponents-bundle.js";
 import "elmEditor.js";
 ```
 
 The demo in this repository does it that way.
 
-However, if you want to use a bundler and polyfill, you can import your favorite polyfill and
-import the npm package that has this repository's js compiled to es5 with npm, e.g:
+However, if you want to use a bundler you can import the npm package that has this repository's js compiled to es5 with npm, e.g:
 
 ```bash
-npm install --save @webcomponents/webcomponentsjs
 npm install --save elm-rte-toolkit
 ```
 
 And in your javascript, you can import it like so:
 
 ```js
-import "@webcomponents/webcomponentsjs/webcomponents-bundle.js";
-import "@webcomponents/webcomponentsjs/custom-elements-es5-adapter.js";
 import "elm-rte-toolkit";
 ```
 
@@ -71,33 +65,35 @@ Contributions in the form of bug reports, pull requests, or thoughtful discussio
 
 ### Running the demo
 
-The demo was bootstrapped with [create-elm-app](https://github.com/halfzebra/create-elm-app). See that repository for instructions of how to install the `elm-app` command.
-
 To debug the demo locally, run the following from the repository's root directory:
 
 ```bash
 cd demo
-elm-app start
+npm run dev
 ```
 
 To build the demo, run the following from the repository's root directory:
 
 ```bash
 cd demo
-./build.sh
+npm run build
 ```
 
-The demo is hosted with gh-pages, so to update the demo, please update the gh-pages branch with the latest
-build.
+The demo is hosted with GitHub Pages. To update the demo
+
+1. checkout the gh-pages branch
+1. create a new branch, e.g. `git switch -c wolfadex/demo-version-2-0-1`
+1. update with the latest changes from the `main` branch
+1. switch to the [demo](demo) directory
+1. run `npm run build`
+1. PR the changes to the `gh-pages` branch
 
 ### Running tests
 
-For now, because of mysterious package issues with elm-test I don't want to debug,
-tests for the package are in the demo app folder. To run tests:
+*WARNING* Tests are temporarily disabled and need updating
 
 ```bash
-cd demo
-elm-test
+npm run test
 ```
 
 # Notes
