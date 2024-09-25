@@ -17,7 +17,7 @@
             "jfmengels/elm-review-simplify": "2.1.5",
             "jfmengels/elm-review-unused": "1.2.3",
             "jsuder-xx/elm-review-reducible-lambdas": "2.0.1",
-            "lue-bird/elm-review-import-simple": "1.0.2",
+            "lue-bird/elm-review-import-simple": "1.0.3",
             "stil4m/elm-syntax": "7.3.6"
         },
         "indirect": {
