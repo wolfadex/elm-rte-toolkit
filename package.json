@@ -4,7 +4,6 @@
     "description": "Elm toolkit for rich text editors",
     "main": "elm-rte-toolkit.js",
     "scripts": {
-        "build": "babel js -d js-dist",
         "test": "echo \"Error: no test specified\" && exit 1",
         "review": "elm-review --watch --fix"
     },
@@ -12,15 +11,20 @@
         "type": "git",
         "url": "git+https://github.com/wolfadex/elm-rte-toolkit.git"
     },
-    "author": "Michael Weiss",
+    "authors": [
+        {
+            "name": "Michael Weiss"
+        },
+        {
+            "name": "Wolfgang Schuster"
+        }
+    ],
     "license": "BSD-3-Clause",
     "bugs": {
         "url": "https://github.com/wolfadex/elm-rte-toolkit/issues"
     },
     "homepage": "https://github.com/wolfadex/elm-rte-toolkit#readme",
     "devDependencies": {
-        "babel-cli": "^6.26.0",
-        "babel-preset-env": "^1.7.0",
         "elm-review": "^2.12.0"
     },
     "volta": {
