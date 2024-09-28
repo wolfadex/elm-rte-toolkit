@@ -40,22 +40,9 @@ jobs:
             # important to skip this step if cache was restored.
             - name: npm ci
               if: steps.cache-node_modules.outputs.cache-hit != 'true'
-              env:
-                  # If you have a `"postinstall": "elm-tooling install"` script in your
-                  # package.json, this turns it into a no-op. We’ll run it in the next
-                  # step because of the caching. If elm-tooling.json changes but
-                  # package-lock.json does not, the postinstall script needs running
-                  # but this step won’t.
-                  NO_ELM_TOOLING_INSTALL: 1
               run: npm ci
-            # - name: elm-tooling install
-            #   run: npx --no-install elm-tooling install
             - name: Tests
               run: npm test
-            # - name: elm-review
-            #   run: npx elm-review
-            # - name: elm-format
-            #   run: npx --no-install elm-format . --validate
             - name: Build elm docs
               run: npx --no-install elm make --docs docs.json
               # - name: Elm Publish
