@@ -1,7 +1,7 @@
 {
     "type": "package",
     "name": "wolfadex/elm-rte-toolkit",
-    "summary": "Build rich text editors in Elm",
+    "summary": "Build rich text editors in Elm (fork of mweiss/elm-rte-toolkit)",
     "license": "BSD-3-Clause",
     "version": "1.0.0",
     "exposed-modules": [
