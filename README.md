@@ -1,3 +1,8 @@
+A fork of [mweiss/elm-rte-toolkit](https://package.elm-lang.org/packages/mweiss/elm-rte-toolkit/1.0.4/) with:
+
+-   bug fix PRs from original repo merged
+-   the toolkit expanded with more common helpers & examples
+
 # Rich Text Editor Toolkit
 
 Create rich text editors in Elm.
@@ -107,12 +112,3 @@ and
 ```sh
 npm run dev:review
 ```
-
-# Notes
-
-This was forked from https://github.com/mweiss/elm-rte-toolkit.
-
-### Goals
-
--   merge known bug fixes
--   expand the toolkit with more common helpers & examples
