@@ -90,10 +90,22 @@ The demo is hosted with GitHub Pages. To update the demo
 
 ### Running tests
 
-*WARNING* Tests are temporarily disabled and need updating
+Before a release make sure to run
 
 ```sh
 npm run test
+```
+
+During development you can use both
+
+```sh
+npm run dev:test
+```
+
+and
+
+```sh
+npm run dev:review
 ```
 
 # Notes
@@ -103,4 +115,4 @@ This was forked from https://github.com/mweiss/elm-rte-toolkit.
 ### Goals
 
 -   merge known bug fixes
--   expand the toolkit with more common helpers
+-   expand the toolkit with more common helpers & examples
