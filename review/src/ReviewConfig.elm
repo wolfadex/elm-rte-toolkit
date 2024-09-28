@@ -18,15 +18,14 @@ import Docs.UpToDateReadmeLinks
 import NoConfusingPrefixOperator
 import NoDebug.Log
 import NoDebug.TodoOrToString
-import NoExposingEverything
-import NoRedundantlyQualifiedType
 import NoEtaReducibleLambdas
+import NoExposingEverything
 import NoImportingEverything
 import NoMissingTypeAnnotation
 import NoMissingTypeAnnotationInLetIn
 import NoMissingTypeExpose
-import Review.ImportSimple
 import NoPrematureLetComputation
+import NoRedundantlyQualifiedType
 import NoSimpleLetBody
 import NoUnused.CustomTypeConstructorArgs
 import NoUnused.CustomTypeConstructors
@@ -35,6 +34,7 @@ import NoUnused.Exports
 import NoUnused.Parameters
 import NoUnused.Patterns
 import NoUnused.Variables
+import Review.ImportSimple
 import Review.Rule as Rule exposing (Rule)
 import Simplify
 
@@ -71,6 +71,7 @@ config =
         }
     , NoRedundantlyQualifiedType.rule
     , Review.ImportSimple.rule
+
     -- TODO: These would be nice to have, but not necessary yet
     -- , Docs.ReviewLinksAndSections.rule
     -- , Docs.UpToDateReadmeLinks.rule
