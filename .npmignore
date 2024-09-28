@@ -4,3 +4,5 @@ src
 elm.json
 elm-stuff
 node_modules
+tests
+.github
