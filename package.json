@@ -4,7 +4,7 @@
     "description": "Elm toolkit for rich text editors",
     "main": "js/elm-rte-toolkit.js",
     "scripts": {
-        "test": "elm-format --validate && elm-review && elm-test",
+        "test": "elm-format . --validate && elm-review && elm-test",
         "dev:test": "elm-test --watch",
         "dev:review": "elm-review --watch --fix"
     },
@@ -26,6 +26,7 @@
     },
     "homepage": "https://github.com/wolfadex/elm-rte-toolkit#readme",
     "devDependencies": {
+        "elm": "^0.19.1-6",
         "elm-format": "^0.8.7",
         "elm-review": "^2.12.0",
         "elm-test": "^0.19.1-revision12"
