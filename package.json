@@ -1,8 +1,8 @@
 {
     "name": "@wolfadex/elm-rte-toolkit",
-    "version": "1.0.0",
+    "version": "1.0.0-beta.0",
     "description": "Elm toolkit for rich text editors",
-    "main": "elm-rte-toolkit.js",
+    "main": "js/elm-rte-toolkit.js",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
         "review": "elm-review --watch --fix"
