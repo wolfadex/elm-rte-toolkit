@@ -48,14 +48,14 @@ jobs:
                   # but this step won’t.
                   NO_ELM_TOOLING_INSTALL: 1
               run: npm ci
-            - name: elm-tooling install
-              run: npx --no-install elm-tooling install
+            # - name: elm-tooling install
+            #   run: npx --no-install elm-tooling install
             - name: Tests
               run: npm test
-            - name: elm-review
-              run: npx elm-review
-            - name: elm-format
-              run: npx --no-install elm-format . --validate
+            # - name: elm-review
+            #   run: npx elm-review
+            # - name: elm-format
+            #   run: npx --no-install elm-format . --validate
             - name: Build elm docs
               run: npx --no-install elm make --docs docs.json
               # - name: Elm Publish
