@@ -53,6 +53,7 @@ config =
     , NoExposingEverything.rule
     , NoImportingEverything.rule []
     , NoMissingTypeAnnotation.rule
+        |> Rule.ignoreErrorsForDirectories [ "tests/" ]
     , NoMissingTypeExpose.rule
     , NoSimpleLetBody.rule
     , NoPrematureLetComputation.rule

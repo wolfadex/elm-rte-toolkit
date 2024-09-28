@@ -42,5 +42,7 @@
         "folkertdev/elm-deque": "3.0.1 <= v < 4.0.0",
         "hecrj/html-parser": "2.3.4 <= v < 3.0.0"
     },
-    "test-dependencies": {}
+    "test-dependencies": {
+        "elm-explorations/test": "2.2.0 <= v < 3.0.0"
+    }
 }

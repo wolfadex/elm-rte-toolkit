@@ -4,8 +4,8 @@
     "description": "Elm toolkit for rich text editors",
     "main": "js/elm-rte-toolkit.js",
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1",
-        "review": "elm-review --watch --fix"
+        "dev:test": "elm-test --watch",
+        "dev:review": "elm-review --watch --fix"
     },
     "repository": {
         "type": "git",
@@ -25,7 +25,8 @@
     },
     "homepage": "https://github.com/wolfadex/elm-rte-toolkit#readme",
     "devDependencies": {
-        "elm-review": "^2.12.0"
+        "elm-review": "^2.12.0",
+        "elm-test": "^0.19.1-revision12"
     },
     "volta": {
         "node": "20.17.0"

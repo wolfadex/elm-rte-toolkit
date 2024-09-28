@@ -1,6 +1,8 @@
 module RichText.Internal.DomNode exposing
     ( DomNode(..)
     , decodeDomNode
+    , domElementNodeType
+    , domTextNodeType
     , extractRootEditorBlockNode
     , findTextChanges
     )
