@@ -8,7 +8,7 @@ This package was heavily inspired by other rich text editor frameworks like Pros
 
 ## Resources
 
--   Elm Package: https://package.elm-lang.org/packages/mweiss/elm-rte-toolkit/latest/
+-   Elm Package: https://package.elm-lang.org/packages/wolfadex/elm-rte-toolkit/latest/
 -   Demo page: https://wolfadex.github.io/elm-rte-toolkit (source code is in the [demo](demo) directory)
 -   Wiki: https://github.com/wolfadex/elm-rte-toolkit/wiki
 
