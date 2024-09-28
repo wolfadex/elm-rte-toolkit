@@ -26,8 +26,8 @@ The demo in this repository does it that way.
 
 However, if you want to use a bundler you can import the npm package that has this repository's js compiled to es5 with npm, e.g:
 
-```bash
-npm install --save elm-rte-toolkit
+```sh
+npm install --save @wolfadex/elm-rte-toolkit
 ```
 
 And in your javascript, you can import it like so:
@@ -67,14 +67,14 @@ Contributions in the form of bug reports, pull requests, or thoughtful discussio
 
 To debug the demo locally, run the following from the repository's root directory:
 
-```bash
+```sh
 cd demo
 npm run dev
 ```
 
 To build the demo, run the following from the repository's root directory:
 
-```bash
+```sh
 cd demo
 npm run build
 ```
@@ -82,7 +82,7 @@ npm run build
 The demo is hosted with GitHub Pages. To update the demo
 
 1. checkout the gh-pages branch
-1. create a new branch, e.g. `git switch -c wolfadex/demo-version-2-0-1`
+1. create a new branch, e.g. `git switch -c demo-version-2-0-1`
 1. update with the latest changes from the `main` branch
 1. switch to the [demo](demo) directory
 1. run `npm run build`
@@ -92,7 +92,7 @@ The demo is hosted with GitHub Pages. To update the demo
 
 *WARNING* Tests are temporarily disabled and need updating
 
-```bash
+```sh
 npm run test
 ```
 
